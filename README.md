@@ -8,7 +8,7 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 | --- | --- | --- |
 | Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** |
 | North Star, embudo por canal (registros, compras, CPA, ROI) y usabilidad de **Maru Coach** | **PostHog**, organización "Growth Labs 2" (marucoach.com) | **Real.** Canal según la UTM de la primera visita; registro = primer login; ingresos = `monto` de `compra_confirmada`. |
-| North Star y usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, pero medido con clics automáticos (botones "Amoblar", "Subir mi foto") hasta que la app mande eventos propios. |
+| North Star y usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, pero medido con clics automáticos (botones "Crear diseños gratis" / "Generar mi diseño" y "Subir mi foto"; ojo que "Amoblar" es solo la pestaña del modo) hasta que la app mande eventos propios. |
 | Embudo outbound de Amobla IA y todo **Turnia** | CRM o planilla de prospección; Turnia no tiene PostHog | Ejemplo. |
 
 Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. Lo real se guarda como foto en `data.js` y las funciones `/api/meta` y `/api/posthog` lo actualizan en vivo cuando tienen sus claves (abajo).

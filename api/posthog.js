@@ -11,6 +11,10 @@
 const HOST = process.env.POSTHOG_HOST || 'https://us.posthog.com';
 const DAY = "toDate(toTimeZone(timestamp, 'America/Argentina/Buenos_Aires'))";
 const FROM_META = "lower(properties.utm_source) IN ('meta', 'ig', 'facebook', 'fb', 'instagram')";
+// Amobla IA: clic en el botón que genera el diseño ("Crear N diseños gratis",
+// "Generar mi diseño"). Ojo: "Amoblar" es solo la pestaña del modo.
+const GENERATE_CLICK = "event = '$autocapture' AND (properties.$el_text ILIKE 'Crear % gratis'"
+  + " OR properties.$el_text IN ('Generar mi diseño', 'Generar otra variante'))";
 
 const PROJECTS = {
   // Maru Coach · organización "Growth Labs 2"
@@ -63,7 +67,7 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview' AND ${FROM_META}) AS visitantesMeta,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
-          uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Amoblar') AS amoblaron,
+          uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios
         FROM events WHERE timestamp >= now() - INTERVAL 60 DAY
         GROUP BY date ORDER BY date`,
@@ -71,15 +75,14 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview' AND ${FROM_META}) AS visitantesMeta,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
-          uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Amoblar') AS amoblaron,
+          uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Rediseñar (plan pago)') AS quisieronPagar,
           countIf(event = '$rageclick') AS rageclicks
         FROM events WHERE timestamp >= now() - INTERVAL 60 DAY`,
       nsm: `SELECT uniqIf(person_id, timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
           uniqIf(person_id, timestamp < now() - INTERVAL 7 DAY) AS previos7
-        FROM events WHERE event = '$autocapture' AND properties.$el_text = 'Amoblar'
-          AND timestamp >= now() - INTERVAL 14 DAY`,
+        FROM events WHERE ${GENERATE_CLICK} AND timestamp >= now() - INTERVAL 14 DAY`,
       paginas: `SELECT properties.$pathname AS pagina, uniq(person_id) AS visitantes, count() AS vistas
         FROM events WHERE event = '$pageview' AND timestamp >= now() - INTERVAL 30 DAY
         GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,
