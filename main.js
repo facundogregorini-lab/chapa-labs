@@ -286,6 +286,12 @@
         { k: 'ROI', v: fmt(f.roi, 'pct') },
       ];
     }
+    if (p.acquisition.type === 'prospects') {
+      const { totals } = prospectFigures(p);
+      const out = p.acquisition.stages.map((s) => ({ k: s.label, v: fmt(totals[s.key], 'int') }));
+      if (p.ads) out.push({ k: 'Inversión Meta', v: fmt(adsTotals(adsRows(p.ads)).spend, 'money', p.ads.currency) });
+      return out;
+    }
     if (p.ads) {
       const t = adsTotals(adsRows(p.ads));
       return [
@@ -385,7 +391,9 @@
       const f = nsmFigures(p);
       const { ns, prev, value, progress } = f;
       const rev = p.revenue ? revenueSummary(p) : null;
-      const acqSource = p.acquisition.type === 'funnel' ? 'Meta Ads + PostHog' : p.ads ? p.ads.source : p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound';
+      const acqSource = p.acquisition.type === 'funnel' ? 'Meta Ads + PostHog'
+        : p.acquisition.type === 'prospects' ? `Outbound (planilla)${p.ads ? ` + ${p.ads.source}` : ''}`
+          : p.ads ? p.ads.source : p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound';
       return `<tr>
         <td><span class="proj-name" style="font-size:13px"><span class="dot" style="background:${ACCENTS[i]}"></span><a href="#${esc(p.id)}">${esc(p.name)}</a></span></td>
         <td style="text-align:left;white-space:normal;min-width:180px">${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</td>
@@ -620,6 +628,240 @@
       </div>` : ''}`;
   }
 
+  // ─── Prospección outbound (planilla) ──────────────────────
+  // Filas de data.js ([prioridad, nombre, sdr, estado, fecha, canal, score]) o
+  // de /api/prospectos (objetos con esas claves).
+  const prospectRows = (a) => a.rows.map((r) => (Array.isArray(r)
+    ? { p: r[0], n: r[1], sdr: r[2], estado: r[3], fecha: r[4], canal: r[5], score: r[6] }
+    : r));
+  const plain = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  // Etapa a la que llegó cada fila (0 prospectado … 3 suscriptor), según la
+  // columna Estado. Sin estado de avance, la fecha de envío la cuenta como contactada.
+  function stageOf(r) {
+    const e = plain(r.estado);
+    if (/no interes|descart|rechaz|perdid/.test(e)) return 1;
+    if (/suscri|client|pago|pagó|compr|cerrad|ganad/.test(e)) return 3;
+    if (/interes|demo|prueba|reunion|propuesta/.test(e)) return 2;
+    if (r.fecha || /envia|contact|respond|incorrect|seguim/.test(e)) return 1;
+    return 0;
+  }
+
+  function prospectFigures(p) {
+    const a = p.acquisition;
+    const rows = prospectRows(a).map((r) => ({ ...r, stage: stageOf(r) }));
+    const count = (list) => Object.fromEntries(a.stages.map((s, i) => [s.key, list.filter((r) => r.stage >= i).length]));
+    const totals = count(rows);
+    const group = (key, order) => {
+      const names = [...new Set(rows.map((r) => r[key] || 'Sin asignar'))]
+        .sort((x, y) => (order ? order.indexOf(x) - order.indexOf(y) : x.localeCompare(y)));
+      return names.map((name) => ({ nombre: name, ...count(rows.filter((r) => (r[key] || 'Sin asignar') === name)) }));
+    };
+    const days = [...new Set(rows.map((r) => r.fecha).filter(Boolean))].sort();
+    return {
+      rows, totals,
+      bySdr: group('sdr'),
+      byChannel: group('canal').filter((g) => g.nombre !== 'Sin asignar'),
+      byDay: days.map((d) => ({ label: dayLabel(d), tip: dayTip(d), value: rows.filter((r) => r.fecha === d).length })),
+    };
+  }
+
+  // ─── Ventas proyectadas ───────────────────────────────────
+  // Cada conversión es la real de la planilla o una estimada; se elige en el
+  // tablero y se recuerda en este navegador.
+  const projStore = (p) => `chapa-proyeccion-${p.id}`;
+  function projSettings(p) {
+    const def = p.acquisition.projection;
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(projStore(p)) || '{}'); } catch (e) { /* sin storage */ }
+    return {
+      ticket: Number.isFinite(saved.ticket) ? saved.ticket : def.ticket,
+      scenario: Number.isFinite(saved.scenario) ? saved.scenario : null,
+      rates: def.rates.map((r, i) => ({ ...r, ...((saved.rates || [])[i] || {}) })),
+    };
+  }
+  function saveProjSettings(p, s) {
+    try { localStorage.setItem(projStore(p), JSON.stringify(s)); } catch (e) { /* sin storage */ }
+  }
+
+  function projection(p, f, s) {
+    const st = p.acquisition.stages;
+    const rates = s.rates.map((r, i) => {
+      const from = f.totals[st[i].key];
+      const to = f.totals[st[i + 1].key];
+      const real = ratio(to, from);
+      // Sin datos en la etapa de origen no hay conversión real: se usa la estimada.
+      const useReal = r.mode === 'real' && from > 0;
+      return { from: st[i], to: st[i + 1], fromN: from, toN: to, real, mode: r.mode, estimate: r.estimate, value: useReal ? real : r.estimate, fallback: r.mode === 'real' && !useReal };
+    });
+    // Escenarios a partir de una cantidad de contactados (o de prospectados).
+    const fromContacted = (contacted) => {
+      const interested = contacted * rates[1].value;
+      const subs = interested * rates[2].value;
+      return { contacted, interested, subs, sales: subs * s.ticket };
+    };
+    const base = f.totals[st[0].key];
+    const contacted = f.totals[st[1].key];
+    const scenario = s.scenario ?? Math.max(contacted * 5, 100);
+    return {
+      rates,
+      perContact: rates[1].value * rates[2].value * s.ticket,
+      rows: [
+        { escenario: 'Con los contactados actuales', prospects: null, ...fromContacted(contacted) },
+        { escenario: `Si se contacta toda la base (${fmt(base, 'int')})`, prospects: base, ...fromContacted(base * rates[0].value) },
+        { escenario: 'Escenario propio', custom: true, prospects: null, ...fromContacted(scenario) },
+      ],
+      scenario,
+    };
+  }
+
+  function projectionResults(p, f, s) {
+    const cur = p.acquisition.projection.currency;
+    const pr = projection(p, f, s);
+    const rateText = (r) => `${fmt(r.value, 'pct')}${r.mode === 'real' && !r.fallback ? ' real' : ' estimada'}`;
+    const rows = pr.rows.map((r) => `<tr>
+        <td style="white-space:normal">${esc(r.escenario)}</td>
+        <td>${fmt(r.contacted, 'int')}</td>
+        <td>${fmt(r.interested, 'dec')}</td>
+        <td>${fmt(r.subs, 'dec')}</td>
+        <td><strong>${fmt(r.sales, 'money', cur)}</strong></td>
+      </tr>`).join('');
+    return `
+      <div class="tiles">
+        ${tile({ label: 'Ventas proyectadas', hint: 'Con los contactados actuales, por mes', value: pr.rows[0].sales, format: 'money', currency: cur })}
+        ${tile({ label: 'Suscriptores proyectados', hint: 'Con los contactados actuales', value: pr.rows[0].subs, format: 'dec' })}
+        ${tile({ label: 'Valor por contactado', hint: 'Ventas esperadas por cada contacto', value: pr.perContact, format: 'money', currency: cur })}
+        ${tile({ label: 'Si se contacta toda la base', hint: 'Ventas proyectadas por mes', value: pr.rows[1].sales, format: 'money', currency: cur })}
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Proyección por escenario</h3>
+        <p class="sub">${pr.rates.map((r) => `${esc(r.from.label)} → ${esc(r.to.label)}: ${rateText(r)}`).join(' · ')} · ticket ${fmt(s.ticket, 'money', cur)}</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Escenario</th><th>Contactados</th><th>Interesados</th><th>Suscriptores</th><th>Ventas por mes</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+        <p class="note">Ventas = suscriptores × ticket medio. Con las conversiones en "Real", el número sale de la planilla; si una etapa todavía no tiene datos, se usa la estimada.</p>
+      </div>`;
+  }
+
+  function renderProjection(p, f) {
+    const a = p.acquisition;
+    const cur = a.projection.currency;
+    const s = projSettings(p);
+    const pr = projection(p, f, s);
+    const rateCtrl = pr.rates.map((r, i) => `
+      <div class="ctrl">
+        <span class="ctrl-label">${esc(r.from.label)} → ${esc(r.to.label)}</span>
+        <select data-proj="mode" data-i="${i}" aria-label="Conversión ${esc(r.from.label)} a ${esc(r.to.label)}">
+          <option value="real"${r.mode === 'real' ? ' selected' : ''}>Real</option>
+          <option value="estimate"${r.mode === 'estimate' ? ' selected' : ''}>Estimada</option>
+        </select>
+        <label class="pct-input${r.mode === 'real' && !r.fallback ? ' is-off' : ''}">
+          <input type="number" inputmode="decimal" min="0" max="100" step="0.5" value="${Math.round(r.estimate * 1000) / 10}" data-proj="estimate" data-i="${i}" aria-label="Conversión estimada en %">
+          <span>%</span>
+        </label>
+        <span class="ctrl-real">Real: ${r.fromN ? `${fmt(r.real, 'pct')} (${fmt(r.toN, 'int')} de ${fmt(r.fromN, 'int')})` : 'sin datos'}${r.fallback ? ' · se usa la estimada' : ''}${i === 0 && r.fromN > r.toN ? ` · falta escribirles a ${fmt(r.fromN - r.toN, 'int')}` : ''}</span>
+      </div>`).join('');
+    return `
+      <div class="card proj-controls">
+        <h3>Variables</h3>
+        <p class="sub">Elegí si cada conversión es la real o una estimada y completá el ticket medio. Se recuerda en este navegador.</p>
+        ${rateCtrl}
+        <div class="ctrl">
+          <span class="ctrl-label">Ticket medio por mes</span>
+          <label class="num-input"><span>${esc(SYMBOL[cur] || cur)}</span><input type="number" inputmode="numeric" min="0" step="100" value="${s.ticket}" data-proj="ticket" aria-label="Ticket medio"></label>
+          <span class="ctrl-real">${esc(a.projection.ticketNote || '')}</span>
+        </div>
+        <div class="ctrl">
+          <span class="ctrl-label">Contactados del escenario propio</span>
+          <label class="num-input"><input type="number" inputmode="numeric" min="0" step="10" value="${pr.scenario}" data-proj="scenario" aria-label="Contactados del escenario propio"></label>
+          <span class="ctrl-real"></span>
+        </div>
+        <button type="button" class="link-btn" data-proj="reset">Volver a los valores iniciales</button>
+      </div>
+      <div id="proj-out" style="margin-top:12px">${projectionResults(p, f, s)}</div>`;
+  }
+
+  // Cambios en las variables: recalcula solo los resultados (sin perder el foco).
+  function onProjectionInput(e) {
+    const el = e.target.closest('[data-proj]');
+    const p = PROJECTS.find((x) => x.id === state.view);
+    if (!el || !p || p.acquisition.type !== 'prospects') return;
+    const s = projSettings(p);
+    const k = el.dataset.proj;
+    const i = Number(el.dataset.i);
+    const n = Number(el.value);
+    if ((e.type === 'click') !== (k === 'reset')) return;
+    if (k === 'reset') {
+      try { localStorage.removeItem(projStore(p)); } catch (err) { /* sin storage */ }
+      render();
+      return;
+    }
+    if (k === 'mode') s.rates[i].mode = el.value;
+    else if (k === 'estimate' && el.value !== '' && Number.isFinite(n)) s.rates[i].estimate = Math.min(100, Math.max(0, n)) / 100;
+    else if (k === 'ticket' && el.value !== '' && Number.isFinite(n)) s.ticket = Math.max(0, n);
+    else if (k === 'scenario' && el.value !== '' && Number.isFinite(n)) s.scenario = Math.max(0, Math.round(n));
+    else return;
+    saveProjSettings(p, { ticket: s.ticket, scenario: s.scenario, rates: s.rates.map((r) => ({ mode: r.mode, estimate: r.estimate })) });
+    const f = prospectFigures(p);
+    if (k === 'mode') {
+      // El campo de % se atenúa cuando la conversión real está en uso.
+      const r = projection(p, f, s).rates[i];
+      const box = el.parentElement.querySelector('.pct-input');
+      if (box) box.classList.toggle('is-off', r.mode === 'real' && !r.fallback);
+    }
+    const out = $('#proj-out');
+    if (out) out.innerHTML = projectionResults(p, f, s);
+  }
+
+  function renderProspects(p, color) {
+    const a = p.acquisition;
+    const f = prospectFigures(p);
+    const st = a.stages;
+    const t = f.totals;
+    const last = st[st.length - 1].key;
+    const tiles = st.map((s) => tile({ label: s.label, hint: s.hint, value: t[s.key], format: 'int' }));
+    tiles.push(tile({ label: 'Pendientes de contactar', hint: 'Prospectados sin mensaje enviado', value: t[st[0].key] - t[st[1].key], format: 'int' }));
+    tiles.push(tile({ label: 'Tasa de contacto', hint: `${st[1].label} / ${st[0].label.toLowerCase()}`, value: ratio(t[st[1].key], t[st[0].key]), format: 'pct' }));
+    tiles.push(tile({ label: 'Tasa de interés', hint: `${st[2].label} / ${st[1].label.toLowerCase()}`, value: ratio(t[st[2].key], t[st[1].key]), format: 'pct' }));
+    tiles.push(tile({ label: 'Conversión total', hint: `${st[0].label} → ${st[st.length - 1].label}`, value: ratio(t[last], t[st[0].key]), format: 'pct' }));
+
+    const cols = [{ key: 'nombre', label: '' }, ...st.map((s) => ({ key: s.key, label: s.label, format: 'int' })), { key: 'contacto', label: 'Tasa de contacto', format: 'pct' }];
+    const withRates = (list) => list.map((r) => ({ ...r, contacto: ratio(r[st[1].key], r[st[0].key]) }));
+    const total = withRates([{ nombre: 'Total', ...t }])[0];
+
+    const stageLabel = (r) => st[r.stage].label;
+    const listCols = [
+      { key: 'p', label: '#' },
+      { key: 'n', label: 'Inmobiliaria' },
+      { key: 'sdr', label: 'SDR' },
+      { key: 'estado', label: 'Estado en la planilla' },
+      { key: 'etapa', label: 'Etapa' },
+      { key: 'fecha', label: 'Envío', format: 'day' },
+      { key: 'canal', label: 'Canal' },
+      { key: 'score', label: 'Score', format: 'int' },
+    ];
+    const list = f.rows.slice().sort((x, y) => y.stage - x.stage || (x.p || 999) - (y.p || 999))
+      .map((r) => ({ ...r, etapa: stageLabel(r), fecha: r.fecha || null, canal: r.canal || '—', sdr: r.sdr || '—' }));
+
+    return `
+      <div class="tiles">${tiles.join('')}</div>
+      <div class="grid g-2" style="margin-top:12px">
+        <div class="card"><h3>Embudo de prospección</h3><p class="sub">Toda la planilla · conversión entre etapas</p><div class="funnel">${funnelHtml(st, t, color)}</div></div>
+        <div class="card"><h3>Contactados por día</h3><p class="sub">Según la fecha de envío</p>${f.byDay.length ? chart(barChart({ points: f.byDay, format: 'int', color, height: 220 })) : '<p class="sub">Todavía no hay envíos con fecha.</p>'}</div>
+      </div>
+      <div class="grid g-2" style="margin-top:12px">
+        <div class="card"><h3>Por SDR</h3><p class="sub">Quién tiene asignada cada inmobiliaria</p>${table({ columns: [{ ...cols[0], label: 'SDR' }, ...cols.slice(1)], rows: withRates(f.bySdr), total })}</div>
+        <div class="card"><h3>Por canal</h3><p class="sub">Contactados según por dónde salió el mensaje</p>${table({ columns: [{ key: 'nombre', label: 'Canal' }, ...st.slice(1).map((s) => ({ key: s.key, label: s.label, format: 'int' }))], rows: f.byChannel })}</div>
+      </div>
+      <details class="card list-card" style="margin-top:12px">
+        <summary><h3>Listado de prospectos</h3><span class="sub">${fmt(f.rows.length, 'int')} inmobiliarias · las más avanzadas primero</span></summary>
+        ${table({ columns: listCols, rows: list })}
+      </details>
+
+      <h2 class="section">Ventas proyectadas <span>· a partir de los contactados</span></h2>
+      ${renderProjection(p, f)}`;
+  }
+
   // ─── Pauta en Meta Ads (datos reales) ─────────────────────
   function adsTotals(rows) {
     const t = sumRows(rows, ['spend', 'impressions', 'clicks', 'landing', 'results']);
@@ -788,7 +1030,12 @@
     const { ns, prev, list, value, progress } = f;
     const lastMonth = allMonths[allMonths.length - 1];
     const realUsability = !p.usability.sample && p.posthog;
-    const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound' }[p.acquisition.type];
+    const acq = p.acquisition;
+    const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound', prospects: 'Outbound' }[acq.type];
+    const acqBadge = acq.type === 'funnel' ? phBadge(p)
+      : acq.type === 'prospects' ? badge(null, `Datos reales · ${esc(acq.source)}, ${acq.live ? 'en vivo' : `actualizado el ${dayTip(acq.snapshotAt)}`}`)
+        : badge(acq);
+    const renderAcq = { funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound, prospects: renderProspects }[acq.type];
 
     main.innerHTML = `
       <div class="page-head">
@@ -817,15 +1064,32 @@
       <h2 class="section">Suscriptores e ingresos ${p.revenue.sample ? badge(p.revenue) : phBadge(p)}</h2>
       ${renderRevenue(p, color)}` : ''}
 
-      ${p.ads ? `
-      <h2 class="section">Adquisición <span>· Pauta en ${esc(p.ads.source)}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
-      ${renderAds(p, color)}` : ''}
+      <section class="pillar" aria-labelledby="producto">
+        <div class="pillar-head">
+          <h2 id="producto">Producto</h2>
+          <p>Funnels y usabilidad del producto digital: qué hace la gente una vez que llega.</p>
+        </div>
+        <h2 class="section">Funnels y usabilidad <span>· ${realUsability ? 'desde el lanzamiento' : `${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}`}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
+        ${renderUsability(p, color)}
+      </section>
 
-      <h2 class="section">Adquisición <span>· ${acqTitle}</span> ${p.acquisition.type === 'funnel' ? phBadge(p) : badge(p.acquisition)}</h2>
-      ${{ funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound }[p.acquisition.type](p, color)}
+      <section class="pillar" aria-labelledby="distribucion">
+        <div class="pillar-head">
+          <h2 id="distribucion">Distribución</h2>
+          <p>Adquisición: cómo llegan los clientes, por qué canal y a qué costo.</p>
+        </div>
+        ${acq.type === 'prospects' ? `
+        <h2 class="section">${acqTitle} <span>· prospectados → contactados → interesados → suscriptores</span> ${acqBadge}</h2>
+        ${renderAcq(p, color)}` : ''}
 
-      <h2 class="section">Usabilidad <span>· ${realUsability ? 'desde el lanzamiento' : `${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}`}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
-      ${renderUsability(p, color)}`;
+        ${p.ads ? `
+        <h2 class="section">Pauta en ${esc(p.ads.source)} ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
+        ${renderAds(p, color)}` : ''}
+
+        ${acq.type !== 'prospects' ? `
+        <h2 class="section">${acqTitle} ${acqBadge}</h2>
+        ${renderAcq(p, color)}` : ''}
+      </section>`;
   }
 
   // ─── Navegación ───────────────────────────────────────────
@@ -902,6 +1166,10 @@
     if (g) g.querySelector('.cross').setAttribute('opacity', '1');
   });
 
+  main.addEventListener('input', onProjectionInput);
+  main.addEventListener('change', onProjectionInput);
+  main.addEventListener('click', onProjectionInput);
+
   let resizeTimer;
   new ResizeObserver(() => {
     clearTimeout(resizeTimer);
@@ -973,8 +1241,28 @@
     } catch (e) { /* queda la foto de data.js */ }
   }
 
+  // Planilla de prospección en vivo (función /api/prospectos en Vercel).
+  async function loadLiveProspects() {
+    const p = PROJECTS.find((x) => x.acquisition.type === 'prospects');
+    if (location.protocol === 'file:' || !p) return;
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch('/api/prospectos', { signal: ctrl.signal });
+      if (!res.ok) return;
+      const live = await res.json();
+      if (!live.rows || !live.rows.length) return;
+      p.acquisition.rows = live.rows;
+      p.acquisition.live = true;
+      // Sin redibujar mientras se edita una variable de la proyección.
+      if (document.activeElement && document.activeElement.closest('[data-proj]')) return;
+      render();
+    } catch (e) { /* queda la foto de data.js */ }
+  }
+
   fromHash();
   render();
   loadLiveAds();
   loadLivePosthog();
+  loadLiveProspects();
 })();

@@ -138,7 +138,7 @@ h2.section span { text-transform: none; letter-spacing: 0; font-weight: 400; }
 }
 .badge.is-sample { background: color-mix(in srgb, var(--warning) 26%, transparent); color: var(--ink); }
 .badge.is-real { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good-text); }
-h2.section .badge { font-weight: 600; }
+h2.section .badge { font-weight: 600; white-space: normal; }
 .state { font-size: 12px; color: var(--muted); }
 .state.on { color: var(--good-text); }
 
@@ -240,6 +240,41 @@ td.heat { border-bottom: 2px solid var(--surface); border-left: 2px solid var(--
 .status.critical i { background: var(--critical); }
 .note { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
 
+/* ─── Producto / Distribución ─────────────────────── */
+.pillar { margin-top: 40px; padding-top: 4px; border-top: 2px solid var(--ink); }
+.pillar-head { margin: 14px 0 0; }
+.pillar-head h2 { font-size: 22px; letter-spacing: -0.3px; margin: 0; }
+.pillar-head p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
+.pillar h2.section { margin-top: 24px; }
+
+/* Listado plegable */
+.list-card summary { cursor: pointer; list-style: none; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.list-card summary::-webkit-details-marker { display: none; }
+.list-card summary::before { content: "▸"; color: var(--muted); font-size: 12px; transition: transform .15s; }
+.list-card[open] summary::before { transform: rotate(90deg); }
+.list-card summary h3 { margin: 0; }
+.list-card summary .sub { margin: 0; }
+.list-card[open] summary { margin-bottom: 12px; }
+.list-card th:nth-child(2), .list-card td:nth-child(2),
+.list-card th:nth-child(n+3):nth-child(-n+5), .list-card td:nth-child(n+3):nth-child(-n+5),
+.list-card th:nth-child(7), .list-card td:nth-child(7) { text-align: left; }
+
+/* Variables de la proyección */
+input { font: inherit; color: inherit; }
+.proj-controls { display: grid; gap: 10px; }
+.proj-controls .sub { margin-bottom: 4px; }
+.ctrl { display: grid; grid-template-columns: minmax(150px, 230px) auto auto minmax(0, 1fr); align-items: center; gap: 8px 12px; font-size: 14px; }
+.ctrl-label { color: var(--ink-2); }
+.ctrl-real { font-size: 12px; color: var(--muted); }
+.ctrl input {
+  height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface);
+  padding: 0 10px; width: 92px; font-variant-numeric: tabular-nums;
+}
+.ctrl .num-input input { width: 130px; }
+.pct-input, .num-input { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.pct-input.is-off input { opacity: .45; }
+.link-btn { justify-self: start; background: none; border: 0; padding: 0; color: var(--s1); cursor: pointer; font-size: 13px; text-decoration: underline; }
+
 /* ─── Tooltip ─────────────────────────────────────── */
 .tip {
   position: fixed; z-index: 10; pointer-events: none; min-width: 120px;
@@ -261,6 +296,9 @@ td.heat { border-bottom: 2px solid var(--surface); border-left: 2px solid var(--
   .month-pick span { display: none; }
   .hero { font-size: 34px; }
   .f-row { grid-template-columns: 96px minmax(0, 1fr) 48px; gap: 8px; }
+  .ctrl { grid-template-columns: minmax(0, 1fr) auto; }
+  .ctrl-label, .ctrl-real { grid-column: 1 / -1; }
+  .ctrl-real:empty { display: none; }
   .card { padding: 16px; }
   .table-wrap { margin: 0 -16px; padding: 0 16px; }
 }

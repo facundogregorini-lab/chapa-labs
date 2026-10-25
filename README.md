@@ -9,9 +9,10 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 | Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** |
 | North Star, embudo por canal (registros, compras, CPA, ROI) y usabilidad de **Maru Coach** | **PostHog**, organización "Growth Labs 2" (marucoach.com) | **Real.** Canal según la UTM de la primera visita; registro = primer login; ingresos = `monto` de `compra_confirmada`. |
 | North Star y usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, pero medido con clics automáticos (botones "Crear diseños gratis" / "Generar mi diseño" y "Subir mi foto"; ojo que "Amoblar" es solo la pestaña del modo) hasta que la app mande eventos propios. |
-| Embudo outbound de Amobla IA y todo **Turnia** | CRM o planilla de prospección; Turnia no tiene PostHog | Ejemplo. |
+| Embudo outbound de **Amobla IA** y ventas proyectadas | **Google Sheet** "Prospecting amobla IA" (pestaña Prospectos) | **Real.** Etapa según la columna Estado y la fecha de envío. |
+| Todo **Turnia** | Turnia no tiene PostHog; sus datos viven en su propia base | Ejemplo. |
 
-Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. Lo real se guarda como foto en `data.js` y las funciones `/api/meta` y `/api/posthog` lo actualizan en vivo cuando tienen sus claves (abajo).
+Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. Lo real se guarda como foto en `data.js` y las funciones `/api/meta`, `/api/posthog` y `/api/prospectos` lo actualizan en vivo cuando tienen sus claves (abajo).
 
 ### Conectar Meta Ads en vivo
 
@@ -24,6 +25,23 @@ Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. 
 1. En PostHog → avatar → **Settings → Personal API keys** → **Create personal API key**. Darle acceso a las organizaciones **Growth Labs 2** y **AmoblaIA** (o a todas) con el permiso **Query: Read**.
 2. En Vercel, agregar `POSTHOG_API_KEY` con esa clave y hacer **Redeploy**.
 
+### Conectar la planilla de prospección de Amobla IA en vivo
+
+1. En la planilla → **Compartir** → "Cualquier persona con el enlace" → **Lector**. Hoy está como *Editor*: con el link cualquiera puede modificarla, conviene bajarlo a Lector.
+2. En Vercel, agregar `AMOBLA_SHEET_ID` con el id de la planilla (lo que va entre `/d/` y `/edit` en el link) y, si la pestaña Prospectos no es la primera, `AMOBLA_SHEET_GID`. Va en una variable y no en el repo porque el repo es público.
+3. **Redeploy.** El dashboard lee la planilla al abrirse (5 minutos de caché). La función devuelve solo inmobiliaria, SDR, estado, fecha de envío, canal y score: nada de teléfonos, emails ni notas.
+
+Cómo se cuenta cada etapa (columna **Estado**):
+
+| Etapa | Cuenta las filas con |
+| --- | --- |
+| Prospectados | Todas las filas con nombre de inmobiliaria |
+| Contactados | Fecha de envío, o un estado como "Enviado", "Respondió", "Número incorrecto", "No interesado" |
+| Interesados | Estado con "Interesado", "Demo", "Prueba", "Reunión" o "Propuesta" |
+| Suscriptores | Estado con "Suscriptor", "Cliente", "Pagó", "Compró" o "Cerrado" |
+
+Cada etapa incluye a las siguientes (un suscriptor también cuenta como interesado y contactado). Para que el embudo avance alcanza con cambiar el Estado en la planilla. El canal sale de la columna Notas: si empieza con "Mail" es Email; si no, WhatsApp.
+
 Las consultas de cada proyecto (y el id de proyecto de PostHog) están en `api/posthog.js`. Para sumar Turnia: crear su proyecto en PostHog, agregar sus consultas ahí y en `data.js` un bloque `posthog` con la misma forma.
 
 Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match` en `data.js`) y cuenta como resultado el evento de `ads.resultAction` (por ejemplo `maru_paywall_viewed` del píxel o la conversión personalizada "Foto subida").
@@ -31,12 +49,13 @@ Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match`
 ## Qué muestra
 
 - **Resumen**: una tarjeta por proyecto con su North Star Metric, la variación contra el mes anterior, el avance contra la meta y los números clave de adquisición, más un cuadro comparativo.
-- **Una pestaña por proyecto**, con tres secciones:
-  1. **North Star Metric**: valor del mes, variación, avance a la meta y evolución mensual.
-  2. **Adquisición**, según el modelo del proyecto:
-     - **Pauta paga** (Maru Coach): inversión, registros nuevos, costo por registro (CPL), nuevos pagos, conversión a pago, costo por adquisición (CPA), ingresos atribuidos, ROI y ROAS. Por mes y por canal.
-     - **Outbound** (Amobla IA y Turnia): embudo prospectados → contactados → interesados → demo agendada → demo realizada → cliente nuevo, con la conversión entre etapas, MRR nuevo, evolución mensual y desglose por canal.
-  3. **Usabilidad**: KPIs de uso y tablas libres (uso por funcionalidad, retención por cohorte con mapa de calor, salud de cuentas, uso por rubro).
+- **Una pestaña por proyecto**: arriba la **North Star Metric** (valor, variación, avance a la meta y evolución) y los suscriptores e ingresos; abajo, dos secciones:
+  1. **Producto**: funnels y usabilidad del producto digital. KPIs de uso, recorrido dentro de la web o la app y tablas libres (secciones o páginas más usadas, uso por funcionalidad, retención por cohorte con mapa de calor).
+  2. **Distribución**: la adquisición, según el modelo del proyecto:
+     - **Outbound con planilla** (Amobla IA): embudo prospectados → contactados → interesados → suscriptores con la conversión entre etapas, contactados por día, desglose por SDR y por canal, y el listado completo de prospectos. Debajo, **ventas proyectadas**: cada conversión se elige como *real* (de la planilla) o *estimada* (un % que se completa), más el ticket medio; proyecta interesados, suscriptores y ventas por mes con los contactados actuales, con toda la base y con un escenario propio. Las variables se recuerdan en cada navegador.
+     - **Pauta en Meta Ads** (Maru Coach y Amobla IA): inversión, impresiones, clics, CTR, CPC y resultado por día y por campaña.
+     - **Embudo por canal** (Maru Coach): visitantes → registro → suscripción por canal, con CPL, CPA y ROI.
+     - **Outbound por mes** (Turnia, de ejemplo): embudo con demo agendada y realizada, MRR nuevo y desglose por canal.
 - **Selector de mes** arriba a la derecha: todo se recalcula a ese mes y la variación es contra el anterior.
 - Tema claro y oscuro (sigue al sistema; el botón ◐ lo fija). Se ve bien en celular.
 
@@ -50,7 +69,9 @@ Todo vive en `data.js`. Por cada proyecto:
 | `ads` | Pauta real de Meta Ads: prefijo de las campañas, evento que cuenta como resultado y la foto por día y campaña. |
 | `sample` | En `northStar`, `acquisition` o `usability`: marca la sección como de ejemplo. |
 | `northStar` | Nombre, definición, `target` (meta) y `series` con un valor por mes (`"AAAA-MM"`). |
-| `acquisition.type` | `"paid"` u `"outbound"`. Define qué tablas y gráficos se muestran. |
+| `acquisition.type` | `"funnel"`, `"paid"`, `"outbound"` o `"prospects"`. Define qué tablas y gráficos se muestran. |
+| `acquisition.rows` | Solo `prospects`: la foto de la planilla, una fila por inmobiliaria (`[prioridad, nombre, SDR, estado, fecha, canal, score]`). |
+| `acquisition.projection` | Solo `prospects`: moneda, ticket medio y conversiones iniciales de las ventas proyectadas (`mode`: `"real"` o `"estimate"`; `estimate`: 0,1 = 10%). |
 | `acquisition.months` | Una fila por mes. Pauta: `inversion`, `registros`, `pagos`, `ingresos` (CPL, CPA, conversión, ROI y ROAS se calculan solos). Outbound: una columna por etapa de `stages` y opcional `mrrNuevo`. |
 | `acquisition.channels` | Desglose por canal del último mes, con los mismos campos. |
 | `usability.kpis` | Tarjetas: `label`, `value`, `prev` (mes anterior), `format` y `good` (`"up"` o `"down"`: qué dirección es buena). |
@@ -67,6 +88,6 @@ Cuando una sección pase a tener datos reales, sacarle `sample: true`.
 ## Próximos pasos posibles
 
 - Leer los datos desde una Google Sheet compartida (cada proyecto en una pestaña) en lugar de editar `data.js`.
-- Conectar el CRM o la planilla de prospección de Amobla IA y Turnia para el embudo.
+- Conectar la prospección de Turnia de la misma forma que la de Amobla IA.
 - Instrumentar eventos propios en Amobla IA (foto subida, ambiente generado, compra) y PostHog en Turnia.
 - Agregar metas por mes y alertas cuando una métrica se desvía.
