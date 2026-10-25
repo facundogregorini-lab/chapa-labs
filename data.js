@@ -249,14 +249,14 @@ window.CHAPA_DATA = {
       usability: {
         funnel: {
           title: 'Recorrido en la web',
-          note: 'Personas únicas desde el lanzamiento, como % de los visitantes.',
+          note: 'Personas únicas desde el lanzamiento, como % de los visitantes. Son clics en botones: PostHog todavía no recibe el evento de foto subida.',
           query: 'totales',
           baseLabel: 'de los visitantes',
           steps: [
             { key: 'visitantes', label: 'Visitaron la web' },
             { key: 'estudio', label: 'Entraron al estudio' },
-            { key: 'foto', label: 'Subieron una foto' },
-            { key: 'generaron', label: 'Generaron un diseño' },
+            { key: 'foto', label: 'Tocaron "Subir foto"' },
+            { key: 'generaron', label: 'Tocaron "Crear diseños"' },
             { key: 'precios', label: 'Vieron precios' },
             { key: 'quisieronPagar', label: 'Tocaron "plan pago"' },
           ],
@@ -287,8 +287,8 @@ window.CHAPA_DATA = {
               { key: 'visitantes', label: 'Visitantes', format: 'int' },
               { key: 'visitantesMeta', label: 'Desde Meta', format: 'int' },
               { key: 'estudio', label: 'Estudio', format: 'int' },
-              { key: 'foto', label: 'Foto', format: 'int' },
-              { key: 'generaron', label: 'Generaron', format: 'int' },
+              { key: 'foto', label: 'Tocaron subir foto', format: 'int' },
+              { key: 'generaron', label: 'Tocaron crear', format: 'int' },
             ],
           },
         ],
