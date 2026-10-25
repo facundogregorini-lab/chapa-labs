@@ -11,7 +11,11 @@
   const main = $('#main');
   const tip = $('#tip');
 
-  const allMonths = [...new Set(PROJECTS.flatMap((p) => p.northStar.series.map((s) => s.month)))].sort();
+  const projectMonths = (p) => [
+    ...p.northStar.series.map((s) => s.month),
+    ...(p.ads ? p.ads.daily.map((d) => d.date.slice(0, 7)) : []),
+  ];
+  let allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
   const state = { month: allMonths[allMonths.length - 1], view: 'resumen' };
   let charts = {};
 
@@ -24,6 +28,19 @@
     return long ? `${name[0].toUpperCase()}${name.slice(1)} ${y}` : `${name.slice(0, 3)} ${String(y).slice(2)}`;
   };
   const SYMBOL = { USD: 'US$', ARS: '$' };
+  const dayLabel = (d) => `${Number(d.slice(8))}/${Number(d.slice(5, 7))}`;
+  const dayTip = (d) => `${Number(d.slice(8))} de ${MONTH_NAMES[Number(d.slice(5, 7)) - 1]}`;
+  const axisLabel = (p) => p.label || monthLabel(p.month);
+  const tipLabel = (p) => p.tip || monthLabel(p.month, true);
+  // Con muchos puntos (días) se muestran ~8 etiquetas en el eje.
+  const showTick = (i, n) => {
+    const every = Math.ceil(n / 8);
+    return n <= 12 || i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2);
+  };
+  const badge = (block, real) => {
+    if (block && block.sample) return '<span class="badge is-sample">Ejemplo</span>';
+    return real ? `<span class="badge is-real">● ${esc(real)}</span>` : '';
+  };
 
   function fmt(v, format, currency = 'USD') {
     if (v === null || v === undefined || Number.isNaN(v)) return '—';
@@ -39,6 +56,7 @@
       case 'month': return monthLabel(v, true);
       case 'delta': return `<span class="delta ${v > 0 ? 'good' : v < 0 ? 'bad' : 'flat'}">${v > 0 ? '+' : ''}${num(v * 100, 0)}%</span>`;
       case 'status': return statusBadge(v);
+      case 'state': return v === 'ACTIVE' ? '<span class="state on">▶ Activa</span>' : '<span class="state">❚❚ Pausada</span>';
       default: return esc(v);
     }
   }
@@ -93,12 +111,13 @@
   };
 
   // ─── Gráficos (SVG a mano) ────────────────────────────────
-  function niceScale(max) {
-    if (max <= 0) return { top: 1, step: 0.25 };
+  function niceScale(max, format) {
+    if (max <= 0) return format === 'pct' ? { top: 1, step: 0.25 } : { top: 4, step: 1 };
     const raw = max / 4;
     const p = 10 ** Math.floor(Math.log10(raw));
     const n = raw / p;
-    const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+    let step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+    if (format === 'int') step = Math.max(1, Math.round(step));
     return { top: Math.ceil(max / step) * step, step };
   }
 
@@ -123,7 +142,7 @@
     return (w) => {
       const h = height;
       const max = Math.max(...points.map((p) => p.value).filter(Number.isFinite), target || 0) * 1.08;
-      const { top, step } = niceScale(max);
+      const { top, step } = niceScale(max, format);
       const f = frame(w, h, top, step, format, currency);
       const n = points.length;
       const x = (i) => f.pad.l + (n === 1 ? f.iw / 2 : (i / (n - 1)) * f.iw);
@@ -137,14 +156,14 @@
       out += `<path class="line" d="${d}" style="stroke:${color}"/>`;
       const colW = n > 1 ? f.iw / (n - 1) : f.iw;
       points.forEach((p, i) => {
-        out += `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${monthLabel(p.month)}</text>`;
+        if (showTick(i, n)) out += `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
         if (!Number.isFinite(p.value)) return;
         const prev = points[i - 1];
         const extra = prev && Number.isFinite(prev.value) ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
         out += `<g class="hitg">
           <line class="cross" x1="${x(i)}" x2="${x(i)}" y1="${f.pad.t}" y2="${f.pad.t + f.ih}" opacity="0"/>
           <circle class="pt" cx="${x(i)}" cy="${f.y(p.value)}" r="4.5" style="fill:${color}"/>
-          <rect class="hit" x="${x(i) - colW / 2}" y="0" width="${colW}" height="${h}" data-tip="${tipHtml(monthLabel(p.month, true), fmt(p.value, format, currency), extra)}"/>
+          <rect class="hit" x="${x(i) - colW / 2}" y="0" width="${colW}" height="${h}" data-tip="${tipHtml(tipLabel(p), fmt(p.value, format, currency), extra)}"/>
         </g>`;
       });
       const last = valid[valid.length - 1];
@@ -161,7 +180,7 @@
     return (w) => {
       const h = height;
       const max = Math.max(...points.map((p) => p.value), 0) * 1.12;
-      const { top, step } = niceScale(max);
+      const { top, step } = niceScale(max, format);
       const f = frame(w, h, top, step, format, currency);
       const n = points.length;
       const band = f.iw / n;
@@ -177,8 +196,8 @@
         const prev = points[i - 1];
         const extra = prev ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
         out += `<path class="bar" d="${d}" style="fill:${color}"/>`;
-        out += `<rect class="hit" x="${cx - band / 2}" y="0" width="${band}" height="${h}" data-tip="${tipHtml(monthLabel(p.month, true), fmt(p.value, format, currency), extra)}"/>`;
-        out += `<text x="${cx}" y="${h - 6}" text-anchor="middle">${monthLabel(p.month)}</text>`;
+        out += `<rect class="hit" x="${cx - band / 2}" y="0" width="${band}" height="${h}" data-tip="${tipHtml(tipLabel(p), fmt(p.value, format, currency), extra)}"/>`;
+        if (showTick(i, n)) out += `<text x="${cx}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
         if (i === n - 1) out += `<text class="val" x="${cx}" y="${y1 - 7}" text-anchor="middle">${fmt(p.value, format, currency)}</text>`;
       });
       return `<svg viewBox="0 0 ${w} ${h}" height="${h}" role="img" aria-label="Evolución mensual">${out}</svg>`;
@@ -238,6 +257,14 @@
   const sumRows = (rows, keys) => Object.fromEntries(keys.map((k) => [k, rows.reduce((a, r) => a + (r[k] || 0), 0)]));
 
   function acquisitionHeadline(p) {
+    if (p.ads) {
+      const t = adsTotals(adsRows(p.ads));
+      return [
+        { k: 'Inversión Meta', v: fmt(t.spend, 'money', p.ads.currency) },
+        { k: 'Costo por clic', v: fmt(t.cpc, 'money', p.ads.currency) },
+        { k: p.ads.resultLabel, v: fmt(t.results, 'int') },
+      ];
+    }
     const a = p.acquisition;
     const { curr, prev } = pick(a.months);
     if (!curr) return [];
@@ -280,7 +307,7 @@
             <span class="chip">${esc(p.stage)}</span>
           </div>
           <div>
-            <p class="nsm-label">North Star · ${esc(ns.name)}</p>
+            <p class="nsm-label">North Star · ${esc(ns.name)} ${badge(ns)}</p>
             <p class="hero">${fmt(value, ns.format)}</p>
             ${delta(value, prev && prev.value, { format: ns.format })}
           </div>
@@ -290,7 +317,7 @@
               <div class="progress-row"><span>${fmt(progress, 'pct')} de la meta</span><span>Meta ${fmt(ns.target, ns.format)}</span></div>
             </div>` : ''}
           ${spark}
-          <div class="proj-acq">${acq}</div>
+          <div class="proj-acq">${acq}${p.ads ? '' : badge(p.acquisition)}</div>
         </a>`;
     }).join('');
 
@@ -302,9 +329,9 @@
         <td style="text-align:left">${esc(ns.name)}</td>
         <td><strong>${fmt(value, ns.format)}</strong></td>
         <td>${delta(value, prev && prev.value, { format: ns.format, suffix: '' })}</td>
-        <td>${progress !== null ? fmt(progress, 'pct') : '—'}</td>
-        <td>${p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound'}</td>
-        <td style="text-align:left">${acq}</td>
+        <td>${progress !== null ? fmt(progress, 'pct') : '—'} ${badge(ns)}</td>
+        <td>${p.ads ? `${esc(p.ads.source)} ${badge(null, 'Real')}` : `${p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound'} ${badge(p.acquisition)}`}</td>
+        <td style="text-align:left;white-space:normal;min-width:260px">${acq}</td>
       </tr>`;
     }).join('');
 
@@ -457,6 +484,66 @@
       </div>` : ''}`;
   }
 
+  // ─── Pauta en Meta Ads (datos reales) ─────────────────────
+  function adsTotals(rows) {
+    const t = sumRows(rows, ['spend', 'impressions', 'clicks', 'landing', 'results']);
+    t.ctr = ratio(t.clicks, t.impressions);
+    t.cpc = ratio(t.spend, t.clicks);
+    t.cpr = ratio(t.spend, t.results);
+    return t;
+  }
+  const adsRows = (a) => a.daily.filter((d) => d.date.slice(0, 7) === state.month);
+  const adsUpdated = (a) => (a.live ? 'en vivo' : `actualizado el ${dayTip(a.snapshotAt)}`);
+
+  function renderAds(p, color) {
+    const a = p.ads;
+    const cur = a.currency;
+    const rows = adsRows(a);
+    if (!rows.length) {
+      return `<div class="card"><p class="sub" style="margin:0">Sin pauta en ${esc(a.source)} en ${monthLabel(state.month, true)}.</p></div>`;
+    }
+    const t = adsTotals(rows);
+    const tiles = [
+      { label: 'Inversión', value: t.spend, format: 'money' },
+      { label: 'Impresiones', value: t.impressions, format: 'int' },
+      { label: 'Clics en el enlace', value: t.clicks, format: 'int' },
+      { label: 'CTR', hint: 'Clics / impresiones', value: t.ctr, format: 'pct' },
+      { label: 'Costo por clic', value: t.cpc, format: 'money' },
+      { label: 'Visitas a la landing', value: t.landing, format: 'int' },
+      { label: a.resultLabel, hint: 'Resultado de la campaña', value: t.results, format: 'int' },
+      { label: 'Costo por resultado', hint: a.resultLabel, value: t.cpr, format: 'money' },
+    ].map((x) => tile({ ...x, currency: cur })).join('');
+
+    const days = [...new Set(rows.map((r) => r.date))].sort();
+    const byDay = days.map((d) => adsTotals(rows.filter((r) => r.date === d)));
+    const pts = (key) => days.map((d, i) => ({ label: dayLabel(d), tip: dayTip(d), value: byDay[i][key] }));
+
+    const camps = a.campaigns.map((c) => ({ ...c, ...adsTotals(rows.filter((r) => r.campaignId === c.id)) }));
+    const cols = [
+      { key: 'name', label: 'Campaña' },
+      { key: 'status', label: 'Estado', format: 'state' },
+      { key: 'spend', label: 'Inversión', format: 'money' },
+      { key: 'impressions', label: 'Impresiones', format: 'int' },
+      { key: 'clicks', label: 'Clics', format: 'int' },
+      { key: 'ctr', label: 'CTR', format: 'pct' },
+      { key: 'cpc', label: 'CPC', format: 'money' },
+      { key: 'landing', label: 'Visitas landing', format: 'int' },
+      { key: 'results', label: a.resultLabel, format: 'int' },
+      { key: 'cpr', label: 'Costo / resultado', format: 'money' },
+    ];
+
+    return `
+      <div class="tiles">${tiles}</div>
+      <div class="grid g-2" style="margin-top:12px">
+        <div class="card"><h3>Inversión diaria</h3><p class="sub">En ${esc(cur)}</p>${chart(barChart({ points: pts('spend'), format: 'money', currency: cur, color }))}</div>
+        <div class="card"><h3>${esc(a.resultLabel)} por día</h3><p class="sub">Resultado que optimiza la campaña</p>${chart(barChart({ points: pts('results'), format: 'int', color }))}</div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Por campaña</h3><p class="sub">${monthLabel(state.month, true)} · ${esc(a.source)}, ${adsUpdated(a)}</p>
+        ${table({ columns: cols, rows: camps, total: camps.length > 1 ? { name: 'Total', ...adsTotals(rows) } : null, currency: cur })}
+      </div>`;
+  }
+
   function renderUsability(p) {
     const u = p.usability || {};
     const tiles = (u.kpis || []).map((k) => tile({ ...k, currency: p.currency })).join('');
@@ -484,7 +571,7 @@
         </div>
       </div>
 
-      <h2 class="section">North Star Metric</h2>
+      <h2 class="section">North Star Metric ${badge(ns)}</h2>
       <div class="card nsm">
         <div>
           <p class="nsm-label">${esc(ns.name)}</p>
@@ -498,10 +585,14 @@
         ${chart(lineChart({ points: list, format: ns.format, target: ns.target, color, height: 240 }))}
       </div>
 
-      <h2 class="section">Adquisición <span>· ${p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound'}</span></h2>
+      ${p.ads ? `
+      <h2 class="section">Adquisición <span>· Pauta en ${esc(p.ads.source)}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
+      ${renderAds(p, color)}` : ''}
+
+      <h2 class="section">Adquisición <span>· ${p.acquisition.type === 'paid' ? 'Registros, pagos y ROI' : 'Outbound'}</span> ${badge(p.acquisition)}</h2>
       ${p.acquisition.type === 'paid' ? renderPaid(p, color) : renderOutbound(p, color)}
 
-      <h2 class="section">Usabilidad <span>· ${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}</span></h2>
+      <h2 class="section">Usabilidad <span>· ${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}</span> ${badge(p.usability)}</h2>
       ${renderUsability(p)}`;
   }
 
@@ -537,8 +628,11 @@
   });
 
   const select = $('#month');
-  select.innerHTML = allMonths.slice().reverse().map((m) => `<option value="${m}">${monthLabel(m, true)}</option>`).join('');
-  select.value = state.month;
+  function fillMonths() {
+    select.innerHTML = allMonths.slice().reverse().map((m) => `<option value="${m}">${monthLabel(m, true)}</option>`).join('');
+    select.value = state.month;
+  }
+  fillMonths();
   select.addEventListener('change', () => { state.month = select.value; render(); });
 
   // Tema: sigue al sistema; el botón lo fija y se recuerda en este navegador.
@@ -586,6 +680,47 @@
   if (DATA.team && DATA.team.length) $('#team').textContent = `Seguimiento de proyectos · ${DATA.team.join(' y ')}`;
   $('#foot').textContent = `Datos actualizados al ${new Date(`${DATA.updatedAt}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 
+  // Datos en vivo de Meta Ads (función /api/meta en Vercel). Si no está
+  // configurada o falla, queda la foto guardada en data.js.
+  async function loadLiveAds() {
+    if (location.protocol === 'file:' || !PROJECTS.some((p) => p.ads)) return;
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 10000);
+      const res = await fetch('/api/meta', { signal: ctrl.signal });
+      if (!res.ok) return;
+      const live = await res.json();
+      let changed = false;
+      PROJECTS.forEach((p) => {
+        if (!p.ads || !p.ads.match) return;
+        const prefix = p.ads.match.toLowerCase();
+        const camps = live.campaigns.filter((c) => c.name.toLowerCase().startsWith(prefix));
+        if (!camps.length) return;
+        const ids = new Set(camps.map((c) => c.id));
+        p.ads.campaigns = camps;
+        p.ads.daily = live.daily.filter((d) => ids.has(d.campaignId)).map((d) => ({
+          date: d.date,
+          campaignId: d.campaignId,
+          spend: d.spend,
+          impressions: d.impressions,
+          clicks: d.clicks,
+          landing: d.actions.landing_page_view || 0,
+          results: d.actions[p.ads.resultAction] || 0,
+        }));
+        if (live.currency) p.ads.currency = live.currency;
+        p.ads.live = true;
+        changed = true;
+      });
+      if (!changed) return;
+      const last = allMonths[allMonths.length - 1];
+      allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
+      if (state.month === last) state.month = allMonths[allMonths.length - 1];
+      fillMonths();
+      render();
+    } catch (e) { /* queda la foto de data.js */ }
+  }
+
   fromHash();
   render();
+  loadLiveAds();
 })();

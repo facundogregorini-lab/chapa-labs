@@ -2,7 +2,25 @@
 
 Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coach**, **Amobla IA** y **Turnia**. Es una página estática (`index.html`, `styles.css`, `main.js` y `data.js`), sin compilación ni dependencias: se abre `index.html` directo en el navegador. Para publicarla alcanza con importar el repo en Vercel (o activar GitHub Pages sobre `main`); `vercel.json` le agrega `noindex` para que no aparezca en buscadores.
 
-> ⚠️ **Los números de esta primera versión son de ejemplo.** Hay que reemplazarlos por los reales en `data.js`.
+## De dónde salen los datos
+
+| Sección | Fuente | Estado |
+| --- | --- | --- |
+| Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** En vivo vía `/api/meta` cuando `META_ACCESS_TOKEN` está configurado; si no, la foto guardada en `data.js`. |
+| North Star de cada proyecto | PostHog u otra fuente del producto | Ejemplo: PostHog todavía no recibe eventos de Maru Coach, Amobla IA ni Turnia. |
+| Registros, pagos, ingresos y ROI de Maru Coach | Backend de Maru / Mercado Pago / PostHog | Ejemplo. |
+| Embudo outbound de Amobla IA y Turnia | CRM o planilla de prospección | Ejemplo. |
+| Usabilidad | PostHog | Ejemplo. |
+
+Todo lo que es de ejemplo se ve con la etiqueta **Ejemplo**; lo real, con **Datos reales**.
+
+### Conectar Meta Ads en vivo
+
+1. En [Business Manager](https://business.facebook.com/settings/system-users) → **Usuarios del sistema**, crear uno (o usar uno existente), asignarle la cuenta publicitaria con permiso de lectura y **Generar token** con el permiso `ads_read`.
+2. En Vercel → proyecto `chapa-labs` → **Settings → Environment Variables**, agregar `META_ACCESS_TOKEN` con ese token (y `META_AD_ACCOUNT_ID` si se usa otra cuenta).
+3. **Redeploy.** El dashboard toma los datos de Meta al abrirse (con 15 minutos de caché) y la etiqueta pasa a decir "en vivo".
+
+Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match` en `data.js`) y cuenta como resultado el evento de `ads.resultAction` (por ejemplo `maru_paywall_viewed` del píxel o la conversión personalizada "Foto subida").
 
 ## Qué muestra
 
@@ -22,6 +40,8 @@ Todo vive en `data.js`. Por cada proyecto:
 
 | Campo | Qué es |
 | --- | --- |
+| `ads` | Pauta real de Meta Ads: prefijo de las campañas, evento que cuenta como resultado y la foto por día y campaña. |
+| `sample` | En `northStar`, `acquisition` o `usability`: marca la sección como de ejemplo. |
 | `northStar` | Nombre, definición, `target` (meta) y `series` con un valor por mes (`"AAAA-MM"`). |
 | `acquisition.type` | `"paid"` u `"outbound"`. Define qué tablas y gráficos se muestran. |
 | `acquisition.months` | Una fila por mes. Pauta: `inversion`, `registros`, `pagos`, `ingresos` (CPL, CPA, conversión, ROI y ROAS se calculan solos). Outbound: una columna por etapa de `stages` y opcional `mrrNuevo`. |
@@ -35,12 +55,11 @@ Las etapas del embudo outbound se configuran en `stages`, así que cada proyecto
 
 **Sumar un proyecto**: copiar uno de los bloques de `projects`, cambiarle el `id` y el nombre. Aparece solo en las pestañas y en el resumen.
 
-Cuando los datos sean reales, cambiar `sample: true` por `false` para ocultar el aviso de "Datos de ejemplo".
+Cuando una sección pase a tener datos reales, sacarle `sample: true`.
 
 ## Próximos pasos posibles
 
 - Leer los datos desde una Google Sheet compartida (cada proyecto en una pestaña) en lugar de editar `data.js`.
-- Traer automáticamente la inversión y los resultados de Meta Ads / Google Ads para Maru Coach.
 - Conectar el CRM o la planilla de prospección de Amobla IA y Turnia para el embudo.
 - Traer la North Star y la usabilidad desde la analítica de producto (PostHog, base de datos propia).
 - Agregar metas por mes y alertas cuando una métrica se desvía.

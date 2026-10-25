@@ -1,10 +1,12 @@
 /*
  * Datos del dashboard de Chapa Labs.
  *
- * ⚠️ Todos los números de esta versión son DE EJEMPLO. Reemplazalos por los
- * reales (a mano, o más adelante desde una planilla / API; ver README.md).
+ * Lo que tiene `sample: true` son números DE EJEMPLO: se muestran con la
+ * etiqueta "Ejemplo" hasta que se conecten los datos reales (ver README.md).
+ * Los bloques `ads` son datos reales de Meta Ads.
  *
  * Cada proyecto tiene:
+ *   - ads:         pauta real en Meta Ads (opcional), por día y campaña.
  *   - northStar:   la métrica principal, con su serie mensual y la meta.
  *   - acquisition: tipo "paid" (pauta: inversión → registros → pagos → ROI)
  *                  o tipo "outbound" (embudo comercial por etapas).
@@ -27,6 +29,7 @@ window.CHAPA_DATA = {
       stage: 'Tracción',
       currency: 'USD',
       northStar: {
+        sample: true,
         name: 'Usuarios activos semanales',
         definition: 'Personas que completan al menos una rutina con su coach en la semana (promedio del mes).',
         format: 'int',
@@ -40,8 +43,33 @@ window.CHAPA_DATA = {
           { month: '2026-10', value: 1240 },
         ],
       },
+      // Pauta real en Meta Ads (cuenta "Costa Reset"). Se actualiza en vivo
+      // desde /api/meta cuando está configurado META_ACCESS_TOKEN en Vercel;
+      // si no, se usa esta foto.
+      ads: {
+        source: 'Meta Ads',
+        currency: 'ARS',
+        match: 'MARU', // campañas cuyo nombre empieza así
+        resultLabel: 'Vieron el paywall',
+        resultAction: 'offsite_conversion.fb_pixel_custom.maru_paywall_viewed',
+        snapshotAt: '2026-10-25',
+        campaigns: [
+          { id: '120248861665880157', name: 'MARU | Límite gratuito | AR | Test01', status: 'ACTIVE', start: '2026-10-18' },
+        ],
+        daily: [
+          { date: '2026-10-18', campaignId: '120248861665880157', spend: 2323.38, impressions: 846, clicks: 20, landing: 12, results: 0 },
+          { date: '2026-10-19', campaignId: '120248861665880157', spend: 7115.93, impressions: 3265, clicks: 53, landing: 50, results: 1 },
+          { date: '2026-10-20', campaignId: '120248861665880157', spend: 4726.62, impressions: 2238, clicks: 37, landing: 31, results: 1 },
+          { date: '2026-10-21', campaignId: '120248861665880157', spend: 3670.98, impressions: 1635, clicks: 34, landing: 30, results: 0 },
+          { date: '2026-10-22', campaignId: '120248861665880157', spend: 5181.55, impressions: 2453, clicks: 57, landing: 38, results: 0 },
+          { date: '2026-10-23', campaignId: '120248861665880157', spend: 7604.44, impressions: 3562, clicks: 84, landing: 68, results: 2 },
+          { date: '2026-10-24', campaignId: '120248861665880157', spend: 10987.88, impressions: 4035, clicks: 92, landing: 63, results: 3 },
+          { date: '2026-10-25', campaignId: '120248861665880157', spend: 4869.33, impressions: 1653, clicks: 45, landing: 25, results: 0 },
+        ],
+      },
       acquisition: {
         type: 'paid',
+        sample: true,
         // inversion e ingresos en la moneda del proyecto; pagos = nuevos suscriptores pagos.
         months: [
           { month: '2026-05', inversion: 800, registros: 410, pagos: 32, ingresos: 1100 },
@@ -59,6 +87,7 @@ window.CHAPA_DATA = {
         ],
       },
       usability: {
+        sample: true,
         kpis: [
           { label: 'Usuarios activos mensuales', format: 'int', value: 2950, prev: 2480, good: 'up' },
           { label: 'Stickiness (DAU / MAU)', format: 'pct', value: 0.31, prev: 0.28, good: 'up' },
@@ -116,6 +145,7 @@ window.CHAPA_DATA = {
       stage: 'Validación',
       currency: 'USD',
       northStar: {
+        sample: true,
         name: 'Ambientes generados con IA',
         definition: 'Ambientes amoblados con IA por las cuentas clientes en el mes.',
         format: 'int',
@@ -129,8 +159,26 @@ window.CHAPA_DATA = {
           { month: '2026-10', value: 4600 },
         ],
       },
+      ads: {
+        source: 'Meta Ads',
+        currency: 'ARS',
+        match: 'amoblaIA',
+        resultLabel: 'Fotos subidas',
+        resultAction: 'offsite_conversion.custom.1095995133177105',
+        snapshotAt: '2026-10-25',
+        campaigns: [
+          { id: '120248966713100157', name: 'amoblaIA | Web - Foto subida | Inmobiliarias AR', status: 'ACTIVE', start: '2026-10-23' },
+          { id: '120248947599480157', name: 'amoblaIA | Leads | Inmobiliarias AR', status: 'PAUSED', start: '2026-10-23' },
+        ],
+        daily: [
+          { date: '2026-10-23', campaignId: '120248966713100157', spend: 1677.86, impressions: 430, clicks: 16, landing: 7, results: 0 },
+          { date: '2026-10-24', campaignId: '120248966713100157', spend: 9159.73, impressions: 1454, clicks: 27, landing: 18, results: 0 },
+          { date: '2026-10-25', campaignId: '120248966713100157', spend: 811.43, impressions: 117, clicks: 2, landing: 2, results: 0 },
+        ],
+      },
       acquisition: {
         type: 'outbound',
+        sample: true,
         stages: [
           { key: 'prospectados', label: 'Prospectados' },
           { key: 'contactados', label: 'Contactados' },
@@ -155,6 +203,7 @@ window.CHAPA_DATA = {
         ],
       },
       usability: {
+        sample: true,
         kpis: [
           { label: 'Cuentas activas', format: 'int', value: 41, prev: 31, good: 'up' },
           { label: 'Ambientes por cuenta', format: 'dec', value: 112, prev: 119, good: 'up' },
@@ -209,6 +258,7 @@ window.CHAPA_DATA = {
       stage: 'Tracción',
       currency: 'USD',
       northStar: {
+        sample: true,
         name: 'Turnos agendados vía Turnia',
         definition: 'Turnos confirmados en el mes en todos los negocios que usan Turnia.',
         format: 'int',
@@ -224,6 +274,7 @@ window.CHAPA_DATA = {
       },
       acquisition: {
         type: 'outbound',
+        sample: true,
         stages: [
           { key: 'prospectados', label: 'Prospectados' },
           { key: 'contactados', label: 'Contactados' },
@@ -248,6 +299,7 @@ window.CHAPA_DATA = {
         ],
       },
       usability: {
+        sample: true,
         kpis: [
           { label: 'Negocios activos', format: 'int', value: 64, prev: 52, good: 'up' },
           { label: 'Turnos por negocio', format: 'dec', value: 116, prev: 113, good: 'up' },

@@ -132,6 +132,15 @@ h2.section {
   margin: 36px 0 12px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
 }
 h2.section span { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.badge {
+  display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  padding: 2px 8px; border-radius: 99px; white-space: nowrap; vertical-align: middle; line-height: 1.5;
+}
+.badge.is-sample { background: color-mix(in srgb, var(--warning) 26%, transparent); color: var(--ink); }
+.badge.is-real { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good-text); }
+h2.section .badge { font-weight: 600; }
+.state { font-size: 12px; color: var(--muted); }
+.state.on { color: var(--good-text); }
 
 /* ─── Cards & grids ───────────────────────────────── */
 .card {
