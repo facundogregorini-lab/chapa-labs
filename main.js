@@ -280,7 +280,8 @@
       const f = funnelFigures(p);
       return [
         { k: 'Inversión Meta', v: fmt(f.spend, 'money', f.cur) },
-        { k: 'Costo por registro', v: fmt(f.cpl, 'money', f.cur) },
+        { k: `${f.buyerLabel} desde Meta`, v: fmt(f.buyers, 'int') },
+        { k: 'CPA', v: fmt(f.cpa, 'money', f.cur) },
         { k: 'ROI', v: fmt(f.roi, 'pct') },
       ];
     }
@@ -496,8 +497,11 @@
     const signups = Number(paid[a.signupKey]) || 0;
     const buyers = Number(paid[a.buyerKey]) || 0;
     const revenue = Number(paid[a.revenueKey]) || 0;
+    const allBuyers = rows.reduce((n, r) => n + (Number(r[a.buyerKey]) || 0), 0);
     return {
-      rows, paid, spend, signups, buyers, revenue,
+      rows, paid, spend, signups, buyers, revenue, allBuyers,
+      buyerLabel: a.buyerLabel || 'Compras',
+      cpaAll: ratio(spend, allBuyers),
       cur: p.ads ? p.ads.currency : p.currency,
       cpl: ratio(spend, signups),
       cpa: ratio(spend, buyers),
@@ -514,8 +518,8 @@
       { label: `Visitantes desde ${paidName}`, value: Number(f.paid.visitantes) || 0, format: 'int' },
       { label: 'Registros', hint: `Desde ${paidName}`, value: f.signups, format: 'int' },
       { label: 'Costo por registro', value: f.cpl, format: 'money' },
-      { label: 'Compras', hint: `Desde ${paidName}`, value: f.buyers, format: 'int' },
-      { label: 'Costo por compra (CPA)', value: f.cpa, format: 'money' },
+      { label: f.buyerLabel, hint: `Desde ${paidName}`, value: f.buyers, format: 'int' },
+      { label: 'CPA', hint: `Inversión / ${f.buyerLabel.toLowerCase()} desde ${paidName}`, value: f.cpa, format: 'money' },
       { label: 'Ingresos', hint: `Desde ${paidName}`, value: f.revenue, format: 'money' },
       { label: 'ROI', hint: '(Ingresos − inversión) / inversión', value: f.roi, format: 'pct' },
     ].map((t) => tile({ ...t, currency: f.cur })).join('');
@@ -621,6 +625,20 @@
       return `<div class="card"><p class="sub" style="margin:0">Sin pauta en ${esc(a.source)} en ${monthLabel(state.month, true)}.</p></div>`;
     }
     const t = adsTotals(rows);
+    // Resultado de negocio (desde el lanzamiento): cruza la inversión de Meta
+    // con las compras de PostHog. Solo en proyectos con embudo real.
+    let business = '';
+    if (p.acquisition.type === 'funnel') {
+      const f = funnelFigures(p);
+      const label = f.buyerLabel;
+      business = `<div class="tiles key-tiles">${[
+        { label: `${label} desde Meta`, hint: 'Llegaron por un anuncio', value: f.buyers, format: 'int' },
+        { label: 'CPA Meta', hint: `Inversión / ${label.toLowerCase()} desde Meta`, value: f.cpa, format: 'money' },
+        { label: `${label} totales`, hint: 'Todas las fuentes', value: f.allBuyers, format: 'int' },
+        { label: 'CPA total', hint: `Inversión / ${label.toLowerCase()} totales`, value: f.cpaAll, format: 'money' },
+      ].map((x) => tile({ ...x, currency: f.cur })).join('')}</div>
+      <p class="note" style="margin:0 0 12px">${esc(label)}: pagos confirmados en PostHog (compra_confirmada) desde el lanzamiento. Meta: según la UTM de la primera visita.</p>`;
+    }
     const tiles = [
       { label: 'Inversión', value: t.spend, format: 'money' },
       { label: 'Impresiones', value: t.impressions, format: 'int' },
@@ -651,6 +669,7 @@
     ];
 
     return `
+      ${business}
       <div class="tiles">${tiles}</div>
       <div class="grid g-2" style="margin-top:12px">
         <div class="card"><h3>Inversión diaria</h3><p class="sub">En ${esc(cur)}</p>${chart(barChart({ points: pts('spend'), format: 'money', currency: cur, color }))}</div>
