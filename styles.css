@@ -154,6 +154,14 @@ h2.section .badge { font-weight: 600; }
 .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .span-2 { grid-column: 1 / -1; }
 .key-tiles { margin-bottom: 8px; }
+.proj > .badge, .proj-acq .badge { align-self: flex-start; }
+.proj-rev { border-top: 1px solid var(--border); padding-top: 10px; }
+.proj-rev-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.proj-rev-head strong { font-size: 20px; color: var(--ink); letter-spacing: -0.3px; }
+.stat-row { display: flex; gap: 12px 36px; flex-wrap: wrap; margin: 2px 0 14px; }
+.stat .k { font-size: 12px; color: var(--muted); }
+.stat .v { font-size: 26px; font-weight: 600; letter-spacing: -0.5px; line-height: 1.2; }
+.stat .h { font-size: 12px; color: var(--muted); }
 .key-tiles .tile { border-color: color-mix(in srgb, var(--s1) 45%, var(--border)); }
 .key-tiles .tile .value { font-size: 30px; }
 .tiles { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }

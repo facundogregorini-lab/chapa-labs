@@ -68,7 +68,9 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
           uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
-          uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios
+          uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
+          countIf(event = 'compra_confirmada') AS compras,
+          sumIf(toFloat(properties.monto), event = 'compra_confirmada') AS ingresos
         FROM events WHERE timestamp >= now() - INTERVAL 60 DAY
         GROUP BY date ORDER BY date`,
       totales: `SELECT uniqIf(person_id, event = '$pageview') AS visitantes,

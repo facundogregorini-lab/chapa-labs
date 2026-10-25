@@ -130,9 +130,10 @@
   };
 
   // ─── Gráficos (SVG a mano) ────────────────────────────────
-  function niceScale(max, format) {
-    if (max <= 0) return format === 'pct' ? { top: 1, step: 0.25 } : { top: 4, step: 1 };
-    const raw = max / 4;
+  // ticks: líneas de grilla (4 en gráficos normales, 2 en los chicos).
+  function niceScale(max, format, ticks = 4) {
+    if (max <= 0) return format === 'pct' ? { top: 1, step: 1 / ticks } : { top: ticks, step: 1 };
+    const raw = max / ticks;
     const p = 10 ** Math.floor(Math.log10(raw));
     const n = raw / p;
     let step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
@@ -161,7 +162,7 @@
     return (w) => {
       const h = height;
       const max = Math.max(...points.map((p) => p.value).filter(Number.isFinite), target || 0) * 1.08;
-      const { top, step } = niceScale(max, format);
+      const { top, step } = niceScale(max, format, h < 130 ? 2 : 4);
       const f = frame(w, h, top, step, format, currency);
       const n = points.length;
       const x = (i) => f.pad.l + (n === 1 ? f.iw / 2 : (i / (n - 1)) * f.iw);
@@ -199,7 +200,7 @@
     return (w) => {
       const h = height;
       const max = Math.max(...points.map((p) => p.value), 0) * 1.12;
-      const { top, step } = niceScale(max, format);
+      const { top, step } = niceScale(max, format, h < 130 ? 2 : 4);
       const f = frame(w, h, top, step, format, currency);
       const n = points.length;
       const band = f.iw / n;
@@ -345,6 +346,17 @@
       const f = nsmFigures(p);
       const { ns, prev, list, value, progress } = f;
       const spark = chart(lineChart({ points: list, format: ns.format, color: ACCENTS[i], height: 120, target: ns.target }));
+      // Debajo de la North Star: nuevos suscriptores e ingresos del mes, por día.
+      const rev = p.revenue ? revenueSummary(p) : null;
+      const revBlock = (title, value, key, format) => `
+          <div class="proj-rev">
+            <div class="proj-rev-head"><span>${esc(title)}</span><strong>${value}</strong></div>
+            ${chart(barChart({ points: rev.rows.map((d) => ({ label: dayLabel(d.date), tip: dayTip(d.date), value: d[key] })), format, currency: rev.cur, color: ACCENTS[i], height: 90 }))}
+          </div>`;
+      const revHtml = !rev ? '' : !rev.rows.length
+        ? `<p class="sub">Sin suscriptores ni ingresos en ${monthLabel(state.month, true)}.</p>`
+        : `${revBlock(p.revenue.subsLabel, fmt(rev.subs, 'int'), 'subs', 'int')}${revBlock('Ingresos', fmt(rev.rev, 'money', rev.cur), 'rev', 'money')}
+          ${p.revenue.sample ? badge(p.revenue) : ''}`;
       const acq = acquisitionHeadline(p).map((m) => `<div class="mini"><div class="k">${m.k}</div><div class="v">${m.v}</div>${m.d || ''}</div>`).join('');
       return `
         <a class="card proj" href="#${esc(p.id)}">
@@ -364,6 +376,7 @@
               <div class="progress-row"><span>${fmt(progress, 'pct')} de la meta</span><span>Meta ${fmt(ns.target, ns.format)}</span></div>
             </div>` : ''}
           ${spark}
+          ${revHtml}
           <div class="proj-acq">${acq}${p.ads ? '' : badge(p.acquisition)}</div>
         </a>`;
     }).join('');
@@ -371,16 +384,17 @@
     const rows = PROJECTS.map((p, i) => {
       const f = nsmFigures(p);
       const { ns, prev, value, progress } = f;
-      const acq = acquisitionHeadline(p).map((m) => `${m.k}: <strong>${m.v}</strong>`).join(' · ');
+      const rev = p.revenue ? revenueSummary(p) : null;
       const acqSource = p.acquisition.type === 'funnel' ? 'Meta Ads + PostHog' : p.ads ? p.ads.source : p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound';
       return `<tr>
         <td><span class="proj-name" style="font-size:13px"><span class="dot" style="background:${ACCENTS[i]}"></span><a href="#${esc(p.id)}">${esc(p.name)}</a></span></td>
-        <td style="text-align:left">${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</td>
+        <td style="text-align:left;white-space:normal;min-width:180px">${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</td>
         <td><strong>${fmt(value, ns.format)}</strong></td>
         <td>${delta(value, prev && prev.value, { format: ns.format, suffix: '' }) || '—'}</td>
+        <td>${rev ? fmt(rev.subs, 'int') : '—'}${rev && p.revenue.sample ? ` ${badge(p.revenue)}` : ''}</td>
+        <td>${rev ? fmt(rev.rev, 'money', rev.cur) : '—'}</td>
         <td>${progress !== null ? fmt(progress, 'pct') : '—'}</td>
         <td>${esc(acqSource)} ${p.acquisition.sample && !p.ads ? badge(p.acquisition) : badge(null, 'Real')}</td>
-        <td style="text-align:left;white-space:normal;min-width:260px">${acq}</td>
       </tr>`;
     }).join('');
 
@@ -388,14 +402,14 @@
       <div class="page-head">
         <div>
           <h1>Portafolio</h1>
-          <p>${monthLabel(state.month, true)} · North Star y adquisición de cada proyecto</p>
+          <p>${monthLabel(state.month, true)} · North Star, suscriptores, ingresos y adquisición de cada proyecto</p>
         </div>
       </div>
       <div class="grid g-3">${cards}</div>
       <h2 class="section">Comparativo <span>· ${monthLabel(state.month, true)}</span></h2>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Proyecto</th><th style="text-align:left">North Star</th><th>Valor</th><th>Variación</th><th>% de meta</th><th>Adquisición</th><th style="text-align:left">Claves</th></tr></thead>
+          <thead><tr><th>Proyecto</th><th style="text-align:left">North Star</th><th>Valor</th><th>Variación</th><th>Nuevos suscriptores</th><th>Ingresos</th><th>% de meta</th><th>Adquisición</th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div>
       </div>`;
@@ -681,6 +695,67 @@
       </div>`;
   }
 
+  // ─── Suscriptores e ingresos por día ──────────────────────
+  // Días del mes elegido, sin huecos (un día sin datos cuenta como 0).
+  function revenueRows(p) {
+    const r = p.revenue;
+    const src = r.daily || phRows(p, r.query);
+    const byDate = new Map(src.filter((d) => d.date.slice(0, 7) === state.month).map((d) => [d.date, d]));
+    if (!byDate.size) return [];
+    const dates = [...byDate.keys()].sort();
+    const out = [];
+    for (let d = new Date(`${dates[0]}T12:00:00Z`); d <= new Date(`${dates[dates.length - 1]}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
+      const key = d.toISOString().slice(0, 10);
+      const row = byDate.get(key) || {};
+      out.push({ date: key, subs: Number(row[r.subsKey || 'suscriptores']) || 0, rev: Number(row[r.revenueKey || 'ingresos']) || 0 });
+    }
+    return out;
+  }
+
+  function revenueSummary(p) {
+    const rows = revenueRows(p);
+    return {
+      rows,
+      cur: p.revenue.currency || p.currency,
+      subs: rows.reduce((a, d) => a + d.subs, 0),
+      rev: rows.reduce((a, d) => a + d.rev, 0),
+    };
+  }
+
+  function renderRevenue(p, color) {
+    const r = p.revenue;
+    const rows = revenueRows(p);
+    if (!rows.length) return `<div class="card"><p class="sub" style="margin:0">Sin datos en ${monthLabel(state.month, true)}.</p></div>`;
+    const cur = r.currency || p.currency;
+    const sum = (list, k) => list.reduce((a, d) => a + d[k], 0);
+    const last7 = rows.slice(-7);
+    const subs = sum(rows, 'subs');
+    const rev = sum(rows, 'rev');
+    const pts = (k) => rows.map((d) => ({ label: dayLabel(d.date), tip: dayTip(d.date), value: d[k] }));
+    const stat = (k, v, hint) => `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${v}</div>${hint ? `<div class="h">${esc(hint)}</div>` : ''}</div>`;
+    const period = `${monthLabel(state.month, true)} · del ${dayTip(rows[0].date)} al ${dayTip(rows[rows.length - 1].date)}`;
+    return `
+      <div class="card">
+        <h3>${esc(r.subsLabel)}</h3><p class="sub">${period}</p>
+        <div class="stat-row">
+          ${stat('En el mes', fmt(subs, 'int'))}
+          ${stat('Últimos 7 días', fmt(sum(last7, 'subs'), 'int'))}
+          ${stat('Promedio diario', fmt(subs / rows.length, 'dec'))}
+        </div>
+        ${chart(barChart({ points: pts('subs'), format: 'int', color, height: 200 }))}
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Ingresos</h3><p class="sub">${period} · en ${esc(cur)}</p>
+        <div class="stat-row">
+          ${stat('En el mes', fmt(rev, 'money', cur))}
+          ${stat('Últimos 7 días', fmt(sum(last7, 'rev'), 'money', cur))}
+          ${stat(`Ingreso por ${r.unitLabel || 'suscriptor'}`, fmt(ratio(rev, subs), 'money', cur))}
+        </div>
+        ${chart(barChart({ points: pts('rev'), format: 'money', currency: cur, color, height: 200 }))}
+      </div>
+      ${r.note ? `<p class="note">${esc(r.note)}</p>` : ''}`;
+  }
+
   function renderUsability(p, color) {
     const u = p.usability || {};
     // KPI con `query`: suma de la columna en PostHog (y con `of`, el cociente).
@@ -737,6 +812,10 @@
         </div>
         ${chart(lineChart({ points: list, format: ns.format, target: ns.target, color, height: 240 }))}
       </div>
+
+      ${p.revenue ? `
+      <h2 class="section">Suscriptores e ingresos ${p.revenue.sample ? badge(p.revenue) : phBadge(p)}</h2>
+      ${renderRevenue(p, color)}` : ''}
 
       ${p.ads ? `
       <h2 class="section">Adquisición <span>· Pauta en ${esc(p.ads.source)}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
