@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Chapa Labs · Seguimiento</title>
+<meta name="description" content="Dashboard ejecutivo de los proyectos de Chapa Labs: North Star Metric, adquisición y usabilidad.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M8 22l5-7 4 4 7-10' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <a class="brand" href="#resumen" aria-label="Chapa Labs, resumen">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>
+        <strong>Chapa Labs</strong>
+        <small id="team">Seguimiento de proyectos</small>
+      </span>
+    </a>
+    <div class="controls">
+      <label class="month-pick">
+        <span>Mes</span>
+        <select id="month"></select>
+      </label>
+      <button class="theme" id="theme" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Proyectos"></nav>
+</header>
+
+<p class="sample" id="sample" hidden>
+  <strong>Datos de ejemplo.</strong> Los números son ilustrativos: se reemplazan en <code>data.js</code>.
+</p>
+
+<main id="main" tabindex="-1"></main>
+
+<footer class="foot" id="foot"></footer>
+
+<div class="tip" id="tip" role="status" aria-live="polite" hidden></div>
+
+<script src="data.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
