@@ -6,19 +6,25 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 
 | Sección | Fuente | Estado |
 | --- | --- | --- |
-| Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** En vivo vía `/api/meta` cuando `META_ACCESS_TOKEN` está configurado; si no, la foto guardada en `data.js`. |
-| North Star de cada proyecto | PostHog u otra fuente del producto | Ejemplo: PostHog todavía no recibe eventos de Maru Coach, Amobla IA ni Turnia. |
-| Registros, pagos, ingresos y ROI de Maru Coach | Backend de Maru / Mercado Pago / PostHog | Ejemplo. |
-| Embudo outbound de Amobla IA y Turnia | CRM o planilla de prospección | Ejemplo. |
-| Usabilidad | PostHog | Ejemplo. |
+| Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** |
+| North Star, embudo por canal (registros, compras, CPA, ROI) y usabilidad de **Maru Coach** | **PostHog**, organización "Growth Labs 2" (marucoach.com) | **Real.** Canal según la UTM de la primera visita; registro = primer login; ingresos = `monto` de `compra_confirmada`. |
+| North Star y usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, pero medido con clics automáticos (botones "Amoblar", "Subir mi foto") hasta que la app mande eventos propios. |
+| Embudo outbound de Amobla IA y todo **Turnia** | CRM o planilla de prospección; Turnia no tiene PostHog | Ejemplo. |
 
-Todo lo que es de ejemplo se ve con la etiqueta **Ejemplo**; lo real, con **Datos reales**.
+Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. Lo real se guarda como foto en `data.js` y las funciones `/api/meta` y `/api/posthog` lo actualizan en vivo cuando tienen sus claves (abajo).
 
 ### Conectar Meta Ads en vivo
 
 1. En [Business Manager](https://business.facebook.com/settings/system-users) → **Usuarios del sistema**, crear uno (o usar uno existente), asignarle la cuenta publicitaria con permiso de lectura y **Generar token** con el permiso `ads_read`.
 2. En Vercel → proyecto `chapa-labs` → **Settings → Environment Variables**, agregar `META_ACCESS_TOKEN` con ese token (y `META_AD_ACCOUNT_ID` si se usa otra cuenta).
 3. **Redeploy.** El dashboard toma los datos de Meta al abrirse (con 15 minutos de caché) y la etiqueta pasa a decir "en vivo".
+
+### Conectar PostHog en vivo
+
+1. En PostHog → avatar → **Settings → Personal API keys** → **Create personal API key**. Darle acceso a las organizaciones **Growth Labs 2** y **AmoblaIA** (o a todas) con el permiso **Query: Read**.
+2. En Vercel, agregar `POSTHOG_API_KEY` con esa clave y hacer **Redeploy**.
+
+Las consultas de cada proyecto (y el id de proyecto de PostHog) están en `api/posthog.js`. Para sumar Turnia: crear su proyecto en PostHog, agregar sus consultas ahí y en `data.js` un bloque `posthog` con la misma forma.
 
 Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match` en `data.js`) y cuenta como resultado el evento de `ads.resultAction` (por ejemplo `maru_paywall_viewed` del píxel o la conversión personalizada "Foto subida").
 
@@ -40,6 +46,7 @@ Todo vive en `data.js`. Por cada proyecto:
 
 | Campo | Qué es |
 | --- | --- |
+| `posthog` | Resultado de las consultas de `api/posthog.js` (la foto inicial). `northStar.posthog`, `acquisition.query` y `usability` (`query`, `funnel`) leen de acá. |
 | `ads` | Pauta real de Meta Ads: prefijo de las campañas, evento que cuenta como resultado y la foto por día y campaña. |
 | `sample` | En `northStar`, `acquisition` o `usability`: marca la sección como de ejemplo. |
 | `northStar` | Nombre, definición, `target` (meta) y `series` con un valor por mes (`"AAAA-MM"`). |
@@ -61,5 +68,5 @@ Cuando una sección pase a tener datos reales, sacarle `sample: true`.
 
 - Leer los datos desde una Google Sheet compartida (cada proyecto en una pestaña) en lugar de editar `data.js`.
 - Conectar el CRM o la planilla de prospección de Amobla IA y Turnia para el embudo.
-- Traer la North Star y la usabilidad desde la analítica de producto (PostHog, base de datos propia).
+- Instrumentar eventos propios en Amobla IA (foto subida, ambiente generado, compra) y PostHog en Turnia.
 - Agregar metas por mes y alertas cuando una métrica se desvía.

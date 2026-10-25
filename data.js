@@ -3,14 +3,17 @@
  *
  * Lo que tiene `sample: true` son números DE EJEMPLO: se muestran con la
  * etiqueta "Ejemplo" hasta que se conecten los datos reales (ver README.md).
- * Los bloques `ads` son datos reales de Meta Ads.
+ * Los bloques `ads` (Meta Ads) y `posthog` (PostHog) son datos reales: esta es
+ * la foto guardada, y /api/meta y /api/posthog la actualizan en vivo.
  *
  * Cada proyecto tiene:
  *   - ads:         pauta real en Meta Ads (opcional), por día y campaña.
- *   - northStar:   la métrica principal, con su serie mensual y la meta.
- *   - acquisition: tipo "paid" (pauta: inversión → registros → pagos → ROI)
- *                  o tipo "outbound" (embudo comercial por etapas).
- *   - usability:   KPIs y tablas de uso del producto (columnas libres).
+ *   - posthog:     resultados de las consultas de api/posthog.js (opcional).
+ *   - northStar:   la métrica principal. Con `posthog` sale de esas consultas;
+ *                  si no, de una serie mensual con meta.
+ *   - acquisition: "funnel" (embudo real por canal + inversión de Meta),
+ *                  "paid" (pauta por mes) u "outbound" (embudo comercial).
+ *   - usability:   KPIs, embudo y tablas de uso. Con `query` salen de PostHog.
  *
  * Los meses van en formato "AAAA-MM" y en el mismo orden en todas las series.
  * Para sumar un proyecto, copiá uno de los bloques y cambiá el id.
@@ -25,23 +28,60 @@ window.CHAPA_DATA = {
     {
       id: 'maru-coach',
       name: 'Maru Coach',
-      tagline: 'App B2C · crecimiento con pauta paga',
-      stage: 'Tracción',
-      currency: 'USD',
+      tagline: 'Coach de búsqueda laboral con IA · pauta paga',
+      stage: 'Lanzamiento',
+      currency: 'ARS',
+      // Analítica real de PostHog (organización "Growth Labs 2"). Mismas columnas
+      // que las consultas de api/posthog.js, que la actualizan en vivo.
+      posthog: {
+        org: 'Growth Labs 2',
+        projectId: 670796,
+        snapshotAt: '2026-10-25',
+        data: {
+          daily: [
+            { date: '2026-10-17', visitantes: 6, resultado: 0, activados: 0, compras: 0, ingresos: 0 },
+            { date: '2026-10-18', visitantes: 99, resultado: 3, activados: 2, compras: 0, ingresos: 0 },
+            { date: '2026-10-19', visitantes: 91, resultado: 14, activados: 2, compras: 0, ingresos: 0 },
+            { date: '2026-10-20', visitantes: 140, resultado: 14, activados: 5, compras: 0, ingresos: 0 },
+            { date: '2026-10-21', visitantes: 57, resultado: 10, activados: 0, compras: 0, ingresos: 0 },
+            { date: '2026-10-22', visitantes: 112, resultado: 16, activados: 1, compras: 0, ingresos: 0 },
+            { date: '2026-10-23', visitantes: 158, resultado: 28, activados: 6, compras: 0, ingresos: 0 },
+            { date: '2026-10-24', visitantes: 153, resultado: 25, activados: 6, compras: 2, ingresos: 1980 },
+            { date: '2026-10-25', visitantes: 60, resultado: 5, activados: 0, compras: 0, ingresos: 0 },
+          ],
+          registros: [
+            { date: '2026-10-19', registros: 8 },
+            { date: '2026-10-20', registros: 9 },
+            { date: '2026-10-21', registros: 5 },
+            { date: '2026-10-22', registros: 3 },
+            { date: '2026-10-23', registros: 19 },
+            { date: '2026-10-24', registros: 16 },
+            { date: '2026-10-25', registros: 1 },
+          ],
+          porCanal: [
+            { canal: 'meta', visitantes: 496, empezaron: 112, resultado: 67, registrados: 35, activados: 12, checkouts: 2, compradores: 1, ingresos: 990 },
+            { canal: 'otras', visitantes: 326, empezaron: 66, resultado: 30, registrados: 26, activados: 10, checkouts: 1, compradores: 1, ingresos: 990 },
+          ],
+          nsm: [{ ultimos7: 97, previos7: 2 }],
+          secciones: [
+            { seccion: 'match', usuarios: 225, vistas: 482 },
+            { seccion: 'cv', usuarios: 171, vistas: 263 },
+            { seccion: 'busquedas', usuarios: 78, vistas: 253 },
+            { seccion: 'postulacion', usuarios: 73, vistas: 162 },
+            { seccion: 'precios', usuarios: 50, vistas: 85 },
+            { seccion: 'carta', usuarios: 15, vistas: 20 },
+            { seccion: 'entrevista', usuarios: 13, vistas: 14 },
+            { seccion: 'video', usuarios: 11, vistas: 12 },
+            { seccion: 'seguimiento', usuarios: 11, vistas: 16 },
+            { seccion: 'extension', usuarios: 11, vistas: 16 },
+          ],
+        },
+      },
       northStar: {
-        sample: true,
-        name: 'Usuarios activos semanales',
-        definition: 'Personas que completan al menos una rutina con su coach en la semana (promedio del mes).',
+        name: 'Personas que obtienen un resultado',
+        definition: 'Personas que recibieron un resultado de la herramienta (match, CV o postulación) en los últimos 7 días. Evento herramienta_resultado.',
         format: 'int',
-        target: 1300,
-        series: [
-          { month: '2026-05', value: 620 },
-          { month: '2026-06', value: 710 },
-          { month: '2026-07', value: 830 },
-          { month: '2026-08', value: 960 },
-          { month: '2026-09', value: 1080 },
-          { month: '2026-10', value: 1240 },
-        ],
+        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'resultado' },
       },
       // Pauta real en Meta Ads (cuenta "Costa Reset"). Se actualiza en vivo
       // desde /api/meta cuando está configurado META_ACCESS_TOKEN en Vercel;
@@ -67,70 +107,57 @@ window.CHAPA_DATA = {
           { date: '2026-10-25', campaignId: '120248861665880157', spend: 4869.33, impressions: 1653, clicks: 45, landing: 25, results: 0 },
         ],
       },
+      // Embudo real: canal según la UTM de la primera visita (PostHog) y la
+      // inversión de Meta Ads para costo por registro, CPA y ROI.
       acquisition: {
-        type: 'paid',
-        sample: true,
-        // inversion e ingresos en la moneda del proyecto; pagos = nuevos suscriptores pagos.
-        months: [
-          { month: '2026-05', inversion: 800, registros: 410, pagos: 32, ingresos: 1100 },
-          { month: '2026-06', inversion: 950, registros: 520, pagos: 41, ingresos: 1450 },
-          { month: '2026-07', inversion: 1100, registros: 600, pagos: 50, ingresos: 1800 },
-          { month: '2026-08', inversion: 1300, registros: 760, pagos: 66, ingresos: 2400 },
-          { month: '2026-09', inversion: 1500, registros: 840, pagos: 74, ingresos: 2750 },
-          { month: '2026-10', inversion: 1700, registros: 990, pagos: 92, ingresos: 3450 },
+        type: 'funnel',
+        query: 'porCanal',
+        paidChannel: 'meta',
+        channels: { meta: 'Meta Ads', otras: 'Otras fuentes' },
+        steps: [
+          { key: 'visitantes', label: 'Visitaron la web' },
+          { key: 'empezaron', label: 'Empezaron el match' },
+          { key: 'resultado', label: 'Obtuvieron un resultado' },
+          { key: 'registrados', label: 'Se registraron' },
+          { key: 'activados', label: 'Se activaron' },
+          { key: 'checkouts', label: 'Iniciaron el pago' },
+          { key: 'compradores', label: 'Compraron' },
         ],
-        // Desglose por canal del último mes cargado.
-        channels: [
-          { canal: 'Meta Ads', inversion: 1000, registros: 610, pagos: 55, ingresos: 2050 },
-          { canal: 'Google Ads', inversion: 500, registros: 250, pagos: 26, ingresos: 990 },
-          { canal: 'TikTok Ads', inversion: 200, registros: 130, pagos: 11, ingresos: 410 },
-        ],
+        signupKey: 'registrados',
+        buyerKey: 'compradores',
+        revenueKey: 'ingresos',
       },
       usability: {
-        sample: true,
         kpis: [
-          { label: 'Usuarios activos mensuales', format: 'int', value: 2950, prev: 2480, good: 'up' },
-          { label: 'Stickiness (DAU / MAU)', format: 'pct', value: 0.31, prev: 0.28, good: 'up' },
-          { label: 'Activación', hint: 'Registro → primera rutina en 7 días', format: 'pct', value: 0.46, prev: 0.42, good: 'up' },
-          { label: 'Churn mensual de pagos', format: 'pct', value: 0.072, prev: 0.081, good: 'down' },
+          { label: 'Visitantes únicos', query: 'porCanal', key: 'visitantes', format: 'int' },
+          { label: 'Empezaron el match', hint: '% de los visitantes', query: 'porCanal', key: 'empezaron', of: 'visitantes', format: 'pct' },
+          { label: 'Obtuvieron un resultado', hint: '% de los que empezaron', query: 'porCanal', key: 'resultado', of: 'empezaron', format: 'pct' },
+          { label: 'Activación', hint: 'Activados / registrados', query: 'porCanal', key: 'activados', of: 'registrados', format: 'pct' },
         ],
         tables: [
           {
-            title: 'Uso por funcionalidad',
-            note: 'Último mes. % sobre usuarios activos mensuales.',
+            title: 'Secciones más usadas',
+            note: 'Últimos 30 días. Personas únicas que entraron a cada sección.',
+            query: 'secciones',
             columns: [
-              { key: 'funcion', label: 'Funcionalidad' },
-              { key: 'alcance', label: '% usuarios', format: 'pct' },
-              { key: 'frecuencia', label: 'Usos / usuario / semana', format: 'dec' },
-              { key: 'var', label: 'Var. vs mes anterior', format: 'delta' },
-            ],
-            rows: [
-              { funcion: 'Rutina guiada', alcance: 0.82, frecuencia: 3.4, var: 0.06 },
-              { funcion: 'Chat con coach IA', alcance: 0.57, frecuencia: 4.1, var: 0.12 },
-              { funcion: 'Registro de comidas', alcance: 0.38, frecuencia: 5.2, var: -0.03 },
-              { funcion: 'Seguimiento de progreso', alcance: 0.34, frecuencia: 1.6, var: 0.02 },
-              { funcion: 'Retos semanales', alcance: 0.21, frecuencia: 1.1, var: 0.09 },
+              { key: 'seccion', label: 'Sección' },
+              { key: 'usuarios', label: 'Personas', format: 'int' },
+              { key: 'vistas', label: 'Vistas', format: 'int' },
             ],
           },
           {
-            title: 'Retención por cohorte',
-            note: '% de cada cohorte de registro que sigue activa N meses después.',
-            heat: true,
+            title: 'Por día',
+            note: 'Personas únicas por día. Registro = primer login.',
+            wide: true,
+            query: ['daily', 'registros'],
             columns: [
-              { key: 'cohorte', label: 'Cohorte', format: 'month' },
-              { key: 'usuarios', label: 'Registros', format: 'int' },
-              { key: 'm1', label: 'Mes 1', format: 'pct', heat: true },
-              { key: 'm2', label: 'Mes 2', format: 'pct', heat: true },
-              { key: 'm3', label: 'Mes 3', format: 'pct', heat: true },
-              { key: 'm4', label: 'Mes 4', format: 'pct', heat: true },
-              { key: 'm5', label: 'Mes 5', format: 'pct', heat: true },
-            ],
-            rows: [
-              { cohorte: '2026-05', usuarios: 410, m1: 0.44, m2: 0.33, m3: 0.28, m4: 0.25, m5: 0.23 },
-              { cohorte: '2026-06', usuarios: 520, m1: 0.47, m2: 0.36, m3: 0.30, m4: 0.27 },
-              { cohorte: '2026-07', usuarios: 600, m1: 0.49, m2: 0.38, m3: 0.32 },
-              { cohorte: '2026-08', usuarios: 760, m1: 0.52, m2: 0.40 },
-              { cohorte: '2026-09', usuarios: 840, m1: 0.54 },
+              { key: 'date', label: 'Día', format: 'day' },
+              { key: 'visitantes', label: 'Visitantes', format: 'int' },
+              { key: 'resultado', label: 'Con resultado', format: 'int' },
+              { key: 'registros', label: 'Registros', format: 'int' },
+              { key: 'activados', label: 'Activados', format: 'int' },
+              { key: 'compras', label: 'Compras', format: 'int' },
+              { key: 'ingresos', label: 'Ingresos', format: 'money' },
             ],
           },
         ],
@@ -141,23 +168,40 @@ window.CHAPA_DATA = {
     {
       id: 'amobla-ia',
       name: 'Amobla IA',
-      tagline: 'SaaS B2B · venta outbound',
-      stage: 'Validación',
+      tagline: 'Virtual staging con IA para inmobiliarias · Meta Ads + outbound',
+      stage: 'Lanzamiento',
       currency: 'USD',
+      // Analítica real de PostHog (organización "AmoblaIA"). Todavía sin eventos
+      // propios: se usan páginas vistas y clics automáticos sobre los botones.
+      posthog: {
+        org: 'AmoblaIA',
+        projectId: 683617,
+        snapshotAt: '2026-10-25',
+        data: {
+          daily: [
+            { date: '2026-10-23', visitantes: 36, visitantesMeta: 12, estudio: 3, foto: 5, amoblaron: 0, precios: 4 },
+            { date: '2026-10-24', visitantes: 38, visitantesMeta: 26, estudio: 4, foto: 3, amoblaron: 1, precios: 5 },
+            { date: '2026-10-25', visitantes: 24, visitantesMeta: 6, estudio: 14, foto: 8, amoblaron: 3, precios: 2 },
+          ],
+          totales: [{ visitantes: 90, visitantesMeta: 42, estudio: 21, foto: 16, amoblaron: 4, precios: 10, quisieronPagar: 6, rageclicks: 12 }],
+          nsm: [{ ultimos7: 4, previos7: 0 }],
+          paginas: [
+            { pagina: '/', visitantes: 61, vistas: 116 },
+            { pagina: '/estudio', visitantes: 21, vistas: 34 },
+            { pagina: '/precios', visitantes: 10, vistas: 19 },
+            { pagina: '/galeria', visitantes: 7, vistas: 9 },
+            { pagina: '/como-hacer-virtual-staging', visitantes: 5, vistas: 5 },
+            { pagina: '/marca-blanca', visitantes: 5, vistas: 5 },
+            { pagina: '/acceso', visitantes: 3, vistas: 13 },
+            { pagina: '/proyectos', visitantes: 2, vistas: 16 },
+          ],
+        },
+      },
       northStar: {
-        sample: true,
-        name: 'Ambientes generados con IA',
-        definition: 'Ambientes amoblados con IA por las cuentas clientes en el mes.',
+        name: 'Personas que amoblaron un ambiente',
+        definition: 'Personas que tocaron "Amoblar" en el estudio en los últimos 7 días. Se mide con los clics automáticos hasta que la app mande un evento propio.',
         format: 'int',
-        target: 5000,
-        series: [
-          { month: '2026-05', value: 1200 },
-          { month: '2026-06', value: 1650 },
-          { month: '2026-07', value: 2300 },
-          { month: '2026-08', value: 2900 },
-          { month: '2026-09', value: 3700 },
-          { month: '2026-10', value: 4600 },
-        ],
+        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'amoblaron' },
       },
       ads: {
         source: 'Meta Ads',
@@ -203,47 +247,48 @@ window.CHAPA_DATA = {
         ],
       },
       usability: {
-        sample: true,
+        funnel: {
+          title: 'Recorrido en la web',
+          note: 'Personas únicas desde el lanzamiento, como % de los visitantes.',
+          query: 'totales',
+          baseLabel: 'de los visitantes',
+          steps: [
+            { key: 'visitantes', label: 'Visitaron la web' },
+            { key: 'estudio', label: 'Entraron al estudio' },
+            { key: 'foto', label: 'Subieron una foto' },
+            { key: 'amoblaron', label: 'Amoblaron' },
+            { key: 'precios', label: 'Vieron precios' },
+            { key: 'quisieronPagar', label: 'Tocaron "plan pago"' },
+          ],
+        },
         kpis: [
-          { label: 'Cuentas activas', format: 'int', value: 41, prev: 31, good: 'up' },
-          { label: 'Ambientes por cuenta', format: 'dec', value: 112, prev: 119, good: 'up' },
-          { label: 'Tiempo a primer ambiente', hint: 'Desde el alta de la cuenta', format: 'hours', value: 5.5, prev: 9, good: 'down' },
-          { label: 'Ambientes descargados o compartidos', format: 'pct', value: 0.63, prev: 0.58, good: 'up' },
+          { label: 'Visitantes únicos', query: 'totales', key: 'visitantes', format: 'int' },
+          { label: 'Llegaron desde Meta', hint: '% de los visitantes', query: 'totales', key: 'visitantesMeta', of: 'visitantes', format: 'pct' },
+          { label: 'Entraron al estudio', hint: '% de los visitantes', query: 'totales', key: 'estudio', of: 'visitantes', format: 'pct' },
+          { label: 'Clics de frustración', hint: 'Rage clicks', query: 'totales', key: 'rageclicks', format: 'int' },
         ],
         tables: [
           {
-            title: 'Uso por funcionalidad',
-            note: 'Último mes. % sobre cuentas activas.',
+            title: 'Páginas más visitadas',
+            note: 'Últimos 30 días.',
+            query: 'paginas',
             columns: [
-              { key: 'funcion', label: 'Funcionalidad' },
-              { key: 'alcance', label: '% cuentas', format: 'pct' },
-              { key: 'volumen', label: 'Usos en el mes', format: 'int' },
-              { key: 'var', label: 'Var. vs mes anterior', format: 'delta' },
-            ],
-            rows: [
-              { funcion: 'Amoblar foto de ambiente', alcance: 0.95, volumen: 3150, var: 0.21 },
-              { funcion: 'Cambiar estilo', alcance: 0.71, volumen: 980, var: 0.34 },
-              { funcion: 'Catálogo propio de muebles', alcance: 0.39, volumen: 310, var: 0.18 },
-              { funcion: 'Compartir con cliente final', alcance: 0.56, volumen: 1420, var: 0.27 },
+              { key: 'pagina', label: 'Página' },
+              { key: 'visitantes', label: 'Personas', format: 'int' },
+              { key: 'vistas', label: 'Vistas', format: 'int' },
             ],
           },
           {
-            title: 'Salud de cuentas',
-            note: 'Cuentas con más uso del mes.',
+            title: 'Por día',
+            note: 'Personas únicas por día.',
+            query: 'daily',
             columns: [
-              { key: 'cuenta', label: 'Cuenta' },
-              { key: 'plan', label: 'Plan' },
-              { key: 'ambientes', label: 'Ambientes', format: 'int' },
-              { key: 'usuarios', label: 'Usuarios', format: 'int' },
-              { key: 'ultimo', label: 'Último uso' },
-              { key: 'salud', label: 'Salud', format: 'status' },
-            ],
-            rows: [
-              { cuenta: 'Cuenta A', plan: 'Pro', ambientes: 640, usuarios: 6, ultimo: 'Hoy', salud: 'good' },
-              { cuenta: 'Cuenta B', plan: 'Pro', ambientes: 410, usuarios: 4, ultimo: 'Hoy', salud: 'good' },
-              { cuenta: 'Cuenta C', plan: 'Starter', ambientes: 220, usuarios: 2, ultimo: 'Ayer', salud: 'good' },
-              { cuenta: 'Cuenta D', plan: 'Starter', ambientes: 95, usuarios: 1, ultimo: 'Hace 6 días', salud: 'warning' },
-              { cuenta: 'Cuenta E', plan: 'Pro', ambientes: 30, usuarios: 3, ultimo: 'Hace 15 días', salud: 'critical' },
+              { key: 'date', label: 'Día', format: 'day' },
+              { key: 'visitantes', label: 'Visitantes', format: 'int' },
+              { key: 'visitantesMeta', label: 'Desde Meta', format: 'int' },
+              { key: 'estudio', label: 'Estudio', format: 'int' },
+              { key: 'foto', label: 'Foto', format: 'int' },
+              { key: 'amoblaron', label: 'Amoblaron', format: 'int' },
             ],
           },
         ],

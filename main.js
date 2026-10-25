@@ -12,8 +12,9 @@
   const tip = $('#tip');
 
   const projectMonths = (p) => [
-    ...p.northStar.series.map((s) => s.month),
+    ...(p.northStar.series || []).map((s) => s.month),
     ...(p.ads ? p.ads.daily.map((d) => d.date.slice(0, 7)) : []),
+    ...(p.posthog ? (p.posthog.data.daily || []).map((d) => d.date.slice(0, 7)) : []),
   ];
   let allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
   const state = { month: allMonths[allMonths.length - 1], view: 'resumen' };
@@ -32,10 +33,10 @@
   const dayTip = (d) => `${Number(d.slice(8))} de ${MONTH_NAMES[Number(d.slice(5, 7)) - 1]}`;
   const axisLabel = (p) => p.label || monthLabel(p.month);
   const tipLabel = (p) => p.tip || monthLabel(p.month, true);
-  // Con muchos puntos (días) se muestran ~8 etiquetas en el eje.
-  const showTick = (i, n) => {
-    const every = Math.ceil(n / 8);
-    return n <= 12 || i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2);
+  // Con muchos puntos (días) se muestran solo las etiquetas que entran en el ancho.
+  const showTick = (i, n, fit) => {
+    const every = Math.ceil(n / Math.max(2, fit));
+    return every <= 1 || i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2);
   };
   const badge = (block, real) => {
     if (block && block.sample) return '<span class="badge is-sample">Ejemplo</span>';
@@ -54,6 +55,7 @@
       case 'hours': return `${num(v, 1)} h`;
       case 'x': return `${num(v, 1, 1)}x`;
       case 'month': return monthLabel(v, true);
+      case 'day': return dayTip(v);
       case 'delta': return `<span class="delta ${v > 0 ? 'good' : v < 0 ? 'bad' : 'flat'}">${v > 0 ? '+' : ''}${num(v * 100, 0)}%</span>`;
       case 'status': return statusBadge(v);
       case 'state': return v === 'ACTIVE' ? '<span class="state on">▶ Activa</span>' : '<span class="state">❚❚ Pausada</span>';
@@ -102,6 +104,23 @@
     </div>`;
 
   const ratio = (a, b) => (b ? a / b : NaN);
+
+  // ─── Datos de PostHog ─────────────────────────────────────
+  // Filas de una consulta de api/posthog.js. Con varias consultas diarias,
+  // las une por fecha (lo que falta en un día cuenta como 0).
+  function phRows(p, query) {
+    const data = (p.posthog && p.posthog.data) || {};
+    const names = [].concat(query);
+    if (names.length === 1) return data[names[0]] || [];
+    const byDate = new Map();
+    names.flatMap((n) => data[n] || []).forEach((r) => byDate.set(r.date, { ...(byDate.get(r.date) || {}), ...r }));
+    const rows = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+    const keys = [...new Set(rows.flatMap(Object.keys))];
+    return rows.map((r) => Object.fromEntries(keys.map((k) => [k, r[k] ?? 0])));
+  }
+  const phSum = (p, query, key) => phRows(p, query).reduce((a, r) => a + (Number(r[key]) || 0), 0);
+  const phUpdated = (p) => (p.posthog.live ? 'en vivo' : `actualizado el ${dayTip(p.posthog.snapshotAt)}`);
+  const phBadge = (p) => badge(null, `Datos reales · PostHog, ${phUpdated(p)}`);
 
   // ─── Datos por mes ────────────────────────────────────────
   const upTo = (rows) => rows.filter((r) => r.month <= state.month);
@@ -156,7 +175,7 @@
       out += `<path class="line" d="${d}" style="stroke:${color}"/>`;
       const colW = n > 1 ? f.iw / (n - 1) : f.iw;
       points.forEach((p, i) => {
-        if (showTick(i, n)) out += `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
+        if (showTick(i, n, Math.floor(f.iw / 46))) out += `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
         if (!Number.isFinite(p.value)) return;
         const prev = points[i - 1];
         const extra = prev && Number.isFinite(prev.value) ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
@@ -197,7 +216,7 @@
         const extra = prev ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
         out += `<path class="bar" d="${d}" style="fill:${color}"/>`;
         out += `<rect class="hit" x="${cx - band / 2}" y="0" width="${band}" height="${h}" data-tip="${tipHtml(tipLabel(p), fmt(p.value, format, currency), extra)}"/>`;
-        if (showTick(i, n)) out += `<text x="${cx}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
+        if (showTick(i, n, Math.floor(f.iw / 46))) out += `<text x="${cx}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
         if (i === n - 1) out += `<text class="val" x="${cx}" y="${y1 - 7}" text-anchor="middle">${fmt(p.value, format, currency)}</text>`;
       });
       return `<svg viewBox="0 0 ${w} ${h}" height="${h}" role="img" aria-label="Evolución mensual">${out}</svg>`;
@@ -257,6 +276,14 @@
   const sumRows = (rows, keys) => Object.fromEntries(keys.map((k) => [k, rows.reduce((a, r) => a + (r[k] || 0), 0)]));
 
   function acquisitionHeadline(p) {
+    if (p.acquisition.type === 'funnel') {
+      const f = funnelFigures(p);
+      return [
+        { k: 'Inversión Meta', v: fmt(f.spend, 'money', f.cur) },
+        { k: 'Costo por registro', v: fmt(f.cpl, 'money', f.cur) },
+        { k: 'ROI', v: fmt(f.roi, 'pct') },
+      ];
+    }
     if (p.ads) {
       const t = adsTotals(adsRows(p.ads));
       return [
@@ -289,15 +316,33 @@
   // ─── Vistas ───────────────────────────────────────────────
   function nsmFigures(p) {
     const ns = p.northStar;
+    if (ns.posthog) {
+      // Valor de los últimos 7 días; la comparación se muestra cuando la
+      // semana anterior tiene datos suficientes.
+      const src = ns.posthog;
+      const head = phRows(p, src.query)[0] || {};
+      const value = Number(head[src.value]);
+      const prevValue = Number(head[src.prev]);
+      const list = phRows(p, src.daily).map((r) => ({ label: dayLabel(r.date), tip: dayTip(r.date), value: Number(r[src.dailyKey]) || 0 }));
+      const progress = ns.target ? Math.min(1, value / ns.target) : null;
+      return {
+        ns, list, value, progress,
+        prev: prevValue >= 10 ? { value: prevValue } : null,
+        suffix: 'vs 7 días ant.',
+        period: prevValue >= 10 ? 'Últimos 7 días' : 'Últimos 7 días · primera semana con datos',
+        badge: phBadge(p),
+      };
+    }
     const { curr, prev, list } = pick(ns.series);
     const value = curr ? curr.value : NaN;
     const progress = ns.target ? Math.min(1, value / ns.target) : null;
-    return { ns, curr, prev, list, value, progress };
+    return { ns, curr, prev, list, value, progress, suffix: 'vs mes ant.', period: '', badge: badge(ns) };
   }
 
   function renderSummary() {
     const cards = PROJECTS.map((p, i) => {
-      const { ns, prev, list, value, progress } = nsmFigures(p);
+      const f = nsmFigures(p);
+      const { ns, prev, list, value, progress } = f;
       const spark = chart(lineChart({ points: list, format: ns.format, color: ACCENTS[i], height: 120, target: ns.target }));
       const acq = acquisitionHeadline(p).map((m) => `<div class="mini"><div class="k">${m.k}</div><div class="v">${m.v}</div>${m.d || ''}</div>`).join('');
       return `
@@ -307,9 +352,10 @@
             <span class="chip">${esc(p.stage)}</span>
           </div>
           <div>
-            <p class="nsm-label">North Star · ${esc(ns.name)} ${badge(ns)}</p>
+            <p class="nsm-label">North Star · ${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</p>
             <p class="hero">${fmt(value, ns.format)}</p>
-            ${delta(value, prev && prev.value, { format: ns.format })}
+            ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
+            ${f.period ? `<p class="period">${f.period}</p>` : ''}
           </div>
           ${progress !== null ? `
             <div>
@@ -322,15 +368,17 @@
     }).join('');
 
     const rows = PROJECTS.map((p, i) => {
-      const { ns, prev, value, progress } = nsmFigures(p);
+      const f = nsmFigures(p);
+      const { ns, prev, value, progress } = f;
       const acq = acquisitionHeadline(p).map((m) => `${m.k}: <strong>${m.v}</strong>`).join(' · ');
+      const acqSource = p.acquisition.type === 'funnel' ? 'Meta Ads + PostHog' : p.ads ? p.ads.source : p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound';
       return `<tr>
         <td><span class="proj-name" style="font-size:13px"><span class="dot" style="background:${ACCENTS[i]}"></span><a href="#${esc(p.id)}">${esc(p.name)}</a></span></td>
-        <td style="text-align:left">${esc(ns.name)}</td>
+        <td style="text-align:left">${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</td>
         <td><strong>${fmt(value, ns.format)}</strong></td>
-        <td>${delta(value, prev && prev.value, { format: ns.format, suffix: '' })}</td>
-        <td>${progress !== null ? fmt(progress, 'pct') : '—'} ${badge(ns)}</td>
-        <td>${p.ads ? `${esc(p.ads.source)} ${badge(null, 'Real')}` : `${p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound'} ${badge(p.acquisition)}`}</td>
+        <td>${delta(value, prev && prev.value, { format: ns.format, suffix: '' }) || '—'}</td>
+        <td>${progress !== null ? fmt(progress, 'pct') : '—'}</td>
+        <td>${esc(acqSource)} ${p.acquisition.sample && !p.ads ? badge(p.acquisition) : badge(null, 'Real')}</td>
         <td style="text-align:left;white-space:normal;min-width:260px">${acq}</td>
       </tr>`;
     }).join('');
@@ -346,7 +394,7 @@
       <h2 class="section">Comparativo <span>· ${monthLabel(state.month, true)}</span></h2>
       <div class="card">
         <div class="table-wrap"><table>
-          <thead><tr><th>Proyecto</th><th style="text-align:left">North Star</th><th>Valor</th><th>Var. mensual</th><th>% de meta</th><th>Adquisición</th><th style="text-align:left">Claves del mes</th></tr></thead>
+          <thead><tr><th>Proyecto</th><th style="text-align:left">North Star</th><th>Valor</th><th>Variación</th><th>% de meta</th><th>Adquisición</th><th style="text-align:left">Claves</th></tr></thead>
           <tbody>${rows}</tbody>
         </table></div>
       </div>`;
@@ -420,6 +468,86 @@
       </div>` : ''}`;
   }
 
+  // Barras de embudo. relative: 'prev' compara cada etapa con la anterior;
+  // 'first' la compara con la primera (para recorridos que no son en orden).
+  function funnelHtml(steps, row, color, { relative = 'prev', baseLabel = 'del total' } = {}) {
+    const top = Math.max(1, ...steps.map((s) => Number(row[s.key]) || 0));
+    const firstV = Number(row[steps[0].key]) || 0;
+    return steps.map((s, i) => {
+      const v = Number(row[s.key]) || 0;
+      const base = relative === 'prev' && i ? Number(row[steps[i - 1].key]) || 0 : firstV;
+      const conv = i ? ratio(v, base) : null;
+      const convText = relative === 'prev' ? 'pasa a la siguiente etapa' : baseLabel;
+      return `${conv !== null ? `<div class="f-row"><span></span><span class="f-conv">↓ ${fmt(conv, 'pct')} ${esc(convText)}</span></div>` : ''}
+        <div class="f-row">
+          <span class="f-label">${esc(s.label)}</span>
+          <span class="f-track"><span class="f-bar" style="display:block;width:${(v / top) * 100}%;background:${color}" data-tip="${tipHtml(s.label, fmt(v, 'int'), i ? `${fmt(ratio(v, firstV), 'pct')} ${baseLabel}` : '')}"></span></span>
+          <span class="f-num">${fmt(v, 'int')}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // ─── Embudo real por canal (PostHog + inversión de Meta) ──
+  function funnelFigures(p) {
+    const a = p.acquisition;
+    const rows = phRows(p, a.query);
+    const paid = rows.find((r) => r.canal === a.paidChannel) || {};
+    const spend = p.ads ? adsTotals(p.ads.daily).spend : NaN;
+    const signups = Number(paid[a.signupKey]) || 0;
+    const buyers = Number(paid[a.buyerKey]) || 0;
+    const revenue = Number(paid[a.revenueKey]) || 0;
+    return {
+      rows, paid, spend, signups, buyers, revenue,
+      cur: p.ads ? p.ads.currency : p.currency,
+      cpl: ratio(spend, signups),
+      cpa: ratio(spend, buyers),
+      roi: ratio(revenue - spend, spend),
+    };
+  }
+
+  function renderFunnelAcq(p, color) {
+    const a = p.acquisition;
+    const f = funnelFigures(p);
+    const paidName = a.channels[a.paidChannel] || a.paidChannel;
+    const tiles = [
+      { label: `Inversión en ${paidName}`, value: f.spend, format: 'money' },
+      { label: `Visitantes desde ${paidName}`, value: Number(f.paid.visitantes) || 0, format: 'int' },
+      { label: 'Registros', hint: `Desde ${paidName}`, value: f.signups, format: 'int' },
+      { label: 'Costo por registro', value: f.cpl, format: 'money' },
+      { label: 'Compras', hint: `Desde ${paidName}`, value: f.buyers, format: 'int' },
+      { label: 'Costo por compra (CPA)', value: f.cpa, format: 'money' },
+      { label: 'Ingresos', hint: `Desde ${paidName}`, value: f.revenue, format: 'money' },
+      { label: 'ROI', hint: '(Ingresos − inversión) / inversión', value: f.roi, format: 'pct' },
+    ].map((t) => tile({ ...t, currency: f.cur })).join('');
+
+    const keys = [...a.steps.map((s) => s.key), a.revenueKey];
+    const order = Object.keys(a.channels);
+    const rows = f.rows.slice().sort((x, y) => order.indexOf(x.canal) - order.indexOf(y.canal))
+      .map((r) => ({ ...r, nombre: a.channels[r.canal] || r.canal }));
+    const total = { nombre: 'Total', ...sumRows(rows, keys) };
+    const first = a.steps[0].key;
+    const last = a.steps[a.steps.length - 1].key;
+    [...rows, total].forEach((r) => { r.conv = ratio(r[last], r[first]); });
+    const cols = [
+      { key: 'nombre', label: 'Canal' },
+      ...a.steps.map((s) => ({ key: s.key, label: s.label, format: 'int' })),
+      { key: 'conv', label: 'Conv. total', format: 'pct' },
+      { key: a.revenueKey, label: 'Ingresos', format: 'money' },
+    ];
+    const since = (phRows(p, 'daily')[0] || {}).date;
+
+    return `
+      <div class="tiles">${tiles}</div>
+      <div class="grid g-2" style="margin-top:12px">
+        <div class="card"><h3>Embudo de ${esc(paidName)}</h3><p class="sub">Personas que llegaron por ${esc(paidName)} · conversión entre etapas</p><div class="funnel">${funnelHtml(a.steps, f.paid, color)}</div></div>
+        <div class="card"><h3>Embudo total</h3><p class="sub">Todas las fuentes</p><div class="funnel">${funnelHtml(a.steps, total, color)}</div></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Por canal</h3><p class="sub">${since ? `Desde el ${dayTip(since)}` : ''} · canal según la UTM de la primera visita</p>
+        ${table({ columns: cols, rows, total, currency: f.cur })}
+      </div>`;
+  }
+
   function renderOutbound(p, color) {
     const a = p.acquisition;
     const { curr, prev, list } = pick(a.months);
@@ -433,17 +561,7 @@
     tiles.push(tile({ label: 'Conversión total', hint: `${stages[0].label} → ${stages[stages.length - 1].label}`, value: ratio(curr[last], curr[first]), prev: prev && ratio(pv[last], pv[first]), format: 'pct' }));
     if (curr.mrrNuevo !== undefined) tiles.push(tile({ label: 'MRR nuevo', value: curr.mrrNuevo, prev: pv.mrrNuevo, format: 'money', currency: p.currency }));
 
-    const top = curr[first] || 1;
-    const funnel = stages.map((s, i) => {
-      const v = curr[s.key];
-      const conv = i ? ratio(v, curr[stages[i - 1].key]) : null;
-      return `${conv !== null ? `<div class="f-row"><span></span><span class="f-conv">↓ ${fmt(conv, 'pct')} pasa a la siguiente etapa</span></div>` : ''}
-        <div class="f-row">
-          <span class="f-label">${esc(s.label)}</span>
-          <span class="f-track"><span class="f-bar" style="display:block;width:${(v / top) * 100}%;background:${color}" data-tip="${tipHtml(s.label, fmt(v, 'int'), i ? `${fmt(ratio(v, top), 'pct')} del total prospectado` : '')}"></span></span>
-          <span class="f-num">${fmt(v, 'int')}</span>
-        </div>`;
-    }).join('');
+    const funnel = funnelHtml(stages, curr, color);
 
     const monthCols = [
       { key: 'month', label: 'Mes', format: 'month' },
@@ -544,24 +662,39 @@
       </div>`;
   }
 
-  function renderUsability(p) {
+  function renderUsability(p, color) {
     const u = p.usability || {};
-    const tiles = (u.kpis || []).map((k) => tile({ ...k, currency: p.currency })).join('');
-    const tables = (u.tables || []).map((t) => `
-      <div class="card">
+    // KPI con `query`: suma de la columna en PostHog (y con `of`, el cociente).
+    const kpiValue = (k) => {
+      if (!k.query) return k.value;
+      const v = phSum(p, k.query, k.key);
+      return k.of ? ratio(v, phSum(p, k.query, k.of)) : v;
+    };
+    const tiles = (u.kpis || []).map((k) => tile({ ...k, value: kpiValue(k), prev: k.query ? undefined : k.prev, currency: p.currency })).join('');
+    const cards = [];
+    if (u.funnel) {
+      const row = phRows(p, u.funnel.query)[0] || {};
+      cards.push(`<div class="card"><h3>${esc(u.funnel.title)}</h3>${u.funnel.note ? `<p class="sub">${esc(u.funnel.note)}</p>` : ''}
+        <div class="funnel">${funnelHtml(u.funnel.steps, row, color, { relative: 'first', baseLabel: u.funnel.baseLabel })}</div></div>`);
+    }
+    (u.tables || []).forEach((t) => cards.push(`
+      <div class="card${t.wide ? ' span-2' : ''}">
         <h3>${esc(t.title)}</h3>${t.note ? `<p class="sub">${esc(t.note)}</p>` : ''}
-        ${table({ columns: t.columns, rows: t.rows, heat: t.heat, currency: p.currency })}
-      </div>`).join('');
+        ${table({ columns: t.columns, rows: t.query ? phRows(p, t.query) : t.rows, heat: t.heat, currency: p.currency })}
+      </div>`));
     return `
       ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
-      ${tables ? `<div class="grid g-2" style="margin-top:12px">${tables}</div>` : ''}`;
+      ${cards.length ? `<div class="grid g-2" style="margin-top:12px">${cards.join('')}</div>` : ''}`;
   }
 
   function renderProject(p) {
     const i = PROJECTS.indexOf(p);
     const color = ACCENTS[i % ACCENTS.length];
-    const { ns, prev, list, value, progress } = nsmFigures(p);
+    const f = nsmFigures(p);
+    const { ns, prev, list, value, progress } = f;
     const lastMonth = allMonths[allMonths.length - 1];
+    const realUsability = !p.usability.sample && p.posthog;
+    const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound' }[p.acquisition.type];
 
     main.innerHTML = `
       <div class="page-head">
@@ -571,12 +704,13 @@
         </div>
       </div>
 
-      <h2 class="section">North Star Metric ${badge(ns)}</h2>
+      <h2 class="section">North Star Metric ${f.badge}</h2>
       <div class="card nsm">
         <div>
           <p class="nsm-label">${esc(ns.name)}</p>
           <p class="hero">${fmt(value, ns.format)}</p>
-          ${delta(value, prev && prev.value, { format: ns.format })}
+          ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
+          ${f.period ? `<p class="period">${f.period}</p>` : ''}
           <p class="nsm-def">${esc(ns.definition)}</p>
           ${progress !== null ? `
             <div class="progress"><span style="width:${progress * 100}%;background:${color}"></span></div>
@@ -589,11 +723,11 @@
       <h2 class="section">Adquisición <span>· Pauta en ${esc(p.ads.source)}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
       ${renderAds(p, color)}` : ''}
 
-      <h2 class="section">Adquisición <span>· ${p.acquisition.type === 'paid' ? 'Registros, pagos y ROI' : 'Outbound'}</span> ${badge(p.acquisition)}</h2>
-      ${p.acquisition.type === 'paid' ? renderPaid(p, color) : renderOutbound(p, color)}
+      <h2 class="section">Adquisición <span>· ${acqTitle}</span> ${p.acquisition.type === 'funnel' ? phBadge(p) : badge(p.acquisition)}</h2>
+      ${{ funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound }[p.acquisition.type](p, color)}
 
-      <h2 class="section">Usabilidad <span>· ${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}</span> ${badge(p.usability)}</h2>
-      ${renderUsability(p)}`;
+      <h2 class="section">Usabilidad <span>· ${realUsability ? 'desde el lanzamiento' : `${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}`}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
+      ${renderUsability(p, color)}`;
   }
 
   // ─── Navegación ───────────────────────────────────────────
@@ -720,7 +854,29 @@
     } catch (e) { /* queda la foto de data.js */ }
   }
 
+  // Datos en vivo de PostHog (función /api/posthog en Vercel).
+  async function loadLivePosthog() {
+    if (location.protocol === 'file:' || !PROJECTS.some((p) => p.posthog)) return;
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch('/api/posthog', { signal: ctrl.signal });
+      if (!res.ok) return;
+      const live = await res.json();
+      let changed = false;
+      PROJECTS.forEach((p) => {
+        const data = p.posthog && live.projects && live.projects[p.id];
+        if (!data) return;
+        p.posthog.data = data;
+        p.posthog.live = true;
+        changed = true;
+      });
+      if (changed) render();
+    } catch (e) { /* queda la foto de data.js */ }
+  }
+
   fromHash();
   render();
   loadLiveAds();
+  loadLivePosthog();
 })();

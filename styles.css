@@ -152,6 +152,7 @@ h2.section .badge { font-weight: 600; }
 .grid { display: grid; gap: 12px; }
 .g-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.span-2 { grid-column: 1 / -1; }
 .tiles { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /* Stat tile */
@@ -181,6 +182,7 @@ h2.section .badge { font-weight: 600; }
 
 /* NSM block */
 .nsm { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 24px; }
+.period { font-size: 12px; color: var(--muted); margin: 2px 0 0; }
 .nsm-def { font-size: 13px; color: var(--muted); margin: 8px 0 16px; }
 
 /* ─── Charts ──────────────────────────────────────── */
