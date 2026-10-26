@@ -959,6 +959,8 @@
       return k.of ? ratio(v, phSum(p, k.query, k.of)) : v;
     };
     const tiles = (u.kpis || []).map((k) => tile({ ...k, value: kpiValue(k), prev: k.query ? undefined : k.prev, currency: p.currency })).join('');
+    const groups = (u.funnelGroups || []).map((g) => funnelGroupHtml(p, g, color)).join('');
+    const volume = u.features ? featuresHtml(p, u.features, color) : '';
     const cards = [];
     if (u.funnel) {
       const row = phRows(p, u.funnel.query)[0] || {};
@@ -972,7 +974,51 @@
       </div>`));
     return `
       ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
+      ${volume}
+      ${groups}
       ${cards.length ? `<div class="grid g-2" style="margin-top:12px">${cards.join('')}</div>` : ''}`;
+  }
+
+  // Funnels ordenados de PostHog: una fila por funnel con s1 … s6.
+  function funnelGroupHtml(p, g, color) {
+    const rows = new Map(phRows(p, g.query).map((r) => [r.funnel, r]));
+    const card = (f, wide) => {
+      const row = rows.get(f.id) || {};
+      const steps = f.steps.map((label, i) => ({ key: `s${i + 1}`, label }));
+      const first = Number(row.s1) || 0;
+      const last = Number(row[`s${steps.length}`]) || 0;
+      return `
+        <div class="card funnel-card${wide ? ' span-2' : ''}">
+          <div class="funnel-head">
+            <div><h3>${esc(f.title)}</h3>${f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}</div>
+            <div class="funnel-total"><strong>${fmt(ratio(last, first), 'pct')}</strong><span>completa el recorrido</span></div>
+          </div>
+          <div class="funnel">${funnelHtml(steps, row, color)}</div>
+        </div>`;
+    };
+    const wide = g.funnels.length === 1;
+    return `
+      <h3 class="group-title">${esc(g.title)}${g.note ? ` <span>· ${esc(g.note)}</span>` : ''}</h3>
+      <div class="grid ${wide ? 'g-1' : 'g-2'}">${g.funnels.map((f) => card(f, wide)).join('')}</div>`;
+  }
+
+  // Volumen por función: personas (barra) y veces que se abrió cada una.
+  function featuresHtml(p, cfg, color) {
+    const rows = phRows(p, cfg.query);
+    const top = Math.max(1, ...rows.map((r) => Number(r[cfg.key]) || 0));
+    const list = rows.map((r) => {
+      const v = Number(r[cfg.key]) || 0;
+      const name = (cfg.names && cfg.names[r[cfg.labelKey]]) || r[cfg.labelKey];
+      return `
+        <div class="v-row">
+          <span class="v-label">${esc(name)}</span>
+          <span class="v-track"><span class="v-bar" style="width:${(v / top) * 100}%;background:${color}" data-tip="${tipHtml(name, `${fmt(v, 'int')} personas`, `${fmt(Number(r[cfg.secondary]) || 0, 'int')} veces`)}"></span></span>
+          <span class="v-num"><strong>${fmt(v, 'int')}</strong><small>${fmt(Number(r[cfg.secondary]) || 0, 'int')} veces</small></span>
+        </div>`;
+    }).join('');
+    return `
+      <h3 class="group-title">${esc(cfg.title)}${cfg.note ? ` <span>· ${esc(cfg.note)}</span>` : ''}</h3>
+      <div class="card"><div class="v-list">${list}</div></div>`;
   }
 
   function renderProject(p) {
@@ -997,6 +1043,17 @@
         </div>
       </div>
 
+      <nav class="jump" aria-label="Secciones del proyecto">
+        <button type="button" data-jump="sec-resumen">Resumen</button>
+        <button type="button" data-jump="producto-sec">Producto</button>
+        <button type="button" data-jump="distribucion-sec">Distribución</button>
+      </nav>
+
+      <section class="pillar" id="sec-resumen" aria-labelledby="resumen-h">
+        <div class="pillar-head">
+          <h2 id="resumen-h">Resumen</h2>
+          <p>La métrica principal y lo que entra: suscriptores e ingresos.</p>
+        </div>
       <h2 class="section">North Star Metric ${f.badge}</h2>
       <div class="card nsm">
         <div>
@@ -1012,8 +1069,9 @@
       ${p.revenue ? `
       <h2 class="section">Suscriptores e ingresos ${p.revenue.noData ? badge(p.revenue) : phBadge(p)}</h2>
       ${renderRevenue(p, color)}` : ''}
+      </section>
 
-      <section class="pillar" aria-labelledby="producto">
+      <section class="pillar" id="producto-sec" aria-labelledby="producto">
         <div class="pillar-head">
           <h2 id="producto">Producto</h2>
           <p>Funnels y usabilidad del producto digital: qué hace la gente una vez que llega.</p>
@@ -1022,7 +1080,7 @@
         ${renderUsability(p, color)}
       </section>
 
-      <section class="pillar" aria-labelledby="distribucion">
+      <section class="pillar" id="distribucion-sec" aria-labelledby="distribucion">
         <div class="pillar-head">
           <h2 id="distribucion">Distribución</h2>
           <p>Adquisición: cómo llegan los clientes, por qué canal y a qué costo.</p>
@@ -1060,6 +1118,8 @@
     if (project) renderProject(project); else renderSummary();
     document.title = project ? `${project.name} · Chapa Labs` : 'Chapa Labs · Seguimiento';
     drawCharts();
+    // Los botones de sección quedan pegados justo debajo del encabezado.
+    document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`);
   }
 
   function fromHash() {
@@ -1071,6 +1131,25 @@
     render();
     window.scrollTo({ top: 0 });
   });
+
+  main.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-jump]');
+    if (!btn) return;
+    const target = document.getElementById(btn.dataset.jump);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  // Marca el botón de la sección que se está viendo.
+  window.addEventListener('scroll', () => {
+    const buttons = [...document.querySelectorAll('[data-jump]')];
+    if (!buttons.length) return;
+    const limit = $('.top').offsetHeight + 80;
+    let current = buttons[0];
+    buttons.forEach((b) => {
+      const el = document.getElementById(b.dataset.jump);
+      if (el && el.getBoundingClientRect().top <= limit) current = b;
+    });
+    buttons.forEach((b) => b.classList.toggle('is-on', b === current));
+  }, { passive: true });
 
   const select = $('#month');
   function fillMonths() {

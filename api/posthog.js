@@ -16,6 +16,49 @@ const FROM_META = "lower(properties.utm_source) IN ('meta', 'ig', 'facebook', 'f
 const GENERATE_CLICK = "event = '$autocapture' AND (properties.$el_text ILIKE 'Crear % gratis'"
   + " OR properties.$el_text IN ('Generar mi diseño', 'Generar otra variante'))";
 
+// Funnels ordenados: cada persona tiene que dar los pasos en ese orden, dentro
+// de la ventana. Devuelve una fila por funnel con las personas de cada paso
+// (s1 … s6; los pasos que el funnel no tiene quedan en 0).
+const MAX_STEPS = 6;
+function funnelsQuery(defs, days) {
+  return Object.entries(defs).map(([id, steps]) => `SELECT '${id}' AS funnel,
+      ${Array.from({ length: MAX_STEPS }, (_, i) => `countIf(l >= ${i + 1}) AS s${i + 1}`).join(', ')}
+    FROM (SELECT person_id, windowFunnel(${days * 86400})(toDateTime(timestamp), ${steps.map((c) => `(${c})`).join(', ')}) AS l
+      FROM events WHERE timestamp >= now() - INTERVAL ${days} DAY GROUP BY person_id)`).join('\nUNION ALL\n');
+}
+
+// Maru Coach. El orden de los pasos es el de las etiquetas de data.js.
+const section = (s) => `event = 'seccion_vista' AND properties.seccion = '${s}'`;
+const result = (h) => `event = 'herramienta_resultado' AND properties.herramienta = '${h}'`;
+// Activación: descargó o usó el resultado. CV y Postulación comparten editor,
+// así que se separan por sección.
+const activation = (key, v) => `event = 'activacion' AND properties.${key} = '${v}'`;
+const MARU_FUNNELS = {
+  // Visita → resultado → precios (por el límite gratis o una función pro) →
+  // elige un plan → Mercado Pago → suscripción.
+  general: [
+    "event = '$pageview'",
+    "event = 'herramienta_resultado'",
+    `event = 'limite_planes_visto' OR (${section('precios')})`,
+    "event = 'plan_click'",
+    "event = 'checkout_creado'",
+    "event = 'compra_confirmada'",
+  ],
+  // Una por función: entra → resultado → lo usa.
+  match: [section('match'), "event = 'match_inicio'", result('match'), "event = 'match_preparar_postulacion'"],
+  cv: [section('cv'), result('cv'), activation('seccion', 'cv')],
+  postulacion: [section('postulacion'), result('postulacion'), activation('seccion', 'postulacion')],
+  carta: [section('carta'), result('carta'), activation('herramienta', 'carta')],
+  entrevista: [section('entrevista'), result('entrevista'), activation('herramienta', 'entrevista')],
+  video: [section('video'), result('video'), activation('herramienta', 'video')],
+  // Recorridos que cruzan pantallas.
+  matchPasos: ["event = 'match_inicio'", "event = 'match_cv_listo'", "event = 'match_perfil_confirmado'",
+    "event = 'match_preferencias_listas'", "event = 'match_ranking_visto'", "event = 'match_preparar_postulacion'"],
+  matchPostulacion: ["event = 'match_ranking_visto'", "event = 'match_preparar_postulacion'",
+    result('postulacion'), activation('seccion', 'postulacion')],
+  ingreso: ["event = 'login_pedido'", "event = 'login_google'", "event = 'login_ok'"],
+};
+
 // Diseños descargados en el día: suma la cantidad de cada descarga.
 const DOWNLOADS = "sumIf(toFloat(properties.cantidad), event = 'diseno_descargado')";
 
@@ -57,6 +100,7 @@ const PROJECTS = {
       secciones: `SELECT properties.seccion AS seccion, uniq(person_id) AS usuarios, count() AS vistas
         FROM events WHERE event = 'seccion_vista' AND timestamp >= now() - INTERVAL 30 DAY
         GROUP BY seccion ORDER BY usuarios DESC LIMIT 10`,
+      funnels: funnelsQuery(MARU_FUNNELS, 30),
     },
   },
 
