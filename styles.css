@@ -380,3 +380,5 @@ input { font: inherit; color: inherit; }
   .flow-rate { padding-left: 92px; }
   .proj-hero-value { font-size: 32px; }
 }
+.edit-status { display: block; font-size: 12px; color: var(--good-text); margin-top: 4px; min-height: 1em; }
+.edit-status.is-error { color: var(--bad-text); }
