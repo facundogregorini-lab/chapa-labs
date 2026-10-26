@@ -41,7 +41,7 @@ Cómo se cuenta cada etapa (columna **Estado**):
 | Interesados | Estado con "Interesado", "Demo", "Prueba", "Reunión" o "Propuesta" |
 | Suscriptores | Estado con "Suscriptor", "Cliente", "Pagó", "Compró" o "Cerrado" |
 
-Cada etapa incluye a las siguientes (un suscriptor también cuenta como interesado y contactado). Para que el embudo avance alcanza con cambiar el Estado en la planilla. El canal sale de la columna Notas: si empieza con "Mail" es Email; si no, WhatsApp.
+Cada etapa incluye a las siguientes (un suscriptor también cuenta como interesado y contactado). Para que el embudo avance alcanza con cambiar el Estado en la planilla. En el tablero, **Editar etapas** permite pisar a mano cualquier total (por ejemplo, contactados que no están en la planilla): los ratios, el embudo y la proyección se recalculan con ese valor. Lo editado se recuerda en ese navegador hasta tocar "Volver a la planilla". El canal sale de la columna Notas: si empieza con "Mail" es Email; si no, WhatsApp.
 
 Las consultas de cada proyecto (y el id de proyecto de PostHog) están en `api/posthog.js`. Para sumar Turnia: crear su proyecto en PostHog, agregar sus consultas ahí y en `data.js` un bloque `posthog` con la misma forma.
 
@@ -53,7 +53,7 @@ Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match`
 - **Una pestaña por proyecto**: arriba la **North Star Metric** (valor, variación, avance a la meta y evolución) y los suscriptores e ingresos; abajo, dos secciones:
   1. **Producto**: funnels y usabilidad del producto digital. KPIs de uso, recorrido dentro de la web o la app y tablas libres (secciones o páginas más usadas, uso por funcionalidad, retención por cohorte con mapa de calor).
   2. **Distribución**: la adquisición, según el modelo del proyecto:
-     - **Outbound con planilla** (Amobla IA): embudo prospectados → contactados → interesados → suscriptores con la conversión entre etapas, contactados por día, desglose por SDR y por canal, y el listado completo de prospectos. Debajo, **ventas proyectadas**: cada conversión se elige como *real* (de la planilla) o *estimada* (un % que se completa), más el ticket medio; proyecta interesados, suscriptores y ventas por mes con los contactados actuales, con toda la base y con un escenario propio. Las variables se recuerdan en cada navegador.
+     - **Outbound con planilla** (Amobla IA): embudo prospectados → contactados → interesados → suscriptores con la conversión entre etapas (editables a mano), contactados por día, desglose por SDR y por canal, y el listado completo de prospectos. Debajo, **ventas proyectadas**: se completa el total de prospectados de la base, cada conversión (*real* o *estimada*) y el ticket medio; muestra los ingresos por mes, el recorrido de la base hasta suscriptores y la comparación con los contactados de hoy. Las variables se recuerdan en cada navegador.
      - **Pauta en Meta Ads** (Maru Coach y Amobla IA): inversión, impresiones, clics, CTR, CPC y resultado por día y por campaña.
      - **Embudo por canal** (Maru Coach): visitantes → registro → suscripción por canal, con CPL, CPA y ROI.
      - **Outbound por mes** (Turnia, de ejemplo): embudo con demo agendada y realizada, MRR nuevo y desglose por canal.
