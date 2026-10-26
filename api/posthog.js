@@ -40,12 +40,12 @@ const result = (h) => `event = 'herramienta_resultado' AND properties.herramient
 // así que se separan por sección.
 const activation = (key, v) => `event = 'activacion' AND properties.${key} = '${v}'`;
 const MARU_FUNNELS = {
-  // Visita → resultado → precios (por el límite gratis o una función pro) →
-  // elige un plan → Mercado Pago → suscripción.
+  // Visita → resultado → precios (límite gratis, modal de una función pro o la
+  // página /precios) → elige un plan → Mercado Pago → suscripción.
   general: [
     "event = '$pageview'",
     "event = 'herramienta_resultado'",
-    `event = 'limite_planes_visto' OR (${section('precios')})`,
+    `event IN ('limite_planes_visto', 'funcion_plan_vista') OR (${section('precios')})`,
     "event = 'plan_click'",
     "event = 'checkout_creado'",
     "event = 'compra_confirmada'",
