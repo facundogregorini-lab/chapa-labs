@@ -18,8 +18,8 @@ const GENERATE_CLICK = "event = '$autocapture' AND (properties.$el_text ILIKE 'C
 
 // Funnels ordenados: cada persona tiene que dar los pasos en ese orden, dentro
 // de la ventana. Devuelve una fila por funnel con las personas de cada paso
-// (s1 … s6; los pasos que el funnel no tiene quedan en 0).
-const MAX_STEPS = 6;
+// (s1 … s10; los pasos que el funnel no tiene quedan en 0).
+const MAX_STEPS = 10;
 function funnelsQuery(defs, days) {
   return Object.entries(defs).map(([id, steps]) => `SELECT '${id}' AS funnel,
       ${Array.from({ length: MAX_STEPS }, (_, i) => `countIf(l >= ${i + 1}) AS s${i + 1}`).join(', ')}
@@ -45,17 +45,21 @@ const MARU_FUNNELS = {
     "event = 'compra_confirmada'",
   ],
   // Una por función: entra → resultado → lo usa.
-  match: [section('match'), "event = 'match_inicio'", result('match'), "event = 'match_preparar_postulacion'"],
+  // Match hasta el final: prepara la postulación personalizada, recibe el CV
+  // adaptado y lo descarga.
+  match: [section('match'), "event = 'match_inicio'", result('match'), "event = 'match_preparar_postulacion'",
+    result('postulacion'), activation('seccion', 'postulacion')],
   cv: [section('cv'), result('cv'), activation('seccion', 'cv')],
   postulacion: [section('postulacion'), result('postulacion'), activation('seccion', 'postulacion')],
   carta: [section('carta'), result('carta'), activation('herramienta', 'carta')],
   entrevista: [section('entrevista'), result('entrevista'), activation('herramienta', 'entrevista')],
   video: [section('video'), result('video'), activation('herramienta', 'video')],
-  // Recorridos que cruzan pantallas.
+  // Recorridos que cruzan pantallas. El match completo sigue en Postulación
+  // (/postulacion con el aviso cargado) hasta el último paso de esa pantalla:
+  // completar el formulario con la extensión.
   matchPasos: ["event = 'match_inicio'", "event = 'match_cv_listo'", "event = 'match_perfil_confirmado'",
-    "event = 'match_preferencias_listas'", "event = 'match_ranking_visto'", "event = 'match_preparar_postulacion'"],
-  matchPostulacion: ["event = 'match_ranking_visto'", "event = 'match_preparar_postulacion'",
-    result('postulacion'), activation('seccion', 'postulacion')],
+    "event = 'match_preferencias_listas'", "event = 'match_ranking_visto'", "event = 'match_preparar_postulacion'",
+    result('postulacion'), activation('seccion', 'postulacion'), "event IN ('extension_store', 'extension_descarga')"],
   ingreso: ["event = 'login_pedido'", "event = 'login_google'", "event = 'login_ok'"],
 };
 
@@ -128,6 +132,10 @@ const PROJECTS = {
           uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Rediseñar (plan pago)') AS quisieronPagar,
+          uniqIf(person_id, event = 'diseno_descargado') AS descargaron,
+          uniqIf(person_id, event = 'plan_click') AS eligieronPlan,
+          uniqIf(person_id, event = 'checkout_creado') AS mercadoPago,
+          uniqIf(person_id, event = 'compra_confirmada') AS pagaron,
           countIf(event = '$rageclick') AS rageclicks
         FROM events WHERE timestamp >= now() - INTERVAL 60 DAY`,
       // North Star: diseños descargados (una descarga de lote suma cada foto).

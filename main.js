@@ -687,15 +687,19 @@
     try { localStorage.setItem(projStore(p), JSON.stringify(s)); } catch (e) { /* sin storage */ }
   }
 
-  function projection(p, totals, s) {
+  function projection(p, totals, s, edited = {}) {
     const st = p.acquisition.stages;
     const rates = s.rates.map((r, i) => {
       const from = totals[st[i].key];
       const to = totals[st[i + 1].key];
       const real = ratio(to, from);
-      // Sin datos en la etapa de origen no hay conversión real: se usa la estimada.
-      const useReal = r.mode === 'real' && from > 0;
-      return { from: st[i], to: st[i + 1], fromN: from, toN: to, real, mode: r.mode, estimate: r.estimate, value: useReal ? real : r.estimate, fallback: r.mode === 'real' && !useReal };
+      // Si la etapa de destino se editó a mano (p. ej. Interesados), esa
+      // conversión usa la tasa que sale del valor editado. Sin datos en la
+      // etapa de origen se usa la estimada.
+      const byHand = st[i + 1].key in edited;
+      const wantsReal = r.mode === 'real' || byHand;
+      const useReal = wantsReal && from > 0;
+      return { from: st[i], to: st[i + 1], fromN: from, toN: to, real, mode: r.mode, byHand, estimate: r.estimate, value: useReal ? real : r.estimate, usesReal: useReal, fallback: wantsReal && !useReal };
     });
     const fromContacted = (contacted) => {
       const interested = contacted * rates[1].value;
@@ -714,11 +718,11 @@
     };
   }
 
-  function projectionResults(p, totals, s) {
+  function projectionResults(p, totals, s, edited) {
     const cur = p.acquisition.projection.currency;
     const st = p.acquisition.stages;
-    const pr = projection(p, totals, s);
-    const rateText = (r) => `${fmt(r.value, 'pct')} ${r.mode === 'real' && !r.fallback ? 'real' : 'estimada'}`;
+    const pr = projection(p, totals, s, edited);
+    const rateText = (r) => `${fmt(r.value, 'pct')} ${r.usesReal ? (r.byHand ? 'editada a mano' : 'real') : 'estimada'}`;
     const t = pr.total;
     const steps = [
       { label: st[0].label, value: t.prospects, format: 'int' },
@@ -757,26 +761,27 @@
         ${scenario('Con los contactados de hoy', 'Lo que ya está en marcha, sin escribirle a nadie más', pr.now)}
         ${scenario(`Con toda la base (${fmt(t.prospects, 'int')} prospectados)`, 'Si se contacta la base que elegiste arriba', t, true)}
       </div>
-      <p class="note">Ingresos = suscriptores × ticket medio. Con una conversión en "Real" se usa la de las etapas (de la planilla o editadas a mano); si la etapa de origen está en 0, se usa la estimada.</p>`;
+      <p class="note">Ingresos = suscriptores × ticket medio. Con una conversión en "Real" se usa la de las etapas de la planilla. Si una etapa se editó a mano arriba, la conversión que llega a esa etapa usa la tasa que sale de ese valor. Si la etapa de origen está en 0, se usa la estimada.</p>`;
   }
 
-  function renderProjection(p, totals) {
+  function renderProjection(p, totals, edited) {
     const a = p.acquisition;
     const cur = a.projection.currency;
     const s = projSettings(p);
-    const pr = projection(p, totals, s);
+    const pr = projection(p, totals, s, edited);
+    const realText = (r) => (r.fromN ? `${fmt(r.real, 'pct')} (${fmt(r.toN, 'int')} de ${fmt(r.fromN, 'int')})` : 'sin datos');
     const rateCtrl = pr.rates.map((r, i) => `
       <div class="ctrl">
         <span class="ctrl-label">${esc(r.from.label)} → ${esc(r.to.label)}</span>
-        <select data-proj="mode" data-i="${i}" aria-label="Conversión ${esc(r.from.label)} a ${esc(r.to.label)}">
-          <option value="real"${r.mode === 'real' ? ' selected' : ''}>Real</option>
-          <option value="estimate"${r.mode === 'estimate' ? ' selected' : ''}>Estimada</option>
+        <select data-proj="mode" data-i="${i}" aria-label="Conversión ${esc(r.from.label)} a ${esc(r.to.label)}"${r.byHand ? ' disabled' : ''}>
+          <option value="real"${r.mode === 'real' || r.byHand ? ' selected' : ''}>Real</option>
+          <option value="estimate"${r.mode === 'estimate' && !r.byHand ? ' selected' : ''}>Estimada</option>
         </select>
-        <label class="pct-input${r.mode === 'real' && !r.fallback ? ' is-off' : ''}">
+        <label class="pct-input${r.usesReal ? ' is-off' : ''}">
           <input type="number" inputmode="decimal" min="0" max="100" step="0.5" value="${Math.round(r.estimate * 1000) / 10}" data-proj="estimate" data-i="${i}" aria-label="Conversión estimada en %">
           <span>%</span>
         </label>
-        <span class="ctrl-real">Real: ${r.fromN ? `${fmt(r.real, 'pct')} (${fmt(r.toN, 'int')} de ${fmt(r.fromN, 'int')})` : 'sin datos'}${r.fallback ? ' · se usa la estimada' : ''}</span>
+        <span class="ctrl-real">${r.byHand ? `Usa la tasa de las etapas editadas a mano: ${realText(r)}` : `Real: ${realText(r)}`}${r.fallback ? ' · sin datos de origen, se usa la estimada' : ''}</span>
       </div>`).join('');
     return `
       <div class="proj-layout">
@@ -796,7 +801,7 @@
           </div>
           <button type="button" class="link-btn" data-proj="reset">Volver a los valores iniciales</button>
         </div>
-        <div id="proj-out">${projectionResults(p, totals, s)}</div>
+        <div id="proj-out">${projectionResults(p, totals, s, edited)}</div>
       </div>`;
   }
 
@@ -821,15 +826,15 @@
     else if (k === 'base' && el.value !== '' && Number.isFinite(n)) s.base = Math.max(0, Math.round(n));
     else return;
     saveProjSettings(p, { ticket: s.ticket, base: s.base, rates: s.rates.map((r) => ({ mode: r.mode, estimate: r.estimate })) });
-    const { totals } = stageTotals(p, prospectFigures(p));
+    const { totals, edited } = stageTotals(p, prospectFigures(p));
     if (k === 'mode') {
       // El campo de % se atenúa cuando la conversión real está en uso.
-      const r = projection(p, totals, s).rates[i];
+      const r = projection(p, totals, s, edited).rates[i];
       const box = el.parentElement.querySelector('.pct-input');
-      if (box) box.classList.toggle('is-off', r.mode === 'real' && !r.fallback);
+      if (box) box.classList.toggle('is-off', r.usesReal);
     }
     const out = $('#proj-out');
-    if (out) out.innerHTML = projectionResults(p, totals, s);
+    if (out) out.innerHTML = projectionResults(p, totals, s, edited);
   }
 
   // Etapas editadas a mano: al confirmar un valor se recalcula todo.
@@ -923,7 +928,7 @@
       </details>
 
       <h2 class="section">Ventas proyectadas <span>· sobre la base total de prospectados</span></h2>
-      ${renderProjection(p, t)}`;
+      ${renderProjection(p, t, edited)}`;
   }
 
   // ─── Pauta en Meta Ads (datos reales) ─────────────────────
@@ -1092,7 +1097,7 @@
       const first = Number(row.s1) || 0;
       const last = Number(row[`s${steps.length}`]) || 0;
       return `
-        <div class="card funnel-card${wide ? ' span-2' : ''}">
+        <div class="card funnel-card${wide || f.wide ? ' span-2' : ''}">
           <div class="funnel-head">
             <div><h3>${esc(f.title)}</h3>${f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}</div>
             <div class="funnel-total"><strong>${fmt(ratio(last, first), 'pct')}</strong><span>completa el recorrido</span></div>
