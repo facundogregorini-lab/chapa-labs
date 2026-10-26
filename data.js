@@ -183,7 +183,7 @@ window.CHAPA_DATA = {
               {
                 id: 'general',
                 title: 'De la visita a la suscripción',
-                note: 'Llegar a precios cuenta por el límite gratis o por una función pro.',
+                note: 'Llegar a precios: ver el modal de planes (por el límite gratis o una función pro) o abrir la página de precios.',
                 steps: ['Visitaron la web', 'Obtuvieron un resultado', 'Llegaron a precios', 'Eligieron un plan', 'Fueron a Mercado Pago', 'Se suscribieron'],
               },
             ],
