@@ -16,6 +16,9 @@ const FROM_META = "lower(properties.utm_source) IN ('meta', 'ig', 'facebook', 'f
 const GENERATE_CLICK = "event = '$autocapture' AND (properties.$el_text ILIKE 'Crear % gratis'"
   + " OR properties.$el_text IN ('Generar mi diseño', 'Generar otra variante'))";
 
+// Diseños descargados en el día: suma la cantidad de cada descarga.
+const DOWNLOADS = "sumIf(toFloat(properties.cantidad), event = 'diseno_descargado')";
+
 const PROJECTS = {
   // Maru Coach · organización "Growth Labs 2"
   'maru-coach': {
@@ -68,6 +71,7 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
           uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
+          ${DOWNLOADS} AS descargados,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
           countIf(event = 'compra_confirmada') AS compras,
           sumIf(toFloat(properties.monto), event = 'compra_confirmada') AS ingresos
@@ -82,9 +86,10 @@ const PROJECTS = {
           uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Rediseñar (plan pago)') AS quisieronPagar,
           countIf(event = '$rageclick') AS rageclicks
         FROM events WHERE timestamp >= now() - INTERVAL 60 DAY`,
-      nsm: `SELECT uniqIf(person_id, timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
-          uniqIf(person_id, timestamp < now() - INTERVAL 7 DAY) AS previos7
-        FROM events WHERE ${GENERATE_CLICK} AND timestamp >= now() - INTERVAL 14 DAY`,
+      // North Star: diseños descargados (una descarga de lote suma cada foto).
+      nsm: `SELECT sumIf(toFloat(properties.cantidad), timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
+          sumIf(toFloat(properties.cantidad), timestamp < now() - INTERVAL 7 DAY) AS previos7
+        FROM events WHERE event = 'diseno_descargado' AND timestamp >= now() - INTERVAL 14 DAY`,
       paginas: `SELECT properties.$pathname AS pagina, uniq(person_id) AS visitantes, count() AS vistas
         FROM events WHERE event = '$pageview' AND timestamp >= now() - INTERVAL 30 DAY
         GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,

@@ -1,8 +1,8 @@
 /*
  * Datos del dashboard de Chapa Labs.
  *
- * Lo que tiene `sample: true` son números DE EJEMPLO: se muestran con la
- * etiqueta "Ejemplo" hasta que se conecten los datos reales (ver README.md).
+ * Lo que tiene `noData: true` todavía no tiene fuente conectada: se muestra en 0
+ * con la etiqueta "Sin datos". Nunca se cargan números inventados.
  * Los bloques `ads` (Meta Ads) y `posthog` (PostHog) son datos reales: esta es
  * la foto guardada, y /api/meta y /api/posthog la actualizan en vivo.
  *
@@ -23,7 +23,6 @@
  */
 window.CHAPA_DATA = {
   updatedAt: '2026-10-25',
-  sample: true,
   team: ['Facundo', 'Axel'],
 
   projects: [
@@ -193,12 +192,14 @@ window.CHAPA_DATA = {
         snapshotAt: '2026-10-25',
         data: {
           daily: [
-            { date: '2026-10-23', visitantes: 36, visitantesMeta: 12, estudio: 3, foto: 5, generaron: 1, precios: 4, compras: 0, ingresos: 0 },
-            { date: '2026-10-24', visitantes: 38, visitantesMeta: 26, estudio: 4, foto: 3, generaron: 3, precios: 5, compras: 0, ingresos: 0 },
-            { date: '2026-10-25', visitantes: 29, visitantesMeta: 9, estudio: 16, foto: 10, generaron: 8, precios: 2, compras: 0, ingresos: 0 },
+            { date: '2026-10-23', visitantes: 36, visitantesMeta: 12, estudio: 3, foto: 5, generaron: 1, descargados: 0, precios: 4, compras: 0, ingresos: 0 },
+            { date: '2026-10-24', visitantes: 38, visitantesMeta: 26, estudio: 4, foto: 3, generaron: 3, descargados: 0, precios: 5, compras: 0, ingresos: 0 },
+            { date: '2026-10-25', visitantes: 29, visitantesMeta: 9, estudio: 16, foto: 10, generaron: 8, descargados: 0, precios: 2, compras: 0, ingresos: 0 },
           ],
           totales: [{ visitantes: 92, visitantesMeta: 43, estudio: 22, foto: 17, generaron: 10, precios: 10, quisieronPagar: 7, rageclicks: 12 }],
-          nsm: [{ ultimos7: 10, previos7: 0 }],
+          // Diseños descargados: la app todavía no manda diseno_descargado
+          // (PR #12 en axellaban/amoblaia), así que la foto marca 0.
+          nsm: [{ ultimos7: 0, previos7: 0 }],
           paginas: [
             { pagina: '/', visitantes: 61, vistas: 116 },
             { pagina: '/estudio', visitantes: 21, vistas: 34 },
@@ -212,10 +213,10 @@ window.CHAPA_DATA = {
         },
       },
       northStar: {
-        name: 'Personas que generaron un diseño',
-        definition: 'Personas que tocaron el botón que genera ("Crear diseños gratis" / "Generar mi diseño") en los últimos 7 días. Se mide con los clics automáticos hasta que la app mande un evento propio.',
+        name: 'Diseños descargados',
+        definition: 'Diseños que se descargaron o compartieron en los últimos 7 días (evento diseno_descargado; una descarga de un lote cuenta cada foto). Marca 0 hasta que la app mande el evento.',
         format: 'int',
-        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'generaron' },
+        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'descargados' },
       },
       revenue: {
         query: 'daily',
@@ -224,7 +225,7 @@ window.CHAPA_DATA = {
         currency: 'ARS',
         subsLabel: 'Nuevos suscriptores',
         unitLabel: 'suscriptor',
-        note: 'Se completa cuando la app mande compra_confirmada a PostHog (PR #10 en axellaban/amoblaia). Hasta entonces marca 0.',
+        note: 'Pagos confirmados por Mercado Pago (evento compra_confirmada, desde el 26/10). Ingresos = monto cobrado.',
       },
       ads: {
         source: 'Meta Ads',
@@ -445,6 +446,7 @@ window.CHAPA_DATA = {
     },
 
     // ─────────────────────────────────────────── TURNIA
+    // Sin fuente conectada (sus datos viven en su propia base): todo en 0.
     {
       id: 'turnia',
       name: 'Turnia',
@@ -452,57 +454,22 @@ window.CHAPA_DATA = {
       stage: 'Tracción',
       currency: 'USD',
       northStar: {
-        sample: true,
+        noData: true,
         name: 'Turnos agendados vía Turnia',
-        definition: 'Turnos confirmados en el mes en todos los negocios que usan Turnia.',
+        definition: 'Turnos confirmados en los últimos 7 días en todos los negocios que usan Turnia. Marca 0 hasta conectar la base de Turnia.',
         format: 'int',
-        target: 8000,
-        series: [
-          { month: '2026-05', value: 2100 },
-          { month: '2026-06', value: 2800 },
-          { month: '2026-07', value: 3600 },
-          { month: '2026-08', value: 4700 },
-          { month: '2026-09', value: 5900 },
-          { month: '2026-10', value: 7400 },
-        ],
       },
       revenue: {
-        sample: true,
+        noData: true,
         currency: 'USD',
         subsLabel: 'Nuevos clientes',
         unitLabel: 'cliente',
-        note: 'Ejemplo: clientes nuevos y MRR nuevo de octubre repartidos por día.',
-        daily: [
-          { date: '2026-10-01', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-02', suscriptores: 2, ingresos: 60 },
-          { date: '2026-10-03', suscriptores: 2, ingresos: 60 },
-          { date: '2026-10-04', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-05', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-06', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-07', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-08', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-09', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-10', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-11', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-12', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-13', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-14', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-15', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-16', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-17', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-18', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-19', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-20', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-21', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-22', suscriptores: 1, ingresos: 30 },
-          { date: '2026-10-23', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-24', suscriptores: 0, ingresos: 0 },
-          { date: '2026-10-25', suscriptores: 0, ingresos: 0 },
-        ],
+        note: 'Marca 0 hasta conectar la base de Turnia.',
+        daily: [],
       },
       acquisition: {
         type: 'outbound',
-        sample: true,
+        noData: true,
         stages: [
           { key: 'prospectados', label: 'Prospectados' },
           { key: 'contactados', label: 'Contactados' },
@@ -511,63 +478,18 @@ window.CHAPA_DATA = {
           { key: 'demos', label: 'Demo realizada' },
           { key: 'clientes', label: 'Cliente nuevo' },
         ],
-        months: [
-          { month: '2026-05', prospectados: 400, contactados: 350, interesados: 45, agendadas: 28, demos: 21, clientes: 5, mrrNuevo: 150 },
-          { month: '2026-06', prospectados: 480, contactados: 430, interesados: 60, agendadas: 36, demos: 28, clientes: 7, mrrNuevo: 210 },
-          { month: '2026-07', prospectados: 560, contactados: 500, interesados: 72, agendadas: 44, demos: 35, clientes: 9, mrrNuevo: 270 },
-          { month: '2026-08', prospectados: 650, contactados: 590, interesados: 85, agendadas: 52, demos: 42, clientes: 11, mrrNuevo: 330 },
-          { month: '2026-09', prospectados: 700, contactados: 640, interesados: 94, agendadas: 58, demos: 47, clientes: 12, mrrNuevo: 360 },
-          { month: '2026-10', prospectados: 800, contactados: 720, interesados: 110, agendadas: 68, demos: 55, clientes: 15, mrrNuevo: 450 },
-        ],
-        channels: [
-          { canal: 'WhatsApp', prospectados: 380, contactados: 350, interesados: 58, agendadas: 36, demos: 30, clientes: 9 },
-          { canal: 'Llamada', prospectados: 200, contactados: 180, interesados: 26, agendadas: 16, demos: 13, clientes: 3 },
-          { canal: 'Email', prospectados: 180, contactados: 160, interesados: 14, agendadas: 9, demos: 7, clientes: 2 },
-          { canal: 'Instagram', prospectados: 40, contactados: 30, interesados: 12, agendadas: 7, demos: 5, clientes: 1 },
-        ],
+        months: [],
+        channels: [],
       },
       usability: {
-        sample: true,
+        noData: true,
         kpis: [
-          { label: 'Negocios activos', format: 'int', value: 64, prev: 52, good: 'up' },
-          { label: 'Turnos por negocio', format: 'dec', value: 116, prev: 113, good: 'up' },
-          { label: 'Turnos autogestionados', hint: 'Los saca el cliente final, sin llamar', format: 'pct', value: 0.68, prev: 0.61, good: 'up' },
-          { label: 'Ausentismo', format: 'pct', value: 0.071, prev: 0.094, good: 'down' },
+          { label: 'Negocios activos', format: 'int', value: 0 },
+          { label: 'Turnos por negocio', format: 'dec', value: 0 },
+          { label: 'Turnos autogestionados', hint: 'Los saca el cliente final, sin llamar', format: 'pct', value: 0 },
+          { label: 'Ausentismo', format: 'pct', value: 0 },
         ],
-        tables: [
-          {
-            title: 'Uso por rubro',
-            note: 'Último mes.',
-            columns: [
-              { key: 'rubro', label: 'Rubro' },
-              { key: 'negocios', label: 'Negocios', format: 'int' },
-              { key: 'turnos', label: 'Turnos', format: 'int' },
-              { key: 'auto', label: 'Autogestionados', format: 'pct' },
-              { key: 'ausentismo', label: 'Ausentismo', format: 'pct' },
-            ],
-            rows: [
-              { rubro: 'Salud', negocios: 22, turnos: 2900, auto: 0.62, ausentismo: 0.08 },
-              { rubro: 'Estética', negocios: 18, turnos: 2150, auto: 0.71, ausentismo: 0.06 },
-              { rubro: 'Barbería', negocios: 14, turnos: 1700, auto: 0.79, ausentismo: 0.05 },
-              { rubro: 'Otros', negocios: 10, turnos: 650, auto: 0.55, ausentismo: 0.11 },
-            ],
-          },
-          {
-            title: 'Uso por funcionalidad',
-            note: 'Último mes. % sobre negocios activos.',
-            columns: [
-              { key: 'funcion', label: 'Funcionalidad' },
-              { key: 'alcance', label: '% negocios', format: 'pct' },
-              { key: 'var', label: 'Var. vs mes anterior', format: 'delta' },
-            ],
-            rows: [
-              { funcion: 'Reserva online (link / web)', alcance: 0.92, var: 0.04 },
-              { funcion: 'Recordatorios por WhatsApp', alcance: 0.81, var: 0.11 },
-              { funcion: 'Agenda con varios profesionales', alcance: 0.44, var: 0.07 },
-              { funcion: 'Cobro de seña', alcance: 0.19, var: 0.05 },
-            ],
-          },
-        ],
+        tables: [],
       },
     },
   ],

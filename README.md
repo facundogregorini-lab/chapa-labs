@@ -8,11 +8,12 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 | --- | --- | --- |
 | Pauta de Maru Coach y Amobla IA | **Meta Ads**, cuenta "Costa Reset": campañas que empiezan con `MARU` y `amoblaIA` | **Real.** |
 | North Star, embudo por canal (registros, compras, CPA, ROI) y usabilidad de **Maru Coach** | **PostHog**, organización "Growth Labs 2" (marucoach.com) | **Real.** Canal según la UTM de la primera visita; registro = primer login; ingresos = `monto` de `compra_confirmada`. |
-| North Star y usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, pero medido con clics automáticos (botones "Crear diseños gratis" / "Generar mi diseño" y "Subir mi foto"; ojo que "Amoblar" es solo la pestaña del modo) hasta que la app mande eventos propios. |
+| North Star de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real.** Diseños descargados: suma de `cantidad` del evento `diseno_descargado`. |
+| Usabilidad de **Amobla IA** | **PostHog**, organización "AmoblaIA" | **Real**, medido con páginas vistas y clics automáticos (botones "Crear diseños gratis" / "Generar mi diseño" y "Subir mi foto"; ojo que "Amoblar" es solo la pestaña del modo). |
 | Embudo outbound de **Amobla IA** y ventas proyectadas | **Google Sheet** "Prospecting amobla IA" (pestaña Prospectos) | **Real.** Etapa según la columna Estado y la fecha de envío. |
-| Todo **Turnia** | Turnia no tiene PostHog; sus datos viven en su propia base | Ejemplo. |
+| Todo **Turnia** | Turnia no tiene PostHog; sus datos viven en su propia base | **Sin datos**: todo marca 0. |
 
-Lo real se ve con la etiqueta **Datos reales**; lo de ejemplo, con **Ejemplo**. Lo real se guarda como foto en `data.js` y las funciones `/api/meta`, `/api/posthog` y `/api/prospectos` lo actualizan en vivo cuando tienen sus claves (abajo).
+Lo real se ve con la etiqueta **Datos reales**; lo que no tiene fuente conectada, con **Sin datos** y en 0. Nunca se cargan números inventados. Lo real se guarda como foto en `data.js` y las funciones `/api/meta`, `/api/posthog` y `/api/prospectos` lo actualizan en vivo cuando tienen sus claves (abajo).
 
 ### Conectar Meta Ads en vivo
 
@@ -48,7 +49,7 @@ Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match`
 
 ## Qué muestra
 
-- **Resumen**: una tarjeta por proyecto con su North Star Metric, la variación contra el mes anterior, el avance contra la meta y los números clave de adquisición, más un cuadro comparativo.
+- **Resumen**: dos bloques con una tarjeta igual por proyecto. Arriba, la **North Star Metric** (últimos 7 días, variación contra los 7 anteriores y evolución por día del mes); abajo, separados, los **suscriptores e ingresos** del mes por día.
 - **Una pestaña por proyecto**: arriba la **North Star Metric** (valor, variación, avance a la meta y evolución) y los suscriptores e ingresos; abajo, dos secciones:
   1. **Producto**: funnels y usabilidad del producto digital. KPIs de uso, recorrido dentro de la web o la app y tablas libres (secciones o páginas más usadas, uso por funcionalidad, retención por cohorte con mapa de calor).
   2. **Distribución**: la adquisición, según el modelo del proyecto:
@@ -67,7 +68,7 @@ Todo vive en `data.js`. Por cada proyecto:
 | --- | --- |
 | `posthog` | Resultado de las consultas de `api/posthog.js` (la foto inicial). `northStar.posthog`, `acquisition.query` y `usability` (`query`, `funnel`) leen de acá. |
 | `ads` | Pauta real de Meta Ads: prefijo de las campañas, evento que cuenta como resultado y la foto por día y campaña. |
-| `sample` | En `northStar`, `acquisition` o `usability`: marca la sección como de ejemplo. |
+| `noData` | En `northStar`, `revenue`, `acquisition` o `usability`: la sección no tiene fuente conectada; se muestra en 0 con la etiqueta "Sin datos". |
 | `northStar` | Nombre, definición, `target` (meta) y `series` con un valor por mes (`"AAAA-MM"`). |
 | `acquisition.type` | `"funnel"`, `"paid"`, `"outbound"` o `"prospects"`. Define qué tablas y gráficos se muestran. |
 | `acquisition.rows` | Solo `prospects`: la foto de la planilla, una fila por inmobiliaria (`[prioridad, nombre, SDR, estado, fecha, canal, score]`). |
@@ -83,7 +84,7 @@ Las etapas del embudo outbound se configuran en `stages`, así que cada proyecto
 
 **Sumar un proyecto**: copiar uno de los bloques de `projects`, cambiarle el `id` y el nombre. Aparece solo en las pestañas y en el resumen.
 
-Cuando una sección pase a tener datos reales, sacarle `sample: true`.
+Cuando una sección pase a tener datos reales, sacarle `noData: true`.
 
 ## Próximos pasos posibles
 
