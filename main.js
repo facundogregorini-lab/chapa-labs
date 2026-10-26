@@ -39,6 +39,7 @@
     return every <= 1 || i === n - 1 || (i % every === 0 && n - 1 - i >= every / 2);
   };
   const badge = (block, real) => {
+    if (block && block.noData) return '<span class="badge is-sample">Sin datos</span>';
     if (block && block.sample) return '<span class="badge is-sample">Ejemplo</span>';
     return real ? `<span class="badge is-real">● ${esc(real)}</span>` : '';
   };
@@ -121,6 +122,27 @@
   const phSum = (p, query, key) => phRows(p, query).reduce((a, r) => a + (Number(r[key]) || 0), 0);
   const phUpdated = (p) => (p.posthog.live ? 'en vivo' : `actualizado el ${dayTip(p.posthog.snapshotAt)}`);
   const phBadge = (p) => badge(null, `Datos reales · PostHog, ${phUpdated(p)}`);
+
+  // ─── Días del mes elegido ─────────────────────────────────
+  // Del 1 al último día del mes (o hasta hoy, si es el mes en curso). Todos los
+  // proyectos usan los mismos días, así los gráficos se comparan.
+  const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  function monthDays() {
+    const [y, m] = state.month.split('-').map(Number);
+    const today = isoDay(new Date());
+    const out = [];
+    for (let d = new Date(y, m - 1, 1); d.getMonth() === m - 1; d.setDate(d.getDate() + 1)) {
+      const key = isoDay(d);
+      if (key > today) break;
+      out.push(key);
+    }
+    return out;
+  }
+  // Valor por día de una columna; un día sin datos cuenta como 0.
+  function dailyPoints(rows, key) {
+    const byDate = new Map(rows.map((r) => [r.date, Number(r[key]) || 0]));
+    return monthDays().map((date) => ({ date, label: dayLabel(date), tip: dayTip(date), value: byDate.get(date) || 0 }));
+  }
 
   // ─── Datos por mes ────────────────────────────────────────
   const upTo = (rows) => rows.filter((r) => r.month <= state.month);
@@ -276,51 +298,6 @@
   }
   const sumRows = (rows, keys) => Object.fromEntries(keys.map((k) => [k, rows.reduce((a, r) => a + (r[k] || 0), 0)]));
 
-  function acquisitionHeadline(p) {
-    if (p.acquisition.type === 'funnel') {
-      const f = funnelFigures(p);
-      return [
-        { k: 'Inversión Meta', v: fmt(f.spend, 'money', f.cur) },
-        { k: `${f.buyerLabel} desde Meta`, v: fmt(f.buyers, 'int') },
-        { k: 'CPA', v: fmt(f.cpa, 'money', f.cur) },
-        { k: 'ROI', v: fmt(f.roi, 'pct') },
-      ];
-    }
-    if (p.acquisition.type === 'prospects') {
-      const { totals } = prospectFigures(p);
-      const out = p.acquisition.stages.map((s) => ({ k: s.label, v: fmt(totals[s.key], 'int') }));
-      if (p.ads) out.push({ k: 'Inversión Meta', v: fmt(adsTotals(adsRows(p.ads)).spend, 'money', p.ads.currency) });
-      return out;
-    }
-    if (p.ads) {
-      const t = adsTotals(adsRows(p.ads));
-      return [
-        { k: 'Inversión Meta', v: fmt(t.spend, 'money', p.ads.currency) },
-        { k: 'Costo por clic', v: fmt(t.cpc, 'money', p.ads.currency) },
-        { k: p.ads.resultLabel, v: fmt(t.results, 'int') },
-      ];
-    }
-    const a = p.acquisition;
-    const { curr, prev } = pick(a.months);
-    if (!curr) return [];
-    if (a.type === 'paid') {
-      const c = paidRow(curr);
-      const pv = prev && paidRow(prev);
-      return [
-        { k: 'Registros', v: fmt(c.registros, 'int'), d: pv && delta(c.registros, pv.registros, { suffix: '' }) },
-        { k: 'CPA', v: fmt(c.cpa, 'money2', p.currency), d: pv && delta(c.cpa, pv.cpa, { good: 'down', suffix: '' }) },
-        { k: 'ROI', v: fmt(c.roi, 'pct'), d: pv && delta(c.roi, pv.roi, { format: 'pct', suffix: '' }) },
-      ];
-    }
-    const first = a.stages[0].key;
-    const last = a.stages[a.stages.length - 1].key;
-    return [
-      { k: 'Prospectados', v: fmt(curr[first], 'int'), d: prev && delta(curr[first], prev[first], { suffix: '' }) },
-      { k: 'Demos', v: fmt(curr.demos, 'int'), d: prev && delta(curr.demos, prev.demos, { suffix: '' }) },
-      { k: 'Clientes nuevos', v: fmt(curr[last], 'int'), d: prev && delta(curr[last], prev[last], { suffix: '' }) },
-    ];
-  }
-
   // ─── Vistas ───────────────────────────────────────────────
   function nsmFigures(p) {
     const ns = p.northStar;
@@ -329,98 +306,77 @@
       // semana anterior tiene datos suficientes.
       const src = ns.posthog;
       const head = phRows(p, src.query)[0] || {};
-      const value = Number(head[src.value]);
-      const prevValue = Number(head[src.prev]);
-      const list = phRows(p, src.daily).map((r) => ({ label: dayLabel(r.date), tip: dayTip(r.date), value: Number(r[src.dailyKey]) || 0 }));
-      const progress = ns.target ? Math.min(1, value / ns.target) : null;
+      const value = Number(head[src.value]) || 0;
+      const prevValue = Number(head[src.prev]) || 0;
       return {
-        ns, list, value, progress,
+        ns, value,
+        list: dailyPoints(phRows(p, src.daily), src.dailyKey),
         prev: prevValue >= 10 ? { value: prevValue } : null,
         suffix: 'vs 7 días ant.',
-        period: prevValue >= 10 ? 'Últimos 7 días' : 'Últimos 7 días · primera semana con datos',
+        period: prevValue >= 10 ? 'Últimos 7 días' : 'Últimos 7 días · sin semana anterior para comparar',
         badge: phBadge(p),
       };
     }
-    const { curr, prev, list } = pick(ns.series);
-    const value = curr ? curr.value : NaN;
-    const progress = ns.target ? Math.min(1, value / ns.target) : null;
-    return { ns, curr, prev, list, value, progress, suffix: 'vs mes ant.', period: '', badge: badge(ns) };
+    // Sin fuente conectada: todo en 0, nada inventado.
+    return {
+      ns, value: 0, prev: null, list: dailyPoints([], 'value'),
+      suffix: '', period: 'Últimos 7 días · sin fuente conectada', badge: badge(ns),
+    };
   }
 
   function renderSummary() {
-    const cards = PROJECTS.map((p, i) => {
-      const f = nsmFigures(p);
-      const { ns, prev, list, value, progress } = f;
-      const spark = chart(lineChart({ points: list, format: ns.format, color: ACCENTS[i], height: 120, target: ns.target }));
-      // Debajo de la North Star: nuevos suscriptores e ingresos del mes, por día.
-      const rev = p.revenue ? revenueSummary(p) : null;
-      const revBlock = (title, value, key, format) => `
-          <div class="proj-rev">
-            <div class="proj-rev-head"><span>${esc(title)}</span><strong>${value}</strong></div>
-            ${chart(barChart({ points: rev.rows.map((d) => ({ label: dayLabel(d.date), tip: dayTip(d.date), value: d[key] })), format, currency: rev.cur, color: ACCENTS[i], height: 90 }))}
-          </div>`;
-      const revHtml = !rev ? '' : !rev.rows.length
-        ? `<p class="sub">Sin suscriptores ni ingresos en ${monthLabel(state.month, true)}.</p>`
-        : `${revBlock(p.revenue.subsLabel, fmt(rev.subs, 'int'), 'subs', 'int')}${revBlock('Ingresos', fmt(rev.rev, 'money', rev.cur), 'rev', 'money')}
-          ${p.revenue.sample ? badge(p.revenue) : ''}`;
-      const acq = acquisitionHeadline(p).map((m) => `<div class="mini"><div class="k">${m.k}</div><div class="v">${m.v}</div>${m.d || ''}</div>`).join('');
-      return `
-        <a class="card proj" href="#${esc(p.id)}">
+    const head = (p, i) => `
           <div class="proj-top">
             <span class="proj-name"><span class="dot" style="background:${ACCENTS[i]}"></span>${esc(p.name)}</span>
             <span class="chip">${esc(p.stage)}</span>
-          </div>
+          </div>`;
+
+    const nsmCards = PROJECTS.map((p, i) => {
+      const f = nsmFigures(p);
+      const { ns, prev, list, value } = f;
+      return `
+        <a class="card proj" href="#${esc(p.id)}">
+          ${head(p, i)}
           <div>
-            <p class="nsm-label">North Star · ${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</p>
+            <p class="nsm-label">${esc(ns.name)} ${ns.noData ? badge(ns) : badge(null, 'Real')}</p>
             <p class="hero">${fmt(value, ns.format)}</p>
             ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
-            ${f.period ? `<p class="period">${f.period}</p>` : ''}
+            <p class="period">${f.period}</p>
           </div>
-          ${progress !== null ? `
-            <div>
-              <div class="progress"><span style="width:${progress * 100}%;background:${ACCENTS[i]}"></span></div>
-              <div class="progress-row"><span>${fmt(progress, 'pct')} de la meta</span><span>Meta ${fmt(ns.target, ns.format)}</span></div>
-            </div>` : ''}
-          ${spark}
-          ${revHtml}
-          <div class="proj-acq">${acq}${p.ads ? '' : badge(p.acquisition)}</div>
+          ${chart(lineChart({ points: list, format: ns.format, color: ACCENTS[i], height: 120 }))}
         </a>`;
     }).join('');
 
-    const rows = PROJECTS.map((p, i) => {
-      const f = nsmFigures(p);
-      const { ns, prev, value, progress } = f;
-      const rev = p.revenue ? revenueSummary(p) : null;
-      const acqSource = p.acquisition.type === 'funnel' ? 'Meta Ads + PostHog'
-        : p.acquisition.type === 'prospects' ? `Outbound (planilla)${p.ads ? ` + ${p.ads.source}` : ''}`
-          : p.ads ? p.ads.source : p.acquisition.type === 'paid' ? 'Pauta paga' : 'Outbound';
-      return `<tr>
-        <td><span class="proj-name" style="font-size:13px"><span class="dot" style="background:${ACCENTS[i]}"></span><a href="#${esc(p.id)}">${esc(p.name)}</a></span></td>
-        <td style="text-align:left;white-space:normal;min-width:180px">${esc(ns.name)} ${ns.sample ? badge(ns) : badge(null, 'Real')}</td>
-        <td><strong>${fmt(value, ns.format)}</strong></td>
-        <td>${delta(value, prev && prev.value, { format: ns.format, suffix: '' }) || '—'}</td>
-        <td>${rev ? fmt(rev.subs, 'int') : '—'}${rev && p.revenue.sample ? ` ${badge(p.revenue)}` : ''}</td>
-        <td>${rev ? fmt(rev.rev, 'money', rev.cur) : '—'}</td>
-        <td>${progress !== null ? fmt(progress, 'pct') : '—'}</td>
-        <td>${esc(acqSource)} ${p.acquisition.sample && !p.ads ? badge(p.acquisition) : badge(null, 'Real')}</td>
-      </tr>`;
+    const revCards = PROJECTS.map((p, i) => {
+      const r = p.revenue || {};
+      const rev = revenueSummary(p);
+      const block = (title, total, key, format) => `
+          <div class="proj-rev">
+            <div class="proj-rev-head"><span>${esc(title)}</span><strong>${fmt(total, format, rev.cur)}</strong></div>
+            ${chart(barChart({ points: rev.rows.map((d) => ({ label: dayLabel(d.date), tip: dayTip(d.date), value: d[key] })), format, currency: rev.cur, color: ACCENTS[i], height: 90 }))}
+          </div>`;
+      return `
+        <a class="card proj" href="#${esc(p.id)}">
+          ${head(p, i)}
+          <p class="nsm-label">${monthLabel(state.month, true)} ${r.noData ? badge(r) : badge(null, 'Real')}</p>
+          ${block(r.subsLabel || 'Nuevos suscriptores', rev.subs, 'subs', 'int')}
+          ${block('Ingresos', rev.rev, 'rev', 'money')}
+        </a>`;
     }).join('');
 
     main.innerHTML = `
       <div class="page-head">
         <div>
           <h1>Portafolio</h1>
-          <p>${monthLabel(state.month, true)} · North Star, suscriptores, ingresos y adquisición de cada proyecto</p>
+          <p>${monthLabel(state.month, true)} · North Star, suscriptores e ingresos de cada proyecto</p>
         </div>
       </div>
-      <div class="grid g-3">${cards}</div>
-      <h2 class="section">Comparativo <span>· ${monthLabel(state.month, true)}</span></h2>
-      <div class="card">
-        <div class="table-wrap"><table>
-          <thead><tr><th>Proyecto</th><th style="text-align:left">North Star</th><th>Valor</th><th>Variación</th><th>Nuevos suscriptores</th><th>Ingresos</th><th>% de meta</th><th>Adquisición</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table></div>
-      </div>`;
+      <h2 class="section">North Star Metric <span>· últimos 7 días y evolución por día</span></h2>
+      <div class="grid g-3">${nsmCards}</div>
+      <section class="summary-block" aria-labelledby="ingresos">
+        <h2 class="section" id="ingresos">Suscriptores e ingresos <span>· ${monthLabel(state.month, true)}, por día</span></h2>
+        <div class="grid g-3">${revCards}</div>
+      </section>`;
   }
 
   function renderPaid(p, color) {
@@ -576,9 +532,13 @@
 
   function renderOutbound(p, color) {
     const a = p.acquisition;
-    const { curr, prev, list } = pick(a.months);
-    if (!curr) return '<p class="note">Sin datos para este mes.</p>';
     const stages = a.stages;
+    // Sin datos: el mes elegido con todas las etapas en 0.
+    const picked = pick(a.months);
+    const zero = { month: state.month, ...Object.fromEntries(stages.map((s) => [s.key, 0])) };
+    const curr = picked.curr || zero;
+    const prev = picked.prev;
+    const list = picked.list.length ? picked.list : [zero];
     const first = stages[0].key;
     const last = stages[stages.length - 1].key;
     const pv = prev || {};
@@ -609,7 +569,7 @@
       ...(stages.some((s) => s.key === 'interesados') ? [{ key: 'interes', label: 'Tasa de interés', format: 'pct' }] : []),
       { key: 'convTotal', label: 'Conv. total', format: 'pct' },
     ];
-    const channelMonth = a.months[a.months.length - 1].month;
+    const channelMonth = a.months.length ? a.months[a.months.length - 1].month : state.month;
 
     return `
       <div class="tiles">${tiles.join('')}</div>
@@ -940,25 +900,18 @@
   // ─── Suscriptores e ingresos por día ──────────────────────
   // Días del mes elegido, sin huecos (un día sin datos cuenta como 0).
   function revenueRows(p) {
-    const r = p.revenue;
-    const src = r.daily || phRows(p, r.query);
-    const byDate = new Map(src.filter((d) => d.date.slice(0, 7) === state.month).map((d) => [d.date, d]));
-    if (!byDate.size) return [];
-    const dates = [...byDate.keys()].sort();
-    const out = [];
-    for (let d = new Date(`${dates[0]}T12:00:00Z`); d <= new Date(`${dates[dates.length - 1]}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 1)) {
-      const key = d.toISOString().slice(0, 10);
-      const row = byDate.get(key) || {};
-      out.push({ date: key, subs: Number(row[r.subsKey || 'suscriptores']) || 0, rev: Number(row[r.revenueKey || 'ingresos']) || 0 });
-    }
-    return out;
+    const r = p.revenue || {};
+    const src = r.daily || (r.query ? phRows(p, r.query) : []);
+    const subs = dailyPoints(src, r.subsKey || 'suscriptores');
+    const rev = dailyPoints(src, r.revenueKey || 'ingresos');
+    return subs.map((d, i) => ({ date: d.date, subs: d.value, rev: rev[i].value }));
   }
 
   function revenueSummary(p) {
     const rows = revenueRows(p);
     return {
       rows,
-      cur: p.revenue.currency || p.currency,
+      cur: (p.revenue && p.revenue.currency) || p.currency,
       subs: rows.reduce((a, d) => a + d.subs, 0),
       rev: rows.reduce((a, d) => a + d.rev, 0),
     };
@@ -967,7 +920,6 @@
   function renderRevenue(p, color) {
     const r = p.revenue;
     const rows = revenueRows(p);
-    if (!rows.length) return `<div class="card"><p class="sub" style="margin:0">Sin datos en ${monthLabel(state.month, true)}.</p></div>`;
     const cur = r.currency || p.currency;
     const sum = (list, k) => list.reduce((a, d) => a + d[k], 0);
     const last7 = rows.slice(-7);
@@ -1027,9 +979,9 @@
     const i = PROJECTS.indexOf(p);
     const color = ACCENTS[i % ACCENTS.length];
     const f = nsmFigures(p);
-    const { ns, prev, list, value, progress } = f;
+    const { ns, prev, list, value } = f;
     const lastMonth = allMonths[allMonths.length - 1];
-    const realUsability = !p.usability.sample && p.posthog;
+    const realUsability = !p.usability.noData && p.posthog;
     const acq = p.acquisition;
     const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound', prospects: 'Outbound' }[acq.type];
     const acqBadge = acq.type === 'funnel' ? phBadge(p)
@@ -1053,15 +1005,12 @@
           ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
           ${f.period ? `<p class="period">${f.period}</p>` : ''}
           <p class="nsm-def">${esc(ns.definition)}</p>
-          ${progress !== null ? `
-            <div class="progress"><span style="width:${progress * 100}%;background:${color}"></span></div>
-            <div class="progress-row"><span>${fmt(progress, 'pct')} de la meta</span><span>Meta ${fmt(ns.target, ns.format)}</span></div>` : ''}
         </div>
-        ${chart(lineChart({ points: list, format: ns.format, target: ns.target, color, height: 240 }))}
+        ${chart(lineChart({ points: list, format: ns.format, color, height: 240 }))}
       </div>
 
       ${p.revenue ? `
-      <h2 class="section">Suscriptores e ingresos ${p.revenue.sample ? badge(p.revenue) : phBadge(p)}</h2>
+      <h2 class="section">Suscriptores e ingresos ${p.revenue.noData ? badge(p.revenue) : phBadge(p)}</h2>
       ${renderRevenue(p, color)}` : ''}
 
       <section class="pillar" aria-labelledby="producto">
@@ -1176,7 +1125,8 @@
     resizeTimer = setTimeout(drawCharts, 80);
   }).observe(main);
 
-  if (DATA.sample) $('#sample').hidden = false;
+  const noData = PROJECTS.some((p) => [p.northStar, p.revenue, p.acquisition, p.usability].some((b) => b && b.noData));
+  if (noData) $('#sample').hidden = false;
   if (DATA.team && DATA.team.length) $('#team').textContent = `Seguimiento de proyectos · ${DATA.team.join(' y ')}`;
   $('#foot').textContent = `Datos actualizados al ${new Date(`${DATA.updatedAt}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
 

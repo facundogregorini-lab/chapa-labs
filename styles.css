@@ -156,6 +156,7 @@ h2.section .badge { font-weight: 600; white-space: normal; }
 .key-tiles { margin-bottom: 8px; }
 .proj > .badge, .proj-acq .badge { align-self: flex-start; }
 .proj-rev { border-top: 1px solid var(--border); padding-top: 10px; }
+.summary-block { margin-top: 40px; padding-top: 8px; border-top: 1px solid var(--border); }
 .proj-rev-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
 .proj-rev-head strong { font-size: 20px; color: var(--ink); letter-spacing: -0.3px; }
 .stat-row { display: flex; gap: 12px 36px; flex-wrap: wrap; margin: 2px 0 14px; }
