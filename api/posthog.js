@@ -7,6 +7,12 @@
 //
 // Las consultas de cada proyecto están acá abajo. La foto inicial de data.js
 // tiene exactamente estas mismas columnas.
+//
+// Período: sin parámetros es el histórico completo. Con ?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
+// (días de Buenos Aires, ambos incluidos) las consultas de Producto y
+// Distribución se limitan a ese período. La North Star (últimos 7 días) no cambia.
+// En las consultas, {ts} es la condición sobre `timestamp`, {ets} sobre
+// `e.timestamp` y {dia} sobre la columna `d` (una fecha).
 
 const HOST = process.env.POSTHOG_HOST || 'https://us.posthog.com';
 const DAY = "toDate(toTimeZone(timestamp, 'America/Argentina/Buenos_Aires'))";
@@ -24,7 +30,7 @@ function funnelsQuery(defs, days) {
   return Object.entries(defs).map(([id, steps]) => `SELECT '${id}' AS funnel,
       ${Array.from({ length: MAX_STEPS }, (_, i) => `countIf(l >= ${i + 1}) AS s${i + 1}`).join(', ')}
     FROM (SELECT person_id, windowFunnel(${days * 86400})(toDateTime(timestamp), ${steps.map((c) => `(${c})`).join(', ')}) AS l
-      FROM events WHERE timestamp >= now() - INTERVAL ${days} DAY GROUP BY person_id)`).join('\nUNION ALL\n');
+      FROM events WHERE {ts} GROUP BY person_id)`).join('\nUNION ALL\n');
 }
 
 // Maru Coach. El orden de los pasos es el de las etiquetas de data.js.
@@ -77,12 +83,12 @@ const PROJECTS = {
           uniqIf(person_id, event = 'activacion') AS activados,
           countIf(event = 'compra_confirmada') AS compras,
           sumIf(toFloat(properties.monto), event = 'compra_confirmada') AS ingresos
-        FROM events WHERE timestamp >= now() - INTERVAL 60 DAY
+        FROM events WHERE {ts}
         GROUP BY date ORDER BY date`,
       // Registro nuevo = primer login exitoso de cada persona.
       registros: `SELECT toString(d) AS date, count() AS registros
         FROM (SELECT person_id, min(${DAY}) AS d FROM events WHERE event = 'login_ok' GROUP BY person_id)
-        WHERE d >= today() - 60 GROUP BY date ORDER BY date`,
+        WHERE {dia} GROUP BY date ORDER BY date`,
       // Embudo por canal de llegada (UTM de la primera visita de cada persona).
       porCanal: `SELECT if(o.origen IN ('meta', 'ig', 'facebook', 'fb', 'instagram'), 'meta', 'otras') AS canal,
           uniqIf(e.person_id, e.event = '$pageview') AS visitantes,
@@ -96,13 +102,13 @@ const PROJECTS = {
         FROM events e
         LEFT JOIN (SELECT person_id, lower(argMin(properties.utm_source, timestamp)) AS origen
           FROM events WHERE event = '$pageview' GROUP BY person_id) o ON e.person_id = o.person_id
-        WHERE e.timestamp >= now() - INTERVAL 60 DAY
+        WHERE {ets}
         GROUP BY canal ORDER BY canal`,
       nsm: `SELECT uniqIf(person_id, timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
           uniqIf(person_id, timestamp < now() - INTERVAL 7 DAY) AS previos7
         FROM events WHERE event = 'herramienta_resultado' AND timestamp >= now() - INTERVAL 14 DAY`,
       secciones: `SELECT properties.seccion AS seccion, uniq(person_id) AS usuarios, count() AS vistas
-        FROM events WHERE event = 'seccion_vista' AND timestamp >= now() - INTERVAL 30 DAY
+        FROM events WHERE event = 'seccion_vista' AND {ts}
         GROUP BY seccion ORDER BY usuarios DESC LIMIT 10`,
       funnels: funnelsQuery(MARU_FUNNELS, 30),
     },
@@ -123,7 +129,7 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
           countIf(event = 'compra_confirmada') AS compras,
           sumIf(toFloat(properties.monto), event = 'compra_confirmada') AS ingresos
-        FROM events WHERE timestamp >= now() - INTERVAL 60 DAY
+        FROM events WHERE {ts}
         GROUP BY date ORDER BY date`,
       totales: `SELECT uniqIf(person_id, event = '$pageview') AS visitantes,
           uniqIf(person_id, event = '$pageview' AND ${FROM_META}) AS visitantesMeta,
@@ -137,13 +143,13 @@ const PROJECTS = {
           uniqIf(person_id, event = 'checkout_creado') AS mercadoPago,
           uniqIf(person_id, event = 'compra_confirmada') AS pagaron,
           countIf(event = '$rageclick') AS rageclicks
-        FROM events WHERE timestamp >= now() - INTERVAL 60 DAY`,
+        FROM events WHERE {ts}`,
       // North Star: diseños descargados (una descarga de lote suma cada foto).
       nsm: `SELECT sumIf(toFloat(properties.cantidad), timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
           sumIf(toFloat(properties.cantidad), timestamp < now() - INTERVAL 7 DAY) AS previos7
         FROM events WHERE event = 'diseno_descargado' AND timestamp >= now() - INTERVAL 14 DAY`,
       paginas: `SELECT properties.$pathname AS pagina, uniq(person_id) AS visitantes, count() AS vistas
-        FROM events WHERE event = '$pageview' AND timestamp >= now() - INTERVAL 30 DAY
+        FROM events WHERE event = '$pageview' AND {ts}
         GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,
     },
   },
@@ -160,10 +166,32 @@ async function runQuery(projectId, sql, key) {
   return (body.results || []).map((row) => Object.fromEntries(body.columns.map((c, i) => [c, row[i] ?? 0])));
 }
 
+// Condiciones del período. Las fechas se validan antes de entrar a la consulta.
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const TZ = "'America/Argentina/Buenos_Aires'";
+function periodSql(desde, hasta) {
+  if (!desde && !hasta) return { ts: '1 = 1', ets: '1 = 1', dia: '1 = 1' };
+  if (!ISO_DAY.test(desde || '') || !ISO_DAY.test(hasta || '') || desde > hasta) return null;
+  const from = (col) => `${col} >= toDateTime('${desde} 00:00:00', ${TZ})`;
+  const to = (col) => `${col} < toDateTime('${hasta} 00:00:00', ${TZ}) + INTERVAL 1 DAY`;
+  return {
+    ts: `${from('timestamp')} AND ${to('timestamp')}`,
+    ets: `${from('e.timestamp')} AND ${to('e.timestamp')}`,
+    dia: `d >= toDate('${desde}') AND d <= toDate('${hasta}')`,
+  };
+}
+const withPeriod = (sql, period) => sql.replace(/\{(ts|ets|dia)\}/g, (_, k) => period[k]);
+
 module.exports = async (req, res) => {
   const key = process.env.POSTHOG_API_KEY;
   if (!key) {
     res.status(503).json({ error: 'Falta configurar POSTHOG_API_KEY en Vercel.' });
+    return;
+  }
+  const query = req.query || {};
+  const period = periodSql(query.desde, query.hasta);
+  if (!period) {
+    res.status(400).json({ error: 'Período inválido: usá desde y hasta con formato AAAA-MM-DD.' });
     return;
   }
   const projects = {};
@@ -171,14 +199,16 @@ module.exports = async (req, res) => {
   await Promise.all(Object.entries(PROJECTS).map(async ([name, cfg]) => {
     try {
       const entries = await Promise.all(Object.entries(cfg.queries)
-        .map(async ([q, sql]) => [q, await runQuery(cfg.id, sql, key)]));
+        .map(async ([q, sql]) => [q, await runQuery(cfg.id, withPeriod(sql, period), key)]));
       projects[name] = Object.fromEntries(entries);
     } catch (err) {
       errors[name] = err.message;
     }
   }));
   res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
-  res.status(Object.keys(projects).length ? 200 : 502).json({ updatedAt: new Date().toISOString(), projects, errors });
+  res.status(Object.keys(projects).length ? 200 : 502).json({ updatedAt: new Date().toISOString(), desde: query.desde || null, hasta: query.hasta || null, projects, errors });
 };
 
 module.exports.PROJECTS = PROJECTS;
+module.exports.periodSql = periodSql;
+module.exports.withPeriod = withPeriod;

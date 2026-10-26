@@ -57,7 +57,8 @@ Cada proyecto toma las campañas cuyo nombre empieza con su prefijo (`ads.match`
      - **Pauta en Meta Ads** (Maru Coach y Amobla IA): inversión, impresiones, clics, CTR, CPC y resultado por día y por campaña.
      - **Embudo por canal** (Maru Coach): visitantes → registro → suscripción por canal, con CPL, CPA y ROI.
      - **Outbound por mes** (Turnia, de ejemplo): embudo con demo agendada y realizada, MRR nuevo y desglose por canal.
-- **Selector de mes** arriba a la derecha: todo se recalcula a ese mes y la variación es contra el anterior.
+- **Selector de mes** arriba a la derecha: aplica al Resumen (North Star, suscriptores e ingresos).
+- **Filtro de fechas** al principio de Producto y de Distribución, en cada proyecto: Histórico (por defecto), Hoy, Últimos 7 días, Últimos 30 días o Elegir fechas. Lo de PostHog se vuelve a consultar para ese período (`/api/posthog?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, necesita la conexión en vivo); la pauta de Meta se filtra por día; en la planilla, contactados y las etapas siguientes cuentan solo los envíos de esas fechas (prospectados es siempre toda la base). La proyección de ventas y la edición a mano de etapas usan siempre el histórico.
 - Tema claro y oscuro (sigue al sistema; el botón ◐ lo fija). Se ve bien en celular.
 
 ## Cómo cargar los datos
