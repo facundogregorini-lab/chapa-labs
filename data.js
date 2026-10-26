@@ -65,17 +65,16 @@ window.CHAPA_DATA = {
             { canal: 'otras', visitantes: 326, empezaron: 66, resultado: 30, registrados: 26, activados: 10, checkouts: 1, compradores: 1, ingresos: 990 },
           ],
           nsm: [{ ultimos7: 97, previos7: 2 }],
-          // Funnels ordenados de los últimos 30 días (consulta "funnels").
+          // Funnels ordenados de los últimos 30 días (consulta "funnels"; foto del 26/10).
           funnels: [
             { funnel: 'general', s1: 905, s2: 105, s3: 19, s4: 4, s5: 3, s6: 2 },
-            { funnel: 'match', s1: 253, s2: 202, s3: 97, s4: 43, s5: 0, s6: 0 },
+            { funnel: 'match', s1: 255, s2: 204, s3: 98, s4: 43, s5: 18, s6: 10 },
             { funnel: 'cv', s1: 188, s2: 15, s3: 13, s4: 0, s5: 0, s6: 0 },
             { funnel: 'postulacion', s1: 79, s2: 22, s3: 14, s4: 0, s5: 0, s6: 0 },
             { funnel: 'carta', s1: 16, s2: 1, s3: 1, s4: 0, s5: 0, s6: 0 },
             { funnel: 'entrevista', s1: 14, s2: 1, s3: 0, s4: 0, s5: 0, s6: 0 },
             { funnel: 'video', s1: 12, s2: 0, s3: 0, s4: 0, s5: 0, s6: 0 },
-            { funnel: 'matchPasos', s1: 205, s2: 100, s3: 93, s4: 89, s5: 87, s6: 40 },
-            { funnel: 'matchPostulacion', s1: 101, s2: 46, s3: 20, s4: 12, s5: 0, s6: 0 },
+            { funnel: 'matchPasos', s1: 207, s2: 101, s3: 94, s4: 90, s5: 88, s6: 40, s7: 16, s8: 8, s9: 1 },
             { funnel: 'ingreso', s1: 97, s2: 81, s3: 68, s4: 0, s5: 0, s6: 0 },
           ],
           secciones: [
@@ -194,7 +193,7 @@ window.CHAPA_DATA = {
             note: 'entran, obtienen un resultado y lo usan (descargan o copian)',
             query: 'funnels',
             funnels: [
-              { id: 'match', title: 'Match', steps: ['Entraron', 'Empezaron el match', 'Vieron su ranking', 'Prepararon una postulación'] },
+              { id: 'match', title: 'Match', note: 'Sigue en la postulación personalizada hasta descargar el CV.', steps: ['Entraron', 'Empezaron el match', 'Vieron su ranking', 'Tocaron «Preparar postulación»', 'Obtuvieron el CV adaptado', 'Descargaron el CV'] },
               { id: 'cv', title: 'CV', steps: ['Entraron', 'Obtuvieron su CV', 'Lo descargaron'] },
               { id: 'postulacion', title: 'Postulación', steps: ['Entraron', 'Obtuvieron su CV adaptado', 'Lo descargaron'] },
               { id: 'carta', title: 'Carta', steps: ['Entraron', 'Obtuvieron su carta', 'La descargaron o copiaron'] },
@@ -207,8 +206,13 @@ window.CHAPA_DATA = {
             note: 'recorridos que cruzan varias pantallas',
             query: 'funnels',
             funnels: [
-              { id: 'matchPasos', title: 'Match paso a paso', steps: ['Empezaron', 'Cargaron el CV', 'Confirmaron el perfil', 'Completaron preferencias', 'Vieron el ranking', 'Prepararon una postulación'] },
-              { id: 'matchPostulacion', title: 'Del match a la postulación', steps: ['Vieron el ranking', 'Prepararon una postulación', 'Obtuvieron el CV adaptado', 'Lo descargaron'] },
+              {
+                id: 'matchPasos',
+                title: 'Match completo, hasta la postulación',
+                note: 'Del match a la postulación personalizada (/postulacion con el aviso cargado) y su último paso: completar el formulario con la extensión. El análisis del aviso no manda evento, por eso no es un paso.',
+                wide: true,
+                steps: ['Empezaron el match', 'Cargaron el CV', 'Confirmaron el perfil', 'Completaron preferencias', 'Vieron el ranking', 'Tocaron «Preparar postulación»', 'Obtuvieron el CV adaptado', 'Descargaron el CV', 'Fueron a la extensión'],
+              },
               { id: 'ingreso', title: 'Ingreso con Google', steps: ['Se les pidió ingresar', 'Tocaron Google', 'Ingresaron'] },
             ],
           },
@@ -455,7 +459,7 @@ window.CHAPA_DATA = {
       usability: {
         funnel: {
           title: 'Recorrido en la web',
-          note: 'Personas únicas desde el lanzamiento, como % de los visitantes. Son clics en botones: PostHog todavía no recibe el evento de foto subida.',
+          note: 'Personas únicas en los últimos 60 días, como % de los visitantes. Subir foto y crear son clics en botones; descargas, planes, Mercado Pago y pagos son eventos de la app (desde el 26/10; las descargas, desde que se despliegue axellaban/amoblaia#12).',
           query: 'totales',
           baseLabel: 'de los visitantes',
           steps: [
@@ -463,8 +467,11 @@ window.CHAPA_DATA = {
             { key: 'estudio', label: 'Entraron al estudio' },
             { key: 'foto', label: 'Tocaron "Subir foto"' },
             { key: 'generaron', label: 'Tocaron "Crear diseños"' },
+            { key: 'descargaron', label: 'Descargaron un diseño' },
             { key: 'precios', label: 'Vieron precios' },
-            { key: 'quisieronPagar', label: 'Tocaron "plan pago"' },
+            { key: 'eligieronPlan', label: 'Eligieron un plan' },
+            { key: 'mercadoPago', label: 'Fueron a Mercado Pago' },
+            { key: 'pagaron', label: 'Pagaron' },
           ],
         },
         kpis: [
