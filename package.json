@@ -1,0 +1,8 @@
+{
+  "name": "chapa-labs",
+  "private": true,
+  "description": "Dashboard de seguimiento de Chapa Labs. La página es estática; las dependencias son solo de las funciones de api/.",
+  "dependencies": {
+    "@vercel/blob": "2.8.2"
+  }
+}

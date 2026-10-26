@@ -627,23 +627,46 @@
 
   // ─── Etapas editadas a mano ───────────────────────────────
   // Cada etapa sale de la planilla, pero se puede pisar a mano desde el
-  // tablero. Se recuerda en este navegador hasta volver a la planilla.
-  const stageStore = (p) => `chapa-etapas-${p.id}`;
-  function stageEdits(p) {
-    try { return JSON.parse(localStorage.getItem(stageStore(p)) || '{}'); } catch (e) { return {}; }
-  }
-  function saveStageEdits(p, edits) {
-    try {
-      if (Object.keys(edits).length) localStorage.setItem(stageStore(p), JSON.stringify(edits));
-      else localStorage.removeItem(stageStore(p));
-    } catch (e) { /* sin storage */ }
-  }
-  // Totales por etapa: los de la planilla, con lo editado a mano encima.
+  // tablero. Se guarda en el servidor (/api/ediciones) y lo ven todos. Cada
+  // edición recuerda el valor de la planilla al editarla: vale mientras la
+  // planilla siga igual y se descarta sola cuando trae un dato nuevo.
+  const stageEdits = (p) => p.acquisition.edits || {};
   function stageTotals(p, f) {
-    const edits = stageEdits(p);
     const totals = { ...f.totals };
-    Object.entries(edits).forEach(([k, v]) => { if (k in totals && Number.isFinite(v)) totals[k] = v; });
-    return { totals, edited: edits };
+    const edited = {};
+    Object.entries(stageEdits(p)).forEach(([k, e]) => {
+      if (k in totals && e.planilla === f.totals[k]) {
+        totals[k] = e.value;
+        edited[k] = e;
+      }
+    });
+    return { totals, edited };
+  }
+  // Guarda en el servidor; si no se puede, la edición queda solo en esta pestaña.
+  async function saveStageEdits(p, edits) {
+    p.acquisition.edits = edits;
+    p.acquisition.editStatus = 'guardando';
+    try {
+      const res = await fetch('/api/ediciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proyecto: p.id, edits }),
+      });
+      if (!res.ok) throw new Error();
+      p.acquisition.edits = (await res.json()).edits || {};
+      p.acquisition.editStatus = 'guardado';
+    } catch (e) {
+      p.acquisition.editStatus = 'error';
+    }
+    const box = $('#edit-status');
+    if (box) box.outerHTML = editStatusHtml(p);
+  }
+  function editStatusHtml(p) {
+    const st = p.acquisition.editStatus;
+    const text = st === 'guardando' ? 'Guardando…'
+      : st === 'error' ? 'No se pudo guardar en el servidor: el cambio queda solo en esta pestaña.'
+        : st === 'guardado' ? 'Guardado. Lo ven todos los que abren el tablero.' : '';
+    return `<span id="edit-status" class="edit-status${st === 'error' ? ' is-error' : ''}" role="status">${esc(text)}</span>`;
   }
 
   // ─── Ventas proyectadas ───────────────────────────────────
@@ -814,20 +837,26 @@
     const el = e.target.closest('[data-stage]');
     const p = PROJECTS.find((x) => x.id === state.view);
     if (!el || !p || p.acquisition.type !== 'prospects') return;
-    const edits = stageEdits(p);
+    const sheet = prospectFigures(p).totals;
+    const edits = { ...stageEdits(p) };
     if (el.dataset.stage === 'reset') {
       if (e.type !== 'click') return;
-      saveStageEdits(p, {});
+      Object.keys(edits).forEach((k) => delete edits[k]);
     } else {
       if (e.type !== 'change') return;
+      const k = el.dataset.stage;
       const n = Number(el.value);
-      if (el.value === '' || !Number.isFinite(n)) delete edits[el.dataset.stage];
-      else edits[el.dataset.stage] = Math.max(0, Math.round(n));
-      saveStageEdits(p, edits);
+      if (el.value === '' || !Number.isFinite(n)) delete edits[k];
+      else edits[k] = { value: Math.max(0, Math.round(n)), planilla: sheet[k], at: new Date().toISOString() };
     }
+    // Las ediciones que la planilla ya dejó atrás se limpian al guardar.
+    Object.keys(edits).forEach((k) => { if (edits[k].planilla !== sheet[k]) delete edits[k]; });
+    p.acquisition.edits = edits;
+    p.acquisition.editStatus = 'guardando';
     const y = window.scrollY;
     render();
     window.scrollTo({ top: y });
+    saveStageEdits(p, edits);
   }
 
   function renderProspects(p, color) {
@@ -846,14 +875,14 @@
     const editor = `
       <div class="card stage-edit">
         <div class="stage-edit-head">
-          <div><h3>Editar etapas</h3><p class="sub">Los valores vienen de la planilla. Escribí uno para pisarlo a mano; vaciá el campo para volver al de la planilla. Se recuerda en este navegador.</p></div>
+          <div><h3>Editar etapas</h3><p class="sub">Los valores vienen de la planilla. Escribí uno para pisarlo a mano; vaciá el campo para volver al de la planilla. Se guarda para todos y vale hasta que la planilla traiga un dato nuevo para esa etapa.</p>${editStatusHtml(p)}</div>
           ${anyEdit ? '<button type="button" class="link-btn" data-stage="reset">Volver a la planilla</button>' : ''}
         </div>
         <div class="stage-inputs">
           ${st.map((s) => `
             <label class="stage-input${edited[s.key] !== undefined ? ' is-edited' : ''}">
               <span>${esc(s.label)}</span>
-              <input type="number" inputmode="numeric" min="0" step="1" value="${edited[s.key] ?? ''}" placeholder="${f.totals[s.key]}" data-stage="${esc(s.key)}" aria-label="${esc(s.label)}">
+              <input type="number" inputmode="numeric" min="0" step="1" value="${edited[s.key] ? edited[s.key].value : ''}" placeholder="${f.totals[s.key]}" data-stage="${esc(s.key)}" aria-label="${esc(s.label)}">
               <small>${edited[s.key] !== undefined ? `Planilla: ${fmt(f.totals[s.key], 'int')}` : 'De la planilla'}</small>
             </label>`).join('')}
         </div>
@@ -1361,13 +1390,34 @@
       p.acquisition.rows = live.rows;
       p.acquisition.live = true;
       // Sin redibujar mientras se edita una variable de la proyección.
-      if (document.activeElement && document.activeElement.closest('[data-proj]')) return;
+      if (document.activeElement && document.activeElement.closest('[data-proj], [data-stage]')) return;
       render();
     } catch (e) { /* queda la foto de data.js */ }
   }
 
+  // Etapas editadas a mano, compartidas (función /api/ediciones en Vercel).
+  async function loadStageEdits() {
+    const list = PROJECTS.filter((p) => p.acquisition.type === 'prospects');
+    await Promise.all(list.map(async (p) => {
+      try {
+        const res = await fetch(`/api/ediciones?proyecto=${encodeURIComponent(p.id)}`);
+        if (!res.ok) return;
+        const { edits } = await res.json();
+        // Si alguien editó en esta pestaña mientras cargaba, gana lo suyo.
+        if (p.acquisition.edits) return;
+        p.acquisition.edits = edits || {};
+        if (state.view !== p.id) return;
+        if (document.activeElement && document.activeElement.closest('[data-proj], [data-stage]')) return;
+        const y = window.scrollY;
+        render();
+        window.scrollTo({ top: y });
+      } catch (e) { /* sin servidor: solo la planilla */ }
+    }));
+  }
+
   fromHash();
   render();
+  loadStageEdits();
   loadLiveAds();
   loadLivePosthog();
   loadLiveProspects();
