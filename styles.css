@@ -382,3 +382,28 @@ input { font: inherit; color: inherit; }
 }
 .edit-status { display: block; font-size: 12px; color: var(--good-text); margin-top: 4px; min-height: 1em; }
 .edit-status.is-error { color: var(--bad-text); }
+
+/* ─── Filtro de fechas ─────────────────────────────── */
+.period-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 16px 0 4px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+}
+.period-title { font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 99px; background: var(--surface-2); }
+.seg button {
+  font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border: 0; border-radius: 99px; cursor: pointer;
+  background: transparent; color: var(--ink-2);
+}
+.seg button:hover { color: var(--ink); }
+.seg button.is-on { background: var(--ink); color: var(--page); }
+.period-date { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.period-date input {
+  font: inherit; font-size: 13px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink);
+}
+.period-now { font-size: 12px; color: var(--muted); margin-left: auto; }
+.period-note { margin: 8px 0 0; }
+@media (max-width: 720px) {
+  .period-now { margin-left: 0; width: 100%; }
+  .seg button { padding: 6px 10px; font-size: 12px; }
+}

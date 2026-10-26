@@ -65,7 +65,7 @@ window.CHAPA_DATA = {
             { canal: 'otras', visitantes: 326, empezaron: 66, resultado: 30, registrados: 26, activados: 10, checkouts: 1, compradores: 1, ingresos: 990 },
           ],
           nsm: [{ ultimos7: 97, previos7: 2 }],
-          // Funnels ordenados de los últimos 30 días (consulta "funnels"; foto del 26/10).
+          // Funnels ordenados del histórico (consulta "funnels"; foto del 26/10).
           funnels: [
             { funnel: 'general', s1: 905, s2: 105, s3: 19, s4: 4, s5: 3, s6: 2 },
             { funnel: 'match', s1: 255, s2: 204, s3: 98, s4: 43, s5: 18, s6: 10 },
@@ -162,7 +162,7 @@ window.CHAPA_DATA = {
         // Volumen por función: personas que entraron y veces que se abrió.
         features: {
           title: 'Funciones más usadas',
-          note: 'últimos 30 días; la barra es la cantidad de personas',
+          note: 'la barra es la cantidad de personas',
           query: 'secciones',
           labelKey: 'seccion',
           key: 'usuarios',
@@ -177,7 +177,7 @@ window.CHAPA_DATA = {
         funnelGroups: [
           {
             title: 'Funnel general',
-            note: 'últimos 30 días, cada persona en orden',
+            note: 'cada persona en orden, con hasta 30 días entre el primer y el último paso',
             query: 'funnels',
             funnels: [
               {
@@ -459,7 +459,7 @@ window.CHAPA_DATA = {
       usability: {
         funnel: {
           title: 'Recorrido en la web',
-          note: 'Personas únicas en los últimos 60 días, como % de los visitantes. Subir foto y crear son clics en botones; descargas, planes, Mercado Pago y pagos son eventos de la app (desde el 26/10; las descargas, desde que se despliegue axellaban/amoblaia#12).',
+          note: 'Personas únicas en el período, como % de los visitantes. Subir foto y crear son clics en botones; descargas, planes, Mercado Pago y pagos son eventos de la app (desde el 26/10; las descargas, desde que se despliegue axellaban/amoblaia#12).',
           query: 'totales',
           baseLabel: 'de los visitantes',
           steps: [
@@ -483,7 +483,7 @@ window.CHAPA_DATA = {
         tables: [
           {
             title: 'Páginas más visitadas',
-            note: 'Últimos 30 días.',
+            note: 'En el período elegido.',
             query: 'paginas',
             columns: [
               { key: 'pagina', label: 'Página' },

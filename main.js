@@ -17,7 +17,12 @@
     ...(p.posthog ? (p.posthog.data.daily || []).map((d) => d.date.slice(0, 7)) : []),
   ];
   let allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
-  const state = { month: allMonths[allMonths.length - 1], view: 'resumen' };
+  const state = {
+    month: allMonths[allMonths.length - 1],
+    view: 'resumen',
+    // Período de Producto y Distribución (por defecto, el histórico).
+    filters: { producto: { key: 'all' }, distribucion: { key: 'all' } },
+  };
   let charts = {};
 
   // ─── Formatos ─────────────────────────────────────────────
@@ -110,7 +115,7 @@
   // Filas de una consulta de api/posthog.js. Con varias consultas diarias,
   // las une por fecha (lo que falta en un día cuenta como 0).
   function phRows(p, query) {
-    const data = (p.posthog && p.posthog.data) || {};
+    const data = phData(p);
     const names = [].concat(query);
     if (names.length === 1) return data[names[0]] || [];
     const byDate = new Map();
@@ -142,6 +147,98 @@
   function dailyPoints(rows, key) {
     const byDate = new Map(rows.map((r) => [r.date, Number(r[key]) || 0]));
     return monthDays().map((date) => ({ date, label: dayLabel(date), tip: dayTip(date), value: byDate.get(date) || 0 }));
+  }
+
+  // ─── Filtro de fechas (Producto y Distribución) ───────────
+  // Cada sección tiene su período. Histórico usa la foto/consulta de siempre;
+  // los demás piden /api/posthog?desde=…&hasta=… y filtran la pauta y la
+  // planilla por fecha.
+  const PERIODS = [
+    { key: 'all', label: 'Histórico' },
+    { key: 'today', label: 'Hoy' },
+    { key: '7d', label: 'Últimos 7 días' },
+    { key: '30d', label: 'Últimos 30 días' },
+    { key: 'custom', label: 'Elegir fechas' },
+  ];
+  const addDays = (iso, n) => {
+    const d = new Date(`${iso}T12:00:00`);
+    d.setDate(d.getDate() + n);
+    return isoDay(d);
+  };
+  // Período de un filtro: { desde, hasta } (días incluidos) o null si es el histórico.
+  function periodRange(f) {
+    const today = isoDay(new Date());
+    if (f.key === 'today') return { desde: today, hasta: today };
+    if (f.key === '7d') return { desde: addDays(today, -6), hasta: today };
+    if (f.key === '30d') return { desde: addDays(today, -29), hasta: today };
+    if (f.key === 'custom' && f.desde && f.hasta && f.desde <= f.hasta) return { desde: f.desde, hasta: f.hasta };
+    return null;
+  }
+  const periodText = (r) => (!r ? 'histórico' : r.desde === r.hasta ? `el ${dayTip(r.desde)}` : `del ${dayTip(r.desde)} al ${dayTip(r.hasta)}`);
+  const rangeKey = (r) => `${r.desde}_${r.hasta}`;
+  // Sección que se está dibujando: { name, range }. Lo leen phRows, la pauta y la planilla.
+  let scope = null;
+  function inScope(name, fn) {
+    const prev = scope;
+    scope = { name, range: periodRange(state.filters[name]) };
+    try { return fn(); } finally { scope = prev; }
+  }
+  const scopeRange = () => (scope && scope.range) || null;
+  const inRange = (date, r) => !!date && date >= r.desde && date <= r.hasta;
+
+  // Datos de PostHog por período: { estado: 'cargando' | 'ok' | 'error', projects }.
+  const periodData = {};
+  function periodStatus(r) {
+    return r ? (periodData[rangeKey(r)] || {}).estado : 'ok';
+  }
+  function phData(p) {
+    const r = scopeRange();
+    if (r && p.posthog) {
+      const d = periodData[rangeKey(r)];
+      if (d && d.estado === 'ok' && d.projects[p.id]) return d.projects[p.id];
+    }
+    return (p.posthog && p.posthog.data) || {};
+  }
+  async function loadPeriod(r) {
+    const k = rangeKey(r);
+    if (periodData[k]) return;
+    periodData[k] = { estado: 'cargando' };
+    try {
+      if (location.protocol === 'file:') throw new Error();
+      const res = await fetch(`/api/posthog?desde=${r.desde}&hasta=${r.hasta}`);
+      if (!res.ok) throw new Error();
+      const body = await res.json();
+      periodData[k] = { estado: 'ok', projects: body.projects || {} };
+    } catch (e) {
+      periodData[k] = { estado: 'error' };
+    }
+    const y = window.scrollY;
+    render();
+    window.scrollTo({ top: y });
+  }
+
+  function periodBar(name) {
+    const f = state.filters[name];
+    const r = periodRange(f);
+    const buttons = PERIODS.map((x) => `<button type="button" data-period="${x.key}" data-section="${name}" class="${f.key === x.key ? 'is-on' : ''}" aria-pressed="${f.key === x.key}">${x.label}</button>`).join('');
+    return `
+      <div class="period-bar">
+        <span class="period-title">Período</span>
+        <div class="seg" role="group" aria-label="Período de ${name === 'producto' ? 'Producto' : 'Distribución'}">${buttons}</div>
+        ${f.key === 'custom' ? `
+          <label class="period-date">Desde <input type="date" data-period-from data-section="${name}" value="${f.desde || ''}" max="${isoDay(new Date())}"></label>
+          <label class="period-date">Hasta <input type="date" data-period-to data-section="${name}" value="${f.hasta || ''}" max="${isoDay(new Date())}"></label>` : ''}
+        <span class="period-now">${r ? `Mostrando ${periodText(r)}` : 'Mostrando todo el histórico'}</span>
+      </div>`;
+  }
+  // Aviso cuando el período necesita PostHog y todavía no está (o falló).
+  function periodNotice(p) {
+    const r = scopeRange();
+    if (!r || !p.posthog) return '';
+    const st = periodStatus(r);
+    if (st === 'error') return '<p class="note period-note">No se pudieron traer de PostHog los datos de ese período (necesita la conexión en vivo). Lo que sale de PostHog muestra el histórico.</p>';
+    if (st !== 'ok') return '<p class="note period-note">Cargando de PostHog los datos de ese período…</p>';
+    return '';
   }
 
   // ─── Datos por mes ────────────────────────────────────────
@@ -471,7 +568,7 @@
     const a = p.acquisition;
     const rows = phRows(p, a.query);
     const paid = rows.find((r) => r.canal === a.paidChannel) || {};
-    const spend = p.ads ? adsTotals(p.ads.daily).spend : NaN;
+    const spend = p.ads ? adsTotals(adsRows(p.ads)).spend : NaN;
     const signups = Number(paid[a.signupKey]) || 0;
     const buyers = Number(paid[a.buyerKey]) || 0;
     const revenue = Number(paid[a.revenueKey]) || 0;
@@ -608,7 +705,13 @@
 
   function prospectFigures(p) {
     const a = p.acquisition;
-    const rows = prospectRows(a).map((r) => ({ ...r, stage: stageOf(r) }));
+    const r = scopeRange();
+    // Con un período elegido, una fila avanza de "prospectado" solo si su
+    // fecha de envío cae en ese período (la planilla no tiene fecha de cada etapa).
+    const rows = prospectRows(a).map((x) => {
+      const stage = stageOf(x);
+      return { ...x, stage: r && stage > 0 && !inRange(x.fecha, r) ? 0 : stage };
+    });
     const count = (list) => Object.fromEntries(a.stages.map((s, i) => [s.key, list.filter((r) => r.stage >= i).length]));
     const totals = count(rows);
     const group = (key, order) => {
@@ -616,7 +719,7 @@
         .sort((x, y) => (order ? order.indexOf(x) - order.indexOf(y) : x.localeCompare(y)));
       return names.map((name) => ({ nombre: name, ...count(rows.filter((r) => (r[key] || 'Sin asignar') === name)) }));
     };
-    const days = [...new Set(rows.map((r) => r.fecha).filter(Boolean))].sort();
+    const days = [...new Set(rows.map((x) => x.fecha).filter((d) => d && (!r || inRange(d, r))))].sort();
     return {
       rows, totals,
       bySdr: group('sdr'),
@@ -864,11 +967,22 @@
     saveStageEdits(p, edits);
   }
 
+  // La proyección usa siempre el histórico de la planilla (con lo editado a mano).
+  function projectionBase(p, t, edited) {
+    if (!scopeRange()) return [t, edited];
+    const prev = scope;
+    scope = null;
+    try {
+      const all = stageTotals(p, prospectFigures(p));
+      return [all.totals, all.edited];
+    } finally { scope = prev; }
+  }
+
   function renderProspects(p, color) {
     const a = p.acquisition;
     const f = prospectFigures(p);
     const st = a.stages;
-    const { totals: t, edited } = stageTotals(p, f);
+    const { totals: t, edited } = scopeRange() ? { totals: f.totals, edited: {} } : stageTotals(p, f);
     const last = st[st.length - 1].key;
     const anyEdit = Object.keys(edited).length > 0;
     const tiles = st.map((s) => tile({ label: s.label, hint: edited[s.key] !== undefined ? `Editado a mano · planilla: ${fmt(f.totals[s.key], 'int')}` : s.hint, value: t[s.key], format: 'int' }));
@@ -877,7 +991,8 @@
     tiles.push(tile({ label: 'Tasa de interés', hint: `${st[2].label} / ${st[1].label.toLowerCase()}`, value: ratio(t[st[2].key], t[st[1].key]), format: 'pct' }));
     tiles.push(tile({ label: 'Conversión total', hint: `${st[0].label} → ${st[st.length - 1].label}`, value: ratio(t[last], t[st[0].key]), format: 'pct' }));
 
-    const editor = `
+    const editor = scopeRange() ? `
+      <div class="card stage-edit"><p class="sub" style="margin:0">Con un período elegido, contactados y las etapas siguientes cuentan solo los envíos de esas fechas. Para editar las etapas a mano, volvé a <strong>Histórico</strong>.</p></div>` : `
       <div class="card stage-edit">
         <div class="stage-edit-head">
           <div><h3>Editar etapas</h3><p class="sub">Los valores vienen de la planilla. Escribí uno para pisarlo a mano; vaciá el campo para volver al de la planilla. Se guarda para todos y vale hasta que la planilla traiga un dato nuevo para esa etapa.</p>${editStatusHtml(p)}</div>
@@ -915,7 +1030,7 @@
       <div class="tiles">${tiles.join('')}</div>
       ${editor}
       <div class="grid g-2" style="margin-top:12px">
-        <div class="card"><h3>Embudo de prospección</h3><p class="sub">${anyEdit ? 'Con los valores editados a mano' : 'Toda la planilla'} · conversión entre etapas</p><div class="funnel">${funnelHtml(st, t, color)}</div></div>
+        <div class="card"><h3>Embudo de prospección</h3><p class="sub">${scopeRange() ? `Envíos ${periodText(scopeRange())}` : anyEdit ? 'Con los valores editados a mano' : 'Toda la planilla'} · conversión entre etapas</p><div class="funnel">${funnelHtml(st, t, color)}</div></div>
         <div class="card"><h3>Contactados por día</h3><p class="sub">Según la fecha de envío en la planilla</p>${f.byDay.length ? chart(barChart({ points: f.byDay, format: 'int', color, height: 220 })) : '<p class="sub">Todavía no hay envíos con fecha.</p>'}</div>
       </div>
       <div class="grid g-2" style="margin-top:12px">
@@ -927,8 +1042,8 @@
         ${table({ columns: listCols, rows: list })}
       </details>
 
-      <h2 class="section">Ventas proyectadas <span>· sobre la base total de prospectados</span></h2>
-      ${renderProjection(p, t, edited)}`;
+      <h2 class="section">Ventas proyectadas <span>· sobre la base total de prospectados${scopeRange() ? ', con el histórico de la planilla' : ''}</span></h2>
+      ${renderProjection(p, ...projectionBase(p, t, edited))}`;
   }
 
   // ─── Pauta en Meta Ads (datos reales) ─────────────────────
@@ -939,7 +1054,11 @@
     t.cpr = ratio(t.spend, t.results);
     return t;
   }
-  const adsRows = (a) => a.daily.filter((d) => d.date.slice(0, 7) === state.month);
+  // Distribución: los días del período elegido (o todo el histórico).
+  const adsRows = (a) => {
+    const r = scopeRange();
+    return r ? a.daily.filter((d) => inRange(d.date, r)) : a.daily.slice();
+  };
   const adsUpdated = (a) => (a.live ? 'en vivo' : `actualizado el ${dayTip(a.snapshotAt)}`);
 
   function renderAds(p, color) {
@@ -947,10 +1066,10 @@
     const cur = a.currency;
     const rows = adsRows(a);
     if (!rows.length) {
-      return `<div class="card"><p class="sub" style="margin:0">Sin pauta en ${esc(a.source)} en ${monthLabel(state.month, true)}.</p></div>`;
+      return `<div class="card"><p class="sub" style="margin:0">Sin pauta en ${esc(a.source)} ${periodText(scopeRange())}.</p></div>`;
     }
     const t = adsTotals(rows);
-    // Resultado de negocio (desde el lanzamiento): cruza la inversión de Meta
+    // Resultado de negocio (en el período): cruza la inversión de Meta
     // con las compras de PostHog. Solo en proyectos con embudo real.
     let business = '';
     if (p.acquisition.type === 'funnel') {
@@ -962,7 +1081,7 @@
         { label: `${label} totales`, hint: 'Todas las fuentes', value: f.allBuyers, format: 'int' },
         { label: 'CPA total', hint: `Inversión / ${label.toLowerCase()} totales`, value: f.cpaAll, format: 'money' },
       ].map((x) => tile({ ...x, currency: f.cur })).join('')}</div>
-      <p class="note" style="margin:0 0 12px">${esc(label)}: pagos confirmados en PostHog (compra_confirmada) desde el lanzamiento. Meta: según la UTM de la primera visita.</p>`;
+      <p class="note" style="margin:0 0 12px">${esc(label)}: pagos confirmados en PostHog (compra_confirmada), ${periodText(scopeRange())}. Meta: según la UTM de la primera visita.</p>`;
     }
     const tiles = [
       { label: 'Inversión', value: t.spend, format: 'money' },
@@ -1135,7 +1254,6 @@
     const color = ACCENTS[i % ACCENTS.length];
     const f = nsmFigures(p);
     const { ns, prev, list, value } = f;
-    const lastMonth = allMonths[allMonths.length - 1];
     const realUsability = !p.usability.noData && p.posthog;
     const acq = p.acquisition;
     const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound', prospects: 'Outbound' }[acq.type];
@@ -1143,6 +1261,30 @@
       : acq.type === 'prospects' ? badge(null, `Datos reales · ${esc(acq.source)}, ${acq.live ? 'en vivo' : `actualizado el ${dayTip(acq.snapshotAt)}`}`)
         : badge(acq);
     const renderAcq = { funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound, prospects: renderProspects }[acq.type];
+    // Pide a PostHog los datos de los períodos elegidos que todavía no estén.
+    ['producto', 'distribucion'].forEach((name) => {
+      const r = periodRange(state.filters[name]);
+      if (r && p.posthog && !periodData[rangeKey(r)]) loadPeriod(r);
+    });
+    const productoHtml = inScope('producto', () => `
+        ${periodBar('producto')}
+        ${periodNotice(p)}
+        <h2 class="section">Funnels y usabilidad <span>· ${realUsability ? periodText(scopeRange()) : 'sin fuente conectada'}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
+        ${renderUsability(p, color)}`);
+    const distribucionHtml = inScope('distribucion', () => `
+        ${periodBar('distribucion')}
+        ${acq.type === 'funnel' ? periodNotice(p) : ''}
+        ${acq.type === 'prospects' ? `
+        <h2 class="section">${acqTitle} <span>· prospectados → contactados → interesados → suscriptores</span> ${acqBadge}</h2>
+        ${renderAcq(p, color)}` : ''}
+
+        ${p.ads ? `
+        <h2 class="section">Pauta en ${esc(p.ads.source)} <span>· ${periodText(scopeRange())}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
+        ${renderAds(p, color)}` : ''}
+
+        ${acq.type !== 'prospects' ? `
+        <h2 class="section">${acqTitle} ${acqBadge}</h2>
+        ${renderAcq(p, color)}` : ''}`);
 
     main.innerHTML = `
       <div class="page-head">
@@ -1185,8 +1327,7 @@
           <h2 id="producto">Producto</h2>
           <p>Funnels y usabilidad del producto digital: qué hace la gente una vez que llega.</p>
         </div>
-        <h2 class="section">Funnels y usabilidad <span>· ${realUsability ? 'desde el lanzamiento' : `${monthLabel(lastMonth, true)}${state.month !== lastMonth ? ' (último mes cargado)' : ''}`}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
-        ${renderUsability(p, color)}
+        ${productoHtml}
       </section>
 
       <section class="pillar" id="distribucion-sec" aria-labelledby="distribucion">
@@ -1194,17 +1335,7 @@
           <h2 id="distribucion">Distribución</h2>
           <p>Adquisición: cómo llegan los clientes, por qué canal y a qué costo.</p>
         </div>
-        ${acq.type === 'prospects' ? `
-        <h2 class="section">${acqTitle} <span>· prospectados → contactados → interesados → suscriptores</span> ${acqBadge}</h2>
-        ${renderAcq(p, color)}` : ''}
-
-        ${p.ads ? `
-        <h2 class="section">Pauta en ${esc(p.ads.source)} ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
-        ${renderAds(p, color)}` : ''}
-
-        ${acq.type !== 'prospects' ? `
-        <h2 class="section">${acqTitle} ${acqBadge}</h2>
-        ${renderAcq(p, color)}` : ''}
+        ${distribucionHtml}
       </section>`;
   }
 
@@ -1240,6 +1371,33 @@
     render();
     window.scrollTo({ top: 0 });
   });
+
+  // Filtro de fechas: botones del período y fechas a elegir.
+  function onPeriod(e) {
+    const btn = e.target.closest('[data-period]');
+    const from = e.target.closest('[data-period-from]');
+    const to = e.target.closest('[data-period-to]');
+    const el = btn || from || to;
+    if (!el) return;
+    if (btn && e.type !== 'click') return;
+    if (!btn && e.type !== 'change') return;
+    const f = state.filters[el.dataset.section];
+    if (btn) {
+      f.key = btn.dataset.period;
+      if (f.key === 'custom' && !f.desde) {
+        f.hasta = isoDay(new Date());
+        f.desde = addDays(f.hasta, -13);
+      }
+    } else if (el.value) {
+      if (from) f.desde = el.value; else f.hasta = el.value;
+      if (f.desde > f.hasta) [f.desde, f.hasta] = [f.hasta, f.desde];
+    }
+    const y = window.scrollY;
+    render();
+    window.scrollTo({ top: y });
+  }
+  main.addEventListener('click', onPeriod);
+  main.addEventListener('change', onPeriod);
 
   main.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-jump]');
