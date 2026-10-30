@@ -24,6 +24,8 @@ const PAGE = "multiIf(properties.$pathname LIKE '/demo/%', '/demo/…', properti
 // habita.: alguien interactuó con una demo pública (estilos, fotos, comparación, descargas).
 const DEMO_INTERACTION = "event IN ('demo_estilo', 'demo_style_viewed', 'demo_photo_changed', 'comparison_slider_used', 'demo_fullscreen_toggled', 'demo_owner_download', 'demo_owner_generar')";
 const AGENCY_JOINED = "event IN ('agency_created', 'agency_claimed', 'agency_user_joined')";
+// Turnia comparte el proyecto de PostHog con otras apps: solo cuenta su dominio.
+const TURNIA_SITE = "properties.$host ILIKE '%turnia%'";
 
 // Funnels ordenados: cada persona tiene que dar los pasos en ese orden, dentro
 // de la ventana. Devuelve una fila por funnel con las personas de cada paso
@@ -158,9 +160,10 @@ const PROJECTS = {
     },
   },
 
-  // Turnia · proyecto "Turnia Salud" (id 518346). La clave de POSTHOG_API_KEY tiene
-  // que tener acceso a su organización. El panel no se mide (datos de pacientes).
-  // Eventos: ANALITICA.md del repo turniasalud.
+  // Turnia · proyecto 518346 (organización "Ai lab"). Lo comparte con otras apps
+  // (Loreado, Copiloto), así que todo se limita al dominio de Turnia. La clave de
+  // POSTHOG_API_KEY tiene que tener acceso a ese proyecto. El panel no se mide
+  // (datos de pacientes). Eventos: ANALITICA.md del repo turniasalud.
   turnia: {
     id: 518346,
     queries: {
@@ -170,20 +173,20 @@ const PROJECTS = {
           uniqIf(person_id, event = 'demo_started') AS empezaronDemo,
           uniqIf(person_id, event = 'demo_conversation_started') AS conversaron,
           uniqIf(person_id, event = 'lead_created') AS pedidos
-        FROM events WHERE {ts} AND ${EXTERNAL}
+        FROM events WHERE {ts} AND ${TURNIA_SITE} AND ${EXTERNAL}
         GROUP BY date ORDER BY date`,
       totales: `SELECT uniqIf(person_id, event = '$pageview') AS visitantes,
           uniqIf(person_id, event = 'personal_demo_viewed') AS demoPersonal,
           uniqIf(person_id, event = 'demo_form_viewed') AS formulario,
           uniqIf(person_id, event = 'demo_started') AS empezaronDemo,
-          uniqIf(person_id, event = 'demo_ready_seen' OR event = 'demo_prepared') AS demoLista,
-          uniqIf(person_id, event = 'demo_conversation_started' OR event = 'demo_message_sent') AS conversaron,
+          uniqIf(person_id, event = 'demo_ready_seen') AS demoLista,
+          uniqIf(person_id, event = 'demo_conversation_started') AS conversaron,
           uniqIf(person_id, event = 'demo_audio_played') AS escucharon,
           uniqIf(person_id, event = 'lead_created') AS pedidos,
           countIf(event = '$rageclick') AS rageclicks
-        FROM events WHERE {ts} AND ${EXTERNAL}`,
+        FROM events WHERE {ts} AND ${TURNIA_SITE} AND ${EXTERNAL}`,
       paginas: `SELECT ${PAGE} AS pagina, uniq(person_id) AS visitantes, count() AS vistas
-        FROM events WHERE event = '$pageview' AND {ts} AND ${EXTERNAL}
+        FROM events WHERE event = '$pageview' AND {ts} AND ${TURNIA_SITE} AND ${EXTERNAL}
         GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,
     },
   },

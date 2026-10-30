@@ -11,7 +11,7 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 | North Star y usabilidad de **habita.** | **PostHog**, organización "AmoblaIA" | **Real.** North Star: diseños generados (evento `diseno_generado`). Producto: recorrido en la web (foto subida, diseño generado, precios, plan) e interacción con las demos públicas (`demo_vista`, interacciones, «Crear mi inmobiliaria», alta). Sin el tráfico del equipo (`is_internal`). |
 | Prospección, demos comerciales e ingresos de **habita.** | **`/api/metricas` de habita.** (Supabase, mismas reglas que `/admin/prospeccion`) | **Real.** Reemplaza a la planilla "Prospecting amobla IA", que quedó vieja: la prospección ahora vive en el panel. |
 | Prospección a odontólogos, demos, pedidos de demo y uso de **Turnia** | **`/api/metricas` de Turnia** (su base) | **Real** cuando se conecta; hasta entonces, **Sin datos**. North Star: turnos que tomó Turnia en los últimos 7 días. |
-| Recorrido en la web de **Turnia** | **PostHog**, proyecto "Turnia Salud" (518346) | **Real** cuando la clave de PostHog tiene acceso a esa organización. |
+| Recorrido en la web de **Turnia** | **PostHog**, proyecto 518346 (organización "Ai lab", compartido con otras apps: se cuenta solo el dominio de Turnia) | **Real** cuando la clave de PostHog tiene acceso a ese proyecto. Datos desde el 30/10. |
 | Ingresos de **Turnia** | — | **Sin datos**: Turnia todavía no registra cobros. |
 
 Lo real se ve con la etiqueta **Datos reales**; lo que no tiene fuente conectada, con **Sin datos** y en 0. Nunca se cargan números inventados. Lo real se guarda como foto en `data.js` y las funciones `/api/meta`, `/api/posthog` y `/api/prospectos` lo actualizan en vivo cuando tienen sus claves (abajo).
