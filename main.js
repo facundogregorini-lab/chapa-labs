@@ -1298,14 +1298,18 @@
     const groups = (u.funnelGroups || []).map((g) => funnelGroupHtml(p, g, color)).join('');
     const volume = u.features ? featuresHtml(p, u.features, color) : '';
     const cards = [];
+    // Lo que sale de PostHog sin foto ni conexión en vivo no es un 0 real: se marca y se explica.
+    const phMissing = (b) => b.query && !b.metrics && p.posthog && !phReal(p);
+    const phNote = '<p class="sub">Falta que la clave de PostHog del tablero (POSTHOG_API_KEY) tenga acceso a este proyecto.</p>';
+    const title = (b) => `<h3>${esc(b.title)}${phMissing(b) ? ` ${badge({ noData: true })}` : ''}</h3>`;
     [].concat(u.funnel || [], u.funnels || []).forEach((f) => {
       const row = f.metrics ? mGet(p, f.metrics) || {} : phRows(p, f.query)[0] || {};
-      cards.push(`<div class="card"><h3>${esc(f.title)}</h3>${f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}
+      cards.push(`<div class="card">${title(f)}${phMissing(f) ? phNote : f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}
         <div class="funnel">${funnelHtml(f.steps, row, color, { relative: f.relative || 'first', baseLabel: f.baseLabel })}</div></div>`);
     });
     (u.tables || []).forEach((t) => cards.push(`
       <div class="card${t.wide ? ' span-2' : ''}">
-        <h3>${esc(t.title)}</h3>${t.note ? `<p class="sub">${esc(t.note)}</p>` : ''}
+        ${title(t)}${phMissing(t) ? phNote : t.note ? `<p class="sub">${esc(t.note)}</p>` : ''}
         ${table({ columns: t.columns, rows: t.metrics ? mRows(p, t.metrics) : t.query ? phRows(p, t.query) : t.rows, heat: t.heat, currency: p.currency })}
       </div>`));
     return `
