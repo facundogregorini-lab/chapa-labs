@@ -17,10 +17,13 @@
 const HOST = process.env.POSTHOG_HOST || 'https://us.posthog.com';
 const DAY = "toDate(toTimeZone(timestamp, 'America/Argentina/Buenos_Aires'))";
 const FROM_META = "lower(properties.utm_source) IN ('meta', 'ig', 'facebook', 'fb', 'instagram')";
-// Amobla IA: clic en el botón que genera el diseño ("Crear N diseños gratis",
-// "Generar mi diseño"). Ojo: "Amoblar" es solo la pestaña del modo.
-const GENERATE_CLICK = "event = '$autocapture' AND (properties.$el_text ILIKE 'Crear % gratis'"
-  + " OR properties.$el_text IN ('Generar mi diseño', 'Generar otra variante'))";
+// Tráfico del equipo: las apps marcan is_internal en sus dispositivos.
+const EXTERNAL = "ifNull(toString(properties.is_internal), '') != 'true'";
+// Las demos y los links de la prospección llevan un token en la URL: se agrupan.
+const PAGE = "multiIf(properties.$pathname LIKE '/demo/%', '/demo/…', properties.$pathname LIKE '/p/%', '/p/…', properties.$pathname)";
+// habita.: alguien interactuó con una demo pública (estilos, fotos, comparación, descargas).
+const DEMO_INTERACTION = "event IN ('demo_estilo', 'demo_style_viewed', 'demo_photo_changed', 'comparison_slider_used', 'demo_fullscreen_toggled', 'demo_owner_download', 'demo_owner_generar')";
+const AGENCY_JOINED = "event IN ('agency_created', 'agency_claimed', 'agency_user_joined')";
 
 // Funnels ordenados: cada persona tiene que dar los pasos en ese orden, dentro
 // de la ventana. Devuelve una fila por funnel con las personas de cada paso
@@ -69,9 +72,6 @@ const MARU_FUNNELS = {
   ingreso: ["event = 'login_pedido'", "event = 'login_google'", "event = 'login_ok'"],
 };
 
-// Diseños descargados en el día: suma la cantidad de cada descarga.
-const DOWNLOADS = "sumIf(toFloat(properties.cantidad), event = 'diseno_descargado')";
-
 const PROJECTS = {
   // Maru Coach · organización "Growth Labs 2"
   'maru-coach': {
@@ -114,8 +114,8 @@ const PROJECTS = {
     },
   },
 
-  // Amobla IA · organización "AmoblaIA". Todavía sin eventos propios: se usan
-  // páginas vistas y clics automáticos sobre los botones.
+  // habita. (ex Amobla IA) · organización "AmoblaIA". Eventos propios de la app
+  // (foto_subida, diseno_generado, demo_vista…) y páginas vistas; sin el equipo.
   'amobla-ia': {
     id: 683617,
     queries: {
@@ -123,33 +123,67 @@ const PROJECTS = {
           uniqIf(person_id, event = '$pageview') AS visitantes,
           uniqIf(person_id, event = '$pageview' AND ${FROM_META}) AS visitantesMeta,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
-          uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
-          uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
-          ${DOWNLOADS} AS descargados,
-          uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
-          countIf(event = 'compra_confirmada') AS compras,
-          sumIf(toFloat(properties.monto), event = 'compra_confirmada') AS ingresos
-        FROM events WHERE {ts}
+          uniqIf(person_id, event = 'foto_subida') AS foto,
+          uniqIf(person_id, event = 'diseno_generado') AS generaron,
+          countIf(event = 'diseno_generado') AS disenos,
+          uniqIf(person_id, event = 'demo_vista') AS demoVieron,
+          uniqIf(person_id, ${AGENCY_JOINED}) AS inmobiliarias
+        FROM events WHERE {ts} AND ${EXTERNAL}
         GROUP BY date ORDER BY date`,
       totales: `SELECT uniqIf(person_id, event = '$pageview') AS visitantes,
           uniqIf(person_id, event = '$pageview' AND ${FROM_META}) AS visitantesMeta,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/estudio') AS estudio,
-          uniqIf(person_id, event = '$autocapture' AND properties.$el_text IN ('Subir mi foto', 'Subí una imagen', 'Cambiar foto')) AS foto,
-          uniqIf(person_id, ${GENERATE_CLICK}) AS generaron,
+          uniqIf(person_id, event = 'foto_subida') AS foto,
+          uniqIf(person_id, event = 'diseno_generado') AS generaron,
+          countIf(event = 'diseno_generado') AS disenos,
           uniqIf(person_id, event = '$pageview' AND properties.$pathname = '/precios') AS precios,
-          uniqIf(person_id, event = '$autocapture' AND properties.$el_text = 'Rediseñar (plan pago)') AS quisieronPagar,
-          uniqIf(person_id, event = 'diseno_descargado') AS descargaron,
           uniqIf(person_id, event = 'plan_click') AS eligieronPlan,
           uniqIf(person_id, event = 'checkout_creado') AS mercadoPago,
           uniqIf(person_id, event = 'compra_confirmada') AS pagaron,
+          uniqIf(person_id, event = 'demo_vista') AS demoVieron,
+          uniqIf(person_id, ${DEMO_INTERACTION}) AS demoInteractuaron,
+          uniqIf(person_id, event = 'demo_agency_cta_clicked') AS demoCta,
+          uniqIf(person_id, event = 'agency_signup_started') AS altaVista,
+          uniqIf(person_id, ${AGENCY_JOINED}) AS inmobiliarias,
+          uniqIf(person_id, event = 'asistente_pregunta') AS asistente,
           countIf(event = '$rageclick') AS rageclicks
-        FROM events WHERE {ts}`,
-      // North Star: diseños descargados (una descarga de lote suma cada foto).
-      nsm: `SELECT sumIf(toFloat(properties.cantidad), timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
-          sumIf(toFloat(properties.cantidad), timestamp < now() - INTERVAL 7 DAY) AS previos7
-        FROM events WHERE event = 'diseno_descargado' AND timestamp >= now() - INTERVAL 14 DAY`,
-      paginas: `SELECT properties.$pathname AS pagina, uniq(person_id) AS visitantes, count() AS vistas
-        FROM events WHERE event = '$pageview' AND {ts}
+        FROM events WHERE {ts} AND ${EXTERNAL}`,
+      // North Star: diseños generados (cada ambientación terminada).
+      nsm: `SELECT countIf(timestamp >= now() - INTERVAL 7 DAY) AS ultimos7,
+          countIf(timestamp < now() - INTERVAL 7 DAY) AS previos7
+        FROM events WHERE event = 'diseno_generado' AND timestamp >= now() - INTERVAL 14 DAY AND ${EXTERNAL}`,
+      paginas: `SELECT ${PAGE} AS pagina, uniq(person_id) AS visitantes, count() AS vistas
+        FROM events WHERE event = '$pageview' AND {ts} AND ${EXTERNAL}
+        GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,
+    },
+  },
+
+  // Turnia · proyecto "Turnia Salud" (id 518346). La clave de POSTHOG_API_KEY tiene
+  // que tener acceso a su organización. El panel no se mide (datos de pacientes).
+  // Eventos: ANALITICA.md del repo turniasalud.
+  turnia: {
+    id: 518346,
+    queries: {
+      daily: `SELECT toString(${DAY}) AS date,
+          uniqIf(person_id, event = '$pageview') AS visitantes,
+          uniqIf(person_id, event = 'personal_demo_viewed') AS demoPersonal,
+          uniqIf(person_id, event = 'demo_started') AS empezaronDemo,
+          uniqIf(person_id, event = 'demo_conversation_started') AS conversaron,
+          uniqIf(person_id, event = 'lead_created') AS pedidos
+        FROM events WHERE {ts} AND ${EXTERNAL}
+        GROUP BY date ORDER BY date`,
+      totales: `SELECT uniqIf(person_id, event = '$pageview') AS visitantes,
+          uniqIf(person_id, event = 'personal_demo_viewed') AS demoPersonal,
+          uniqIf(person_id, event = 'demo_form_viewed') AS formulario,
+          uniqIf(person_id, event = 'demo_started') AS empezaronDemo,
+          uniqIf(person_id, event = 'demo_ready_seen' OR event = 'demo_prepared') AS demoLista,
+          uniqIf(person_id, event = 'demo_conversation_started' OR event = 'demo_message_sent') AS conversaron,
+          uniqIf(person_id, event = 'demo_audio_played') AS escucharon,
+          uniqIf(person_id, event = 'lead_created') AS pedidos,
+          countIf(event = '$rageclick') AS rageclicks
+        FROM events WHERE {ts} AND ${EXTERNAL}`,
+      paginas: `SELECT ${PAGE} AS pagina, uniq(person_id) AS visitantes, count() AS vistas
+        FROM events WHERE event = '$pageview' AND {ts} AND ${EXTERNAL}
         GROUP BY pagina ORDER BY visitantes DESC LIMIT 8`,
     },
   },
