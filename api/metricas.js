@@ -5,7 +5,7 @@
 // Variables de entorno en Vercel:
 //   HABITA_METRICS_SECRET   la misma clave que METRICS_SECRET en el proyecto de habita.
 //   TURNIA_METRICS_SECRET   la misma clave que METRICS_SECRET en el proyecto de Turnia.
-//   HABITA_METRICS_URL      opcional; por defecto https://amoblaia.vercel.app/api/metricas
+//   HABITA_METRICS_URL      opcional; por defecto https://habitaia.vercel.app/api/metricas
 //   TURNIA_METRICS_URL      opcional; por defecto https://turniasalud.vercel.app/api/metricas
 //
 // Período: sin parámetros es el histórico. Con ?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
@@ -14,7 +14,7 @@
 
 const SOURCES = {
   'amobla-ia': {
-    url: () => process.env.HABITA_METRICS_URL || 'https://amoblaia.vercel.app/api/metricas',
+    url: () => process.env.HABITA_METRICS_URL || 'https://habitaia.vercel.app/api/metricas',
     secret: () => process.env.HABITA_METRICS_SECRET,
     secretName: 'HABITA_METRICS_SECRET',
   },
