@@ -642,6 +642,16 @@ window.CHAPA_DATA = {
           { label: 'Ausentismo', hint: 'Ausentes / turnos del período', metrics: 'uso.ausentes', of: 'uso.turnos', format: 'pct' },
         ],
         funnels: [{
+          title: 'Demos con Sofi',
+          note: 'Del panel de Turnia: todas las demos (web, WhatsApp o llamada) y hasta dónde llegaron.',
+          metrics: 'demos',
+          relative: 'prev',
+          steps: [
+            { key: 'iniciadas', label: 'Iniciadas' },
+            { key: 'listas', label: 'Llegaron a hablar con Sofi' },
+            { key: 'terminadas', label: 'Terminadas' },
+          ],
+        }, {
           title: 'Recorrido en la web',
           note: 'PostHog «Turnia Salud», personas únicas como % de los visitantes. Sin el tráfico del equipo.',
           query: 'totales',
