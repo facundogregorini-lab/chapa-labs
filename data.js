@@ -3,17 +3,21 @@
  *
  * Lo que tiene `noData: true` todavía no tiene fuente conectada: se muestra en 0
  * con la etiqueta "Sin datos". Nunca se cargan números inventados.
- * Los bloques `ads` (Meta Ads) y `posthog` (PostHog) son datos reales: esta es
- * la foto guardada, y /api/meta y /api/posthog la actualizan en vivo.
+ * Los bloques `ads` (Meta Ads), `posthog` (PostHog) y `metrics` (las apps) son
+ * datos reales: esta es la foto guardada, y /api/meta, /api/posthog y
+ * /api/metricas la actualizan en vivo.
  *
  * Cada proyecto tiene:
  *   - ads:         pauta real en Meta Ads (opcional), por día y campaña.
  *   - posthog:     resultados de las consultas de api/posthog.js (opcional).
+ *   - metrics:     foto de /api/metricas de la app (habita. y Turnia): prospección,
+ *                  demos, ingresos y uso. Se lee con rutas como 'demos.creadas'.
  *   - northStar:   la métrica principal. Con `posthog` sale de esas consultas;
  *                  si no, de una serie mensual con meta.
  *   - acquisition: "funnel" (embudo real por canal + inversión de Meta),
  *                  "paid" (pauta por mes), "outbound" (embudo comercial por mes)
- *                  o "prospects" (planilla de prospección + ventas proyectadas).
+ *                  "prospects" (planilla de prospección + ventas proyectadas)
+ *                  o "pipeline" (secciones de prospección y demos desde `metrics`).
  *                  Se muestra en la sección Distribución.
  *   - usability:   KPIs, embudo y tablas de uso (sección Producto). Con `query`
  *                  salen de PostHog.
@@ -22,7 +26,7 @@
  * Para sumar un proyecto, copiá uno de los bloques y cambiá el id.
  */
 window.CHAPA_DATA = {
-  updatedAt: '2026-10-25',
+  updatedAt: '2026-10-30',
   team: ['Facundo', 'Axel'],
 
   projects: [
@@ -237,55 +241,100 @@ window.CHAPA_DATA = {
       },
     },
 
-    // ─────────────────────────────────────────── AMOBLA IA
+    // ─────────────────────────────────────────── HABITA. (ex Amobla IA)
+    // El id sigue siendo amobla-ia para no romper los links (#amobla-ia).
     {
       id: 'amobla-ia',
-      name: 'Amobla IA',
-      tagline: 'Virtual staging con IA para inmobiliarias · Meta Ads + outbound',
+      name: 'habita.',
+      tagline: 'Virtual staging con IA para inmobiliarias · prospección, demos y Meta Ads',
       stage: 'Lanzamiento',
-      currency: 'USD',
-      // Analítica real de PostHog (organización "AmoblaIA"). Todavía sin eventos
-      // propios: se usan páginas vistas y clics automáticos sobre los botones.
+      currency: 'ARS',
+      // Analítica real de PostHog (organización "AmoblaIA"), sin el tráfico del
+      // equipo. Mismas columnas que las consultas de api/posthog.js.
       posthog: {
         org: 'AmoblaIA',
         projectId: 683617,
-        snapshotAt: '2026-10-25',
+        snapshotAt: '2026-10-30',
         data: {
           daily: [
-            { date: '2026-10-23', visitantes: 36, visitantesMeta: 12, estudio: 3, foto: 5, generaron: 1, descargados: 0, precios: 4, compras: 0, ingresos: 0 },
-            { date: '2026-10-24', visitantes: 38, visitantesMeta: 26, estudio: 4, foto: 3, generaron: 3, descargados: 0, precios: 5, compras: 0, ingresos: 0 },
-            { date: '2026-10-25', visitantes: 29, visitantesMeta: 9, estudio: 16, foto: 10, generaron: 8, descargados: 0, precios: 2, compras: 0, ingresos: 0 },
+            { date: '2026-10-23', visitantes: 36, visitantesMeta: 12, foto: 0, generaron: 0, disenos: 0, demoVieron: 0, inmobiliarias: 0 },
+            { date: '2026-10-24', visitantes: 38, visitantesMeta: 26, foto: 0, generaron: 0, disenos: 0, demoVieron: 0, inmobiliarias: 0 },
+            { date: '2026-10-25', visitantes: 70, visitantesMeta: 17, foto: 2, generaron: 2, disenos: 31, demoVieron: 0, inmobiliarias: 0 },
+            { date: '2026-10-26', visitantes: 126, visitantesMeta: 17, foto: 7, generaron: 7, disenos: 51, demoVieron: 7, inmobiliarias: 0 },
+            { date: '2026-10-27', visitantes: 163, visitantesMeta: 4, foto: 13, generaron: 12, disenos: 100, demoVieron: 7, inmobiliarias: 2 },
+            { date: '2026-10-28', visitantes: 53, visitantesMeta: 8, foto: 16, generaron: 4, disenos: 33, demoVieron: 6, inmobiliarias: 0 },
+            { date: '2026-10-29', visitantes: 65, visitantesMeta: 10, foto: 8, generaron: 8, disenos: 54, demoVieron: 18, inmobiliarias: 0 },
+            { date: '2026-10-30', visitantes: 26, visitantesMeta: 6, foto: 5, generaron: 5, disenos: 24, demoVieron: 3, inmobiliarias: 1 },
           ],
-          totales: [{ visitantes: 92, visitantesMeta: 43, estudio: 22, foto: 17, generaron: 10, precios: 10, quisieronPagar: 7, rageclicks: 12 }],
-          // Diseños descargados: la app todavía no manda diseno_descargado
-          // (PR #12 en axellaban/amoblaia), así que la foto marca 0.
-          nsm: [{ ultimos7: 0, previos7: 0 }],
+          totales: [{
+            visitantes: 534, visitantesMeta: 92, estudio: 194, foto: 49, generaron: 36, disenos: 293, precios: 41,
+            eligieronPlan: 1, mercadoPago: 0, pagaron: 0, demoVieron: 32, demoInteractuaron: 14, demoCta: 11,
+            altaVista: 7, inmobiliarias: 3, asistente: 0, rageclicks: 60,
+          }],
+          nsm: [{ ultimos7: 293, previos7: 0 }],
+          // Las demos llevan un token en la URL: se agrupan en /demo/….
           paginas: [
-            { pagina: '/', visitantes: 61, vistas: 116 },
-            { pagina: '/estudio', visitantes: 21, vistas: 34 },
-            { pagina: '/precios', visitantes: 10, vistas: 19 },
-            { pagina: '/galeria', visitantes: 7, vistas: 9 },
-            { pagina: '/como-hacer-virtual-staging', visitantes: 5, vistas: 5 },
-            { pagina: '/marca-blanca', visitantes: 5, vistas: 5 },
-            { pagina: '/acceso', visitantes: 3, vistas: 13 },
-            { pagina: '/proyectos', visitantes: 2, vistas: 16 },
+            { pagina: '/', visitantes: 306, vistas: 607 },
+            { pagina: '/estudio', visitantes: 194, vistas: 317 },
+            { pagina: '/precios', visitantes: 41, vistas: 89 },
+            { pagina: '/demo/…', visitantes: 30, vistas: 194 },
+            { pagina: '/galeria', visitantes: 24, vistas: 44 },
+            { pagina: '/acceso', visitantes: 20, vistas: 43 },
+            { pagina: '/panel/empezar', visitantes: 15, vistas: 35 },
+            { pagina: '/marca-blanca', visitantes: 7, vistas: 14 },
           ],
         },
       },
+      // Prospección, demos e ingresos del panel de habita. (Supabase). /api/metricas
+      // los trae en vivo de /api/metricas de la app; esta es la foto del 30/10.
+      metrics: {
+        source: 'panel de habita.',
+        snapshotAt: '2026-10-30',
+        data: {
+          prospeccion: {
+            prospectados: 605, contactados: 65, mensajes: 65, respondieron: 0, interesados: 0, activados: 0, clientes: 0,
+            etapas: { pending: 540, sent: 65 },
+            porSdr: [
+              { sdr: 'Facu', prospectados: 565, contactados: 37, respondieron: 0, interesados: 0, clientes: 0 },
+              { sdr: 'Laban', prospectados: 40, contactados: 28, respondieron: 0, interesados: 0, clientes: 0 },
+            ],
+            porCanal: [{ canal: 'whatsapp', contactados: 65, mensajes: 65, respondieron: 0, interesados: 0, clientes: 0 }],
+            diario: [
+              { date: '2026-10-23', envios: 41, nuevos: 41, respuestas: 0, interesados: 0, reuniones: 0 },
+              { date: '2026-10-24', envios: 17, nuevos: 17, respuestas: 0, interesados: 0, reuniones: 0 },
+              { date: '2026-10-27', envios: 7, nuevos: 7, respuestas: 0, interesados: 0, reuniones: 0 },
+            ],
+          },
+          demos: {
+            creadas: 20, publicadas: 18, ingresaron: 8, interactuaron: 4, generaron: 2, panel: 0, suscribieron: 0, visitantes: 21,
+            diario: [
+              { date: '2026-10-26', creadas: 5, publicadas: 5, visita: 0, generacion: 0 },
+              { date: '2026-10-27', creadas: 2, publicadas: 1, visita: 0, generacion: 0 },
+              { date: '2026-10-28', creadas: 1, publicadas: 0, visita: 0, generacion: 0 },
+              { date: '2026-10-29', creadas: 9, publicadas: 10, visita: 18, generacion: 2 },
+              { date: '2026-10-30', creadas: 3, publicadas: 2, visita: 3, generacion: 0 },
+            ],
+          },
+          ingresos: {
+            moneda: 'ARS', pagos: 1, ingresos: 4990, nuevos: 1, clientes: 1,
+            diario: [{ date: '2026-10-22', pagos: 1, ingresos: 4990, nuevos: 1 }],
+          },
+        },
+      },
       northStar: {
-        name: 'Diseños descargados',
-        definition: 'Diseños que se descargaron o compartieron en los últimos 7 días (evento diseno_descargado; una descarga de un lote cuenta cada foto). Marca 0 hasta que la app mande el evento.',
+        name: 'Diseños generados',
+        definition: 'Ambientaciones terminadas en los últimos 7 días (evento diseno_generado), en el estudio, el panel y las demos. Sin el tráfico del equipo.',
         format: 'int',
-        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'descargados' },
+        posthog: { query: 'nsm', value: 'ultimos7', prev: 'previos7', daily: 'daily', dailyKey: 'disenos' },
       },
       revenue: {
-        query: 'daily',
-        subsKey: 'compras',
+        metrics: 'ingresos.diario',
+        subsKey: 'nuevos',
         revenueKey: 'ingresos',
         currency: 'ARS',
-        subsLabel: 'Nuevos suscriptores',
-        unitLabel: 'suscriptor',
-        note: 'Pagos confirmados por Mercado Pago (evento compra_confirmada, desde el 26/10). Ingresos = monto cobrado.',
+        subsLabel: 'Nuevos clientes',
+        unitLabel: 'cliente',
+        note: 'Pagos aprobados en Mercado Pago (tabla payments de habita.). Nuevos = primer pago de cada comprador.',
       },
       ads: {
         source: 'Meta Ads',
@@ -304,180 +353,123 @@ window.CHAPA_DATA = {
           { date: '2026-10-25', campaignId: '120248966713100157', spend: 811.43, impressions: 117, clicks: 2, landing: 2, results: 0 },
         ],
       },
-      // Outbound real: la planilla de prospección "Prospecting amobla IA" (Google
-      // Sheets). /api/prospectos la lee en vivo; esta es la foto del 25/10.
-      // Cada fila: [prioridad, inmobiliaria, SDR, estado, fecha de envío, canal, score].
       acquisition: {
-        type: 'prospects',
-        source: 'Planilla de prospección',
-        snapshotAt: '2026-10-25',
-        // Etapa según la columna Estado (y la fecha de envío) de cada fila.
-        stages: [
-          { key: 'prospectados', label: 'Prospectados', hint: 'Filas de la planilla' },
-          { key: 'contactados', label: 'Contactados', hint: 'Con mensaje enviado' },
-          { key: 'interesados', label: 'Interesados', hint: 'Estado "Interesado" o "Demo"' },
-          { key: 'suscriptores', label: 'Suscriptores', hint: 'Estado "Suscriptor" o "Cliente"' },
-        ],
-        // Valores iniciales de "Ventas proyectadas" (cada uno se cambia en el tablero).
-        projection: {
-          currency: 'ARS',
-          ticket: 38900, // plan Básico mensual de Amobla IA, precio de lista
-          ticketNote: 'Plan Básico mensual, precio de lista',
-          // La conversión real Prospectados → Contactados mide el avance (a cuántos
-          // ya se les escribió), así que arranca en estimada: la parte de la base
-          // que se puede contactar (hay números fijos, viejos o equivocados).
-          rates: [
-            { mode: 'estimate', estimate: 0.85 }, // Prospectados → Contactados
-            { mode: 'estimate', estimate: 0.1 }, // Contactados → Interesados
-            { mode: 'estimate', estimate: 0.25 }, // Interesados → Suscriptores
-          ],
-        },
-        rows: [
-          [1, 'Mauro Musso Negocios Inmobiliarios', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 96],
-          [2, 'Carla Guzman Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 94],
-          [3, 'Guillermina Moroni', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 93],
-          [4, 'Bartolini Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 92],
-          [5, 'Tormes Propiedades', 'Facu', 'Pendiente', '', '', 92],
-          [6, 'Michalopulos Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 92],
-          [7, 'Salvatto Inmobiliaria', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 92],
-          [8, 'Pezzati Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 92],
-          [9, 'Russillo Asesores Inmobiliarios', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 90],
-          [10, 'De Gennaro Giacone Brokers Inmobiliarios', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 90],
-          [11, 'Aiello Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 89],
-          [12, 'Insabella Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 88],
-          [13, 'Introcaso Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 88],
-          [14, 'Tomasini Bienes Raices', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 88],
-          [15, 'Arriola Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 88],
-          [16, 'Canicoba Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 88],
-          [17, 'Melina Acampora Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 87],
-          [18, 'Valencia Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 86],
-          [19, 'Goncebate Loscalzo Negocios Inmobiliarios', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 86],
-          [20, 'Agliano Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 86],
-          [21, 'Bessone Inmobiliaria', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 85],
-          [22, 'Etchegorry Bienes Raices', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 85],
-          [23, 'Pagnone Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 84],
-          [24, 'Bombina Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 84],
-          [25, 'Leonardo Lencina Estudio Inmobiliario', 'Facu', 'Pendiente', '', '', 93],
-          [26, 'Sol Conde Negocios Inmobiliarios', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 81],
-          [27, 'Girard Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 79],
-          [28, 'Indra Persic Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 77],
-          [29, 'Kuhn Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 77],
-          [30, 'Zelaschi Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 76],
-          [31, 'Visciarelli Abad Propiedades', 'Facu', 'Enviado', '2026-10-23', 'WhatsApp', 75],
-          [32, 'Pestrin Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 73],
-          [33, 'Candoli Propiedades', 'Facu', 'Enviado', '2026-10-23', 'Email', 72],
-          [34, 'Allende Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 71],
-          [35, 'Gisela D´Alessandro', 'Facu', 'Enviado', '2026-10-23', 'Email', 71],
-          [36, 'Walter Burga Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 70],
-          [37, 'Erne Propiedades', 'Facu', 'Número incorrecto', '2026-10-24', 'WhatsApp', 68],
-          [38, 'Gago Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 68],
-          [39, 'Barrera Inmobiliaria', 'Facu', 'Enviado', '2026-10-23', 'Email', 62],
-          [40, 'Crespo Inmobiliaria', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 62],
-          [41, 'Baires One', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 61],
-          [42, 'Bruma Propiedades', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 59],
-          [43, 'REMAX Arena', 'Facu', 'Enviado', '2026-10-23', 'Email', 57],
-          [44, 'REMAX Feliz', 'Laban', 'Enviado', '2026-10-23', 'WhatsApp', 47],
-          [45, 'Espatolero - Lorenzo Desarrollos Inmobiliaria', 'Facu', 'Pendiente', '', '', 46],
-          [46, 'Liliana Armanelli Servicios Inmobiliarios', 'Laban', 'Pendiente', '', '', 67],
-          [47, 'Diana Meiojas Propiedades', 'Facu', 'Pendiente', '', '', 63],
-          [48, 'Sebastian Castro Propiedades', 'Laban', 'Pendiente', '', '', 61],
-          [49, 'Candela Tapia Inmobiliaria Boutique', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 61],
-          [50, 'Leticia Peraza Negocios Inmobiliarios', 'Laban', 'Pendiente', '', '', 61],
-          [51, 'Carlos Piglia Inmuebles', 'Facu', 'Pendiente', '', '', 60],
-          [52, 'Mariano Blanco Propiedades', 'Laban', 'Pendiente', '', '', 59],
-          [53, 'Karina Colaneri Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 59],
-          [54, 'Costa Galli Propiedades', 'Laban', 'Pendiente', '', '', 59],
-          [55, 'Cirilo Leontiev', 'Facu', 'Pendiente', '', '', 59],
-          [56, 'Sandra Gotte Inmobiliaria', 'Laban', 'Pendiente', '', '', 58],
-          [57, 'Gausachs Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 57],
-          [58, 'Oliva Negocios Inmobiliarios', 'Laban', 'Pendiente', '', '', 57],
-          [59, 'Magarzo Estudio Inmobiliario', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 55],
-          [60, 'Mendiondo Propiedades', 'Laban', 'Pendiente', '', '', 55],
-          [61, 'Fernando Gomez Propiedades', 'Facu', 'Enviado', '2026-10-23', 'Email', 73],
-          [62, 'Saforcada Propiedades', 'Laban', 'Pendiente', '', '', 53],
-          [63, 'Franco Propiedades MDP', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 53],
-          [64, 'Acampora y Asoc Propiedades', 'Laban', 'Pendiente', '', '', 53],
-          [65, 'ALAN Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 51],
-          [66, 'Suarez y Asociados Inmobiliaria', 'Laban', 'Pendiente', '', '', 50],
-          [67, 'Madeira Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 49],
-          [68, 'Mc Cosentino', 'Laban', 'Pendiente', '', '', 49],
-          [69, 'Garcia Costanzo Asesoria', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 49],
-          [70, 'Elvira Tenaglia', 'Laban', 'Pendiente', '', '', 47],
-          [71, 'Gabriel Paulino', 'Facu', 'Enviado', '2026-10-23', 'Email', 81],
-          [72, 'Emmanuel Jara Propiedades', 'Laban', 'Pendiente', '', '', 81],
-          [73, 'Carolina Rendo', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 46],
-          [74, 'Pluchino Propiedades', 'Laban', 'Pendiente', '', '', 44],
-          [75, 'GM Servicios Inmobiliarios', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 40],
-          [76, 'Liberatore Propiedades', 'Laban', 'Pendiente', '', '', 75],
-          [77, 'Club House Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 39],
-          [78, 'Obras de Mar', 'Laban', 'Pendiente', '', '', 37],
-          [79, 'Beber Inmobiliaria', 'Facu', 'Pendiente', '', '', 37],
-          [80, 'Doris Elizabeth Angel', 'Laban', 'Pendiente', '', '', 36],
-          [81, 'Eugenia Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 35],
-          [82, 'San Sebastián Inmobiliaria', 'Laban', 'Pendiente', '', '', 35],
-          [83, 'Inmobiliaria Oscar Cura', 'Facu', 'Pendiente', '', '', 35],
-          [84, 'Aldo Germán Patiño Iriarte', 'Laban', 'Pendiente', '', '', 35],
-          [85, 'Jorge J. Bianchi', 'Facu', 'Pendiente', '', '', 35],
-          [86, 'Oreste Gonnet', 'Laban', 'Pendiente', '', '', 70],
-          [87, 'Marcelo Muiño Negocios Inmobiliarios', 'Facu', 'Pendiente', '', '', 35],
-          [88, 'Sarasua Echevarria', 'Laban', 'Pendiente', '', '', 32],
-          [89, 'Turdó Estudio Inmobiliario', 'Facu', 'Pendiente', '', '', 31],
-          [90, 'Mitre 1120 Inmobiliaria', 'Laban', 'Pendiente', '', '', 48],
-          [91, 'Inmobiliaria Bedoya', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 29],
-          [92, 'Zabib Propiedades', 'Laban', 'Pendiente', '', '', 28],
-          [93, 'REMAX Acqua', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 27],
-          [94, 'C21 Niglia', 'Laban', 'Pendiente', '', '', 62],
-          [95, 'Nepi Propiedades', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 27],
-          [96, 'Insaurralde Brokers', 'Laban', 'Pendiente', '', '', 27],
-          [97, 'Reynolds Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [98, 'Ricordi Negocios Inmobiliarios', 'Laban', 'Pendiente', '', '', 27],
-          [99, 'Lepore', 'Facu', 'Pendiente', '', '', 27],
-          [100, 'Castelao Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [101, 'Bazán Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [102, 'Quiroga Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [103, 'Cepeñas Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [104, 'Cechetti Inmobiliaria', 'Laban', 'Pendiente', '', '', 27],
-          [105, 'Schafer y Asoc Negocios Inmobiliarios', 'Facu', 'Pendiente', '', '', 27],
-          [106, 'O.Camino Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [107, 'Rodríguez Llames Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [108, 'Andreatta Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [109, 'Sanz y Ordoqui Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [110, 'Baigorra Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [111, 'Giromini Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [112, 'Velati Propiedades', 'Laban', 'Pendiente', '', '', 27],
-          [113, 'Armando Propiedades', 'Facu', 'Pendiente', '', '', 27],
-          [114, 'REMAX Surf', 'Laban', 'Pendiente', '', '', 26],
-          [115, 'REMAX Beach', 'Facu', 'Enviado', '2026-10-24', 'WhatsApp', 25],
-          [116, 'C21 Cavalca', 'Laban', 'Pendiente', '', '', 59],
-          [117, 'Sauce Propiedades', 'Facu', 'Pendiente', '', '', 21],
-          [118, 'Fera', 'Laban', 'Pendiente', '', '', 17],
-          [119, 'ESV Propiedades', 'Facu', 'Pendiente', '', '', 17],
-          [120, 'GET Propiedades', 'Laban', 'Pendiente', '', '', 17],
-          [121, 'Activa Propiedades', 'Facu', 'Pendiente', '', '', 17],
+        type: 'pipeline',
+        subtitle: 'prospección → demos → clientes',
+        emptyNote: 'Falta conectar /api/metricas de habita. (ver README).',
+        sections: [
+          {
+            title: 'Prospección',
+            note: 'Cohorte del primer envío confirmado, con las reglas del panel /admin/prospeccion',
+            kpis: [
+              { label: 'Prospectados', hint: 'Inmobiliarias en la base', metrics: 'prospeccion.prospectados' },
+              { label: 'Contactados', hint: 'Con un envío confirmado', metrics: 'prospeccion.contactados' },
+              { label: 'Mensajes enviados', metrics: 'prospeccion.mensajes' },
+              { label: 'Tasa de respuesta', hint: 'Respondieron / contactados', metrics: 'prospeccion.respondieron', of: 'prospeccion.contactados', format: 'pct' },
+              { label: 'Interesados', metrics: 'prospeccion.interesados' },
+              { label: 'Clientes', hint: 'Primer pago después de sumarse', metrics: 'prospeccion.clientes' },
+            ],
+            funnels: [{
+              title: 'Embudo comercial',
+              note: 'Conversión entre etapas',
+              steps: [
+                { key: 'prospectados', label: 'Prospectados', metrics: 'prospeccion.prospectados' },
+                { key: 'contactados', label: 'Contactados', metrics: 'prospeccion.contactados' },
+                { key: 'respondieron', label: 'Respondieron', metrics: 'prospeccion.respondieron' },
+                { key: 'interesados', label: 'Interesados', metrics: 'prospeccion.interesados' },
+                { key: 'activados', label: 'Activados', metrics: 'prospeccion.activados' },
+                { key: 'clientes', label: 'Clientes', metrics: 'prospeccion.clientes' },
+              ],
+            }],
+            daily: [{ title: 'Inmobiliarias contactadas por día', note: 'Primer envío confirmado', metrics: 'prospeccion.diario', key: 'nuevos' }],
+            tables: [
+              {
+                title: 'Por SDR',
+                metrics: 'prospeccion.porSdr',
+                columns: [
+                  { key: 'sdr', label: 'SDR' },
+                  { key: 'prospectados', label: 'Prospectados', format: 'int' },
+                  { key: 'contactados', label: 'Contactados', format: 'int' },
+                  { key: 'respondieron', label: 'Respondieron', format: 'int' },
+                  { key: 'interesados', label: 'Interesados', format: 'int' },
+                  { key: 'clientes', label: 'Clientes', format: 'int' },
+                ],
+              },
+              {
+                title: 'Por canal',
+                metrics: 'prospeccion.porCanal',
+                columns: [
+                  { key: 'canal', label: 'Canal' },
+                  { key: 'contactados', label: 'Contactados', format: 'int' },
+                  { key: 'mensajes', label: 'Mensajes', format: 'int' },
+                  { key: 'respondieron', label: 'Respondieron', format: 'int' },
+                  { key: 'clientes', label: 'Clientes', format: 'int' },
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Demos comerciales',
+            note: 'Cada demo cuenta el paso más alto al que llegó su inmobiliaria',
+            kpis: [
+              { label: 'Demos creadas', metrics: 'demos.creadas' },
+              { label: 'Publicadas', hint: 'Con link para mandar', metrics: 'demos.publicadas' },
+              { label: 'Abiertas', hint: '% de las publicadas', metrics: 'demos.ingresaron', of: 'demos.publicadas', format: 'pct' },
+              { label: 'Visitantes de las demos', metrics: 'demos.visitantes' },
+            ],
+            funnels: [{
+              title: 'Resultado de las demos',
+              note: 'Demos que llegaron a cada paso',
+              steps: [
+                { key: 'publicadas', label: 'Publicadas', metrics: 'demos.publicadas' },
+                { key: 'ingresaron', label: 'La abrieron', metrics: 'demos.ingresaron' },
+                { key: 'interactuaron', label: 'Interactuaron', metrics: 'demos.interactuaron' },
+                { key: 'generaron', label: 'Generaron una imagen', metrics: 'demos.generaron' },
+                { key: 'panel', label: 'Crearon su panel', metrics: 'demos.panel' },
+                { key: 'suscribieron', label: 'Se suscribieron', metrics: 'demos.suscribieron' },
+              ],
+            }],
+            daily: [{ title: 'Visitas a las demos por día', note: 'Visitantes únicos de cada demo', metrics: 'demos.diario', key: 'visita' }],
+          },
         ],
       },
       usability: {
-        funnel: {
-          title: 'Recorrido en la web',
-          note: 'Personas únicas en el período, como % de los visitantes. Subir foto y crear son clics en botones; descargas, planes, Mercado Pago y pagos son eventos de la app (desde el 26/10; las descargas, desde que se despliegue axellaban/amoblaia#12).',
-          query: 'totales',
-          baseLabel: 'de los visitantes',
-          steps: [
-            { key: 'visitantes', label: 'Visitaron la web' },
-            { key: 'estudio', label: 'Entraron al estudio' },
-            { key: 'foto', label: 'Tocaron "Subir foto"' },
-            { key: 'generaron', label: 'Tocaron "Crear diseños"' },
-            { key: 'descargaron', label: 'Descargaron un diseño' },
-            { key: 'precios', label: 'Vieron precios' },
-            { key: 'eligieronPlan', label: 'Eligieron un plan' },
-            { key: 'mercadoPago', label: 'Fueron a Mercado Pago' },
-            { key: 'pagaron', label: 'Pagaron' },
-          ],
-        },
+        funnels: [
+          {
+            title: 'Recorrido en la web',
+            note: 'Personas únicas en el período, como % de los visitantes. Sin el tráfico del equipo.',
+            query: 'totales',
+            baseLabel: 'de los visitantes',
+            steps: [
+              { key: 'visitantes', label: 'Visitaron la web' },
+              { key: 'estudio', label: 'Entraron al estudio' },
+              { key: 'foto', label: 'Subieron una foto' },
+              { key: 'generaron', label: 'Generaron un diseño' },
+              { key: 'precios', label: 'Vieron precios' },
+              { key: 'eligieronPlan', label: 'Eligieron un plan' },
+              { key: 'mercadoPago', label: 'Fueron a Mercado Pago' },
+              { key: 'pagaron', label: 'Pagaron' },
+            ],
+          },
+          {
+            title: 'Interacción con las demos',
+            note: 'Personas que abrieron una demo y lo que hicieron después.',
+            query: 'totales',
+            baseLabel: 'de los que la abrieron',
+            steps: [
+              { key: 'demoVieron', label: 'Abrieron una demo' },
+              { key: 'demoInteractuaron', label: 'Interactuaron' },
+              { key: 'demoCta', label: 'Tocaron «Crear mi inmobiliaria»' },
+              { key: 'altaVista', label: 'Vieron el alta' },
+              { key: 'inmobiliarias', label: 'Se sumaron' },
+            ],
+          },
+        ],
         kpis: [
           { label: 'Visitantes únicos', query: 'totales', key: 'visitantes', format: 'int' },
           { label: 'Llegaron desde Meta', hint: '% de los visitantes', query: 'totales', key: 'visitantesMeta', of: 'visitantes', format: 'pct' },
-          { label: 'Entraron al estudio', hint: '% de los visitantes', query: 'totales', key: 'estudio', of: 'visitantes', format: 'pct' },
+          { label: 'Diseños generados', query: 'totales', key: 'disenos', format: 'int' },
+          { label: 'Inmobiliarias que se sumaron', hint: 'Crearon, reclamaron o se unieron', query: 'totales', key: 'inmobiliarias', format: 'int' },
           { label: 'Clics de frustración', hint: 'Rage clicks', query: 'totales', key: 'rageclicks', format: 'int' },
         ],
         tables: [
@@ -499,9 +491,9 @@ window.CHAPA_DATA = {
               { key: 'date', label: 'Día', format: 'day' },
               { key: 'visitantes', label: 'Visitantes', format: 'int' },
               { key: 'visitantesMeta', label: 'Desde Meta', format: 'int' },
-              { key: 'estudio', label: 'Estudio', format: 'int' },
-              { key: 'foto', label: 'Tocaron subir foto', format: 'int' },
-              { key: 'generaron', label: 'Tocaron crear', format: 'int' },
+              { key: 'foto', label: 'Subieron foto', format: 'int' },
+              { key: 'generaron', label: 'Generaron', format: 'int' },
+              { key: 'demoVieron', label: 'Abrieron una demo', format: 'int' },
             ],
           },
         ],
@@ -509,50 +501,162 @@ window.CHAPA_DATA = {
     },
 
     // ─────────────────────────────────────────── TURNIA
-    // Sin fuente conectada (sus datos viven en su propia base): todo en 0.
+    // Todo sale de /api/metricas de Turnia (su base) y del proyecto de PostHog
+    // "Turnia Salud". Hasta conectarlos marca "Sin datos": no hay foto guardada.
     {
       id: 'turnia',
       name: 'Turnia',
-      tagline: 'SaaS B2B de turnos · venta outbound',
+      tagline: 'Agentes de IA que dan turnos para clínicas · prospección a odontólogos',
       stage: 'Tracción',
-      currency: 'USD',
+      currency: 'ARS',
+      posthog: { org: 'Turnia Salud', projectId: 518346, snapshotAt: null, data: {} },
+      metrics: { source: 'panel de Turnia', snapshotAt: null, data: null },
       northStar: {
-        noData: true,
-        name: 'Turnos agendados vía Turnia',
-        definition: 'Turnos confirmados en los últimos 7 días en todos los negocios que usan Turnia. Marca 0 hasta conectar la base de Turnia.',
+        name: 'Turnos agendados por Turnia',
+        definition: 'Turnos que tomó Turnia (WhatsApp, teléfono, web o campañas; no los cargados en el panel) en los últimos 7 días, en clínicas reales (sin las de las demos).',
         format: 'int',
+        metrics: { value: 'uso.ultimos7', prev: 'uso.previos7', daily: 'uso.diario', dailyKey: 'turnos' },
       },
       revenue: {
         noData: true,
-        currency: 'USD',
+        currency: 'ARS',
         subsLabel: 'Nuevos clientes',
         unitLabel: 'cliente',
-        note: 'Marca 0 hasta conectar la base de Turnia.',
+        note: 'Turnia todavía no registra cobros: marca 0. Los clientes ganados se ven en Distribución.',
         daily: [],
       },
       acquisition: {
-        type: 'outbound',
-        noData: true,
-        stages: [
-          { key: 'prospectados', label: 'Prospectados' },
-          { key: 'contactados', label: 'Contactados' },
-          { key: 'interesados', label: 'Interesados' },
-          { key: 'agendadas', label: 'Demo agendada' },
-          { key: 'demos', label: 'Demo realizada' },
-          { key: 'clientes', label: 'Cliente nuevo' },
+        type: 'pipeline',
+        subtitle: 'prospección → demo personal → reunión → cliente',
+        emptyNote: 'Falta conectar /api/metricas de Turnia (ver README).',
+        sections: [
+          {
+            title: 'Prospección a odontólogos',
+            note: 'Cohorte del primer contacto, con las reglas de Panel → Prospección',
+            kpis: [
+              { label: 'Prospectados', metrics: 'prospeccion.prospectados' },
+              { label: 'Contactados', metrics: 'prospeccion.contactados' },
+              { label: 'Abrieron su demo', hint: '% de los contactados', metrics: 'prospeccion.abrieron_demo', of: 'prospeccion.contactados', format: 'pct' },
+              { label: 'Tasa de respuesta', hint: 'Respondieron / contactados', metrics: 'prospeccion.respondieron', of: 'prospeccion.contactados', format: 'pct' },
+              { label: 'Reuniones', hint: 'Incluye clientes', metrics: 'prospeccion.reuniones' },
+              { label: 'Clientes', metrics: 'prospeccion.clientes' },
+            ],
+            funnels: [
+              {
+                title: 'Embudo comercial',
+                note: 'Conversión entre etapas',
+                steps: [
+                  { key: 'prospectados', label: 'Prospectados', metrics: 'prospeccion.prospectados' },
+                  { key: 'contactados', label: 'Contactados', metrics: 'prospeccion.contactados' },
+                  { key: 'respondieron', label: 'Respondieron', metrics: 'prospeccion.respondieron' },
+                  { key: 'reuniones', label: 'Reunión', metrics: 'prospeccion.reuniones' },
+                  { key: 'clientes', label: 'Cliente', metrics: 'prospeccion.clientes' },
+                ],
+              },
+              {
+                title: 'La demo personal',
+                note: 'El link /p/<código> que va en el mensaje',
+                steps: [
+                  { key: 'contactados', label: 'Contactados', metrics: 'prospeccion.contactados' },
+                  { key: 'abrieron', label: 'Abrieron el link', metrics: 'prospeccion.abrieron_demo' },
+                  { key: 'probaron', label: 'Probaron la demo', metrics: 'prospeccion.probaron_demo' },
+                ],
+              },
+            ],
+            daily: [
+              { title: 'Mensajes por día', note: 'Presentaciones y seguimientos', metrics: 'prospeccion.diario', key: 'mensajes' },
+              { title: 'Respuestas por día', metrics: 'prospeccion.diario', key: 'respuestas' },
+            ],
+            tables: [
+              {
+                title: 'Por canal',
+                metrics: 'prospeccion.porCanal',
+                columns: [
+                  { key: 'canal', label: 'Canal' },
+                  { key: 'contactados', label: 'Contactados', format: 'int' },
+                  { key: 'respondieron', label: 'Respondieron', format: 'int' },
+                  { key: 'probaron_demo', label: 'Probaron la demo', format: 'int' },
+                  { key: 'clientes', label: 'Clientes', format: 'int' },
+                ],
+              },
+              {
+                title: 'Por zona',
+                metrics: 'prospeccion.porZona',
+                columns: [
+                  { key: 'zona', label: 'Zona' },
+                  { key: 'prospectados', label: 'Prospectados', format: 'int' },
+                  { key: 'contactados', label: 'Contactados', format: 'int' },
+                  { key: 'respondieron', label: 'Respondieron', format: 'int' },
+                  { key: 'clientes', label: 'Clientes', format: 'int' },
+                ],
+              },
+            ],
+          },
+          {
+            title: 'Demos y pedidos de demo',
+            note: 'Demos con Sofi (web, WhatsApp o llamada) y pedidos de «Pedí una demo»',
+            kpis: [
+              { label: 'Demos iniciadas', metrics: 'demos.iniciadas' },
+              { label: 'Demos que funcionaron', hint: '% de las iniciadas', metrics: 'demos.listas', of: 'demos.iniciadas', format: 'pct' },
+              { label: 'Pedidos de demo', metrics: 'pedidos.pedidos' },
+              { label: 'Pedidos ganados', metrics: 'pedidos.ganados' },
+            ],
+            funnels: [
+              {
+                title: 'Resultado de las demos',
+                steps: [
+                  { key: 'iniciadas', label: 'Iniciadas', metrics: 'demos.iniciadas' },
+                  { key: 'listas', label: 'Llegaron a hablar con Sofi', metrics: 'demos.listas' },
+                  { key: 'terminadas', label: 'Terminadas', metrics: 'demos.terminadas' },
+                ],
+              },
+              {
+                title: 'Pedidos de demo',
+                steps: [
+                  { key: 'pedidos', label: 'Pedidos', metrics: 'pedidos.pedidos' },
+                  { key: 'contactados', label: 'Contactados', metrics: 'pedidos.contactados' },
+                  { key: 'demo_agendada', label: 'Demo agendada', metrics: 'pedidos.demo_agendada' },
+                  { key: 'ganados', label: 'Ganados', metrics: 'pedidos.ganados' },
+                ],
+              },
+            ],
+            daily: [{ title: 'Demos por día', metrics: 'demos.diario', key: 'demos' }],
+          },
         ],
-        months: [],
-        channels: [],
       },
       usability: {
-        noData: true,
         kpis: [
-          { label: 'Negocios activos', format: 'int', value: 0 },
-          { label: 'Turnos por negocio', format: 'dec', value: 0 },
-          { label: 'Turnos autogestionados', hint: 'Los saca el cliente final, sin llamar', format: 'pct', value: 0 },
-          { label: 'Ausentismo', format: 'pct', value: 0 },
+          { label: 'Clínicas activas', hint: 'Con turnos en los últimos 30 días', metrics: 'uso.clinicas_activas', format: 'int' },
+          { label: 'Turnos que tomó Turnia', hint: 'En el período', metrics: 'uso.turnos', format: 'int' },
+          { label: 'Conversaciones con Sofi', hint: 'En el período', metrics: 'uso.conversaciones', format: 'int' },
+          { label: 'Ausentismo', hint: 'Ausentes / turnos del período', metrics: 'uso.ausentes', of: 'uso.turnos', format: 'pct' },
         ],
-        tables: [],
+        funnels: [{
+          title: 'Recorrido en la web',
+          note: 'PostHog «Turnia Salud», personas únicas como % de los visitantes. Sin el tráfico del equipo.',
+          query: 'totales',
+          baseLabel: 'de los visitantes',
+          steps: [
+            { key: 'visitantes', label: 'Visitaron la web' },
+            { key: 'formulario', label: 'Vieron «Probar la demo»' },
+            { key: 'empezaronDemo', label: 'Empezaron la demo' },
+            { key: 'demoLista', label: 'La demo quedó lista' },
+            { key: 'conversaron', label: 'Hablaron con Sofi' },
+            { key: 'pedidos', label: 'Pidieron una demo guiada' },
+          ],
+        }],
+        tables: [
+          {
+            title: 'Páginas más visitadas',
+            note: 'En el período elegido. Los links de la prospección se agrupan en /p/….',
+            query: 'paginas',
+            columns: [
+              { key: 'pagina', label: 'Página' },
+              { key: 'visitantes', label: 'Personas', format: 'int' },
+              { key: 'vistas', label: 'Vistas', format: 'int' },
+            ],
+          },
+        ],
       },
     },
   ],

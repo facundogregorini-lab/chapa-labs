@@ -126,7 +126,30 @@
   }
   const phSum = (p, query, key) => phRows(p, query).reduce((a, r) => a + (Number(r[key]) || 0), 0);
   const phUpdated = (p) => (p.posthog.live ? 'en vivo' : `actualizado el ${dayTip(p.posthog.snapshotAt)}`);
-  const phBadge = (p) => badge(null, `Datos reales · PostHog, ${phUpdated(p)}`);
+  // Sin foto guardada ni conexión en vivo, PostHog todavía no tiene datos de ese proyecto.
+  const phReal = (p) => !!(p.posthog && (p.posthog.live || p.posthog.snapshotAt));
+  const phBadge = (p) => (phReal(p) ? badge(null, `Datos reales · PostHog, ${phUpdated(p)}`) : badge({ noData: true }));
+
+  // ─── Métricas de cada producto (/api/metricas) ────────────
+  // Prospección, demos, ingresos y uso, calculados por cada app con las reglas
+  // de su panel. `p.metrics.data` es la foto; en vivo y por período, lo de la API.
+  // Las rutas son del estilo 'prospeccion.diario' o 'demos.creadas'.
+  const mReal = (p) => !!(p.metrics && p.metrics.data && (p.metrics.live || p.metrics.snapshotAt));
+  function mData(p) {
+    const r = scopeRange();
+    if (r && p.metrics) {
+      const d = metricsPeriod[rangeKey(r)];
+      if (d && d.estado === 'ok' && d.projects[p.id]) return d.projects[p.id];
+    }
+    return (p.metrics && p.metrics.data) || {};
+  }
+  const mGet = (p, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), mData(p));
+  const mNum = (p, path) => Number(mGet(p, path)) || 0;
+  const mRows = (p, path) => [].concat(mGet(p, path) || []);
+  const mUpdated = (p) => (p.metrics.live ? 'en vivo' : `actualizado el ${dayTip(p.metrics.snapshotAt)}`);
+  const mBadge = (p) => (mReal(p) ? badge(null, `Datos reales · ${p.metrics.source}, ${mUpdated(p)}`) : badge({ noData: true }));
+  // Un bloque sin fuente: marcado así en data.js, o que lee métricas que todavía no llegaron.
+  const noSource = (p, block) => !!(block && (block.noData || (block.metrics && !mReal(p))));
 
   // ─── Días del mes elegido ─────────────────────────────────
   // Del 1 al último día del mes (o hasta hoy, si es el mes en curso). Todos los
@@ -414,10 +437,23 @@
         badge: phBadge(p),
       };
     }
+    if (ns.metrics && mReal(p)) {
+      const src = ns.metrics;
+      const value = mNum(p, src.value);
+      const prevValue = mNum(p, src.prev);
+      return {
+        ns, value,
+        list: dailyPoints(mRows(p, src.daily), src.dailyKey),
+        prev: prevValue >= 10 ? { value: prevValue } : null,
+        suffix: 'vs 7 días ant.',
+        period: prevValue >= 10 ? 'Últimos 7 días' : 'Últimos 7 días · sin semana anterior para comparar',
+        badge: mBadge(p),
+      };
+    }
     // Sin fuente conectada: todo en 0, nada inventado.
     return {
       ns, value: 0, prev: null, list: dailyPoints([], 'value'),
-      suffix: '', period: 'Últimos 7 días · sin fuente conectada', badge: badge(ns),
+      suffix: '', period: 'Últimos 7 días · sin fuente conectada', badge: badge({ noData: true }),
     };
   }
 
@@ -435,7 +471,7 @@
         <a class="card proj" href="#${esc(p.id)}">
           ${head(p, i)}
           <div>
-            <p class="nsm-label">${esc(ns.name)} ${ns.noData ? badge(ns) : badge(null, 'Real')}</p>
+            <p class="nsm-label">${esc(ns.name)} ${noSource(p, ns) ? badge({ noData: true }) : badge(null, 'Real')}</p>
             <p class="hero">${fmt(value, ns.format)}</p>
             ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
             <p class="period">${f.period}</p>
@@ -455,7 +491,7 @@
       return `
         <a class="card proj" href="#${esc(p.id)}">
           ${head(p, i)}
-          <p class="nsm-label">${monthLabel(state.month, true)} ${r.noData ? badge(r) : badge(null, 'Real')}</p>
+          <p class="nsm-label">${monthLabel(state.month, true)} ${noSource(p, r) ? badge({ noData: true }) : badge(null, 'Real')}</p>
           ${block(r.subsLabel || 'Nuevos suscriptores', rev.subs, 'subs', 'int')}
           ${block('Ingresos', rev.rev, 'rev', 'money')}
         </a>`;
@@ -1047,6 +1083,77 @@
   }
 
   // ─── Pauta en Meta Ads (datos reales) ─────────────────────
+  // ─── Prospección, demos y pedidos (métricas del producto) ─
+  // Secciones de data.js: cada una con KPIs, embudos, series por día y tablas.
+  // Una serie por día se completa con 0 en los días sin actividad.
+  function dayRange(rows) {
+    const r = scopeRange();
+    const dates = rows.map((x) => x.date).filter(Boolean).sort();
+    const from = r ? r.desde : dates[0];
+    const to = r ? r.hasta : isoDay(new Date());
+    const out = [];
+    for (let d = from; d && d <= to && out.length < 120; d = addDays(d, 1)) out.push(d);
+    return out;
+  }
+  function seriesPoints(rows, key) {
+    const byDate = new Map(rows.map((r) => [r.date, Number(r[key]) || 0]));
+    return dayRange(rows).map((date) => ({ date, label: dayLabel(date), tip: dayTip(date), value: byDate.get(date) || 0 }));
+  }
+  function renderPipeline(p, color) {
+    const a = p.acquisition;
+    if (!mReal(p)) return `<div class="card"><p class="sub">${esc(a.emptyNote || 'Todavía no hay datos de esta fuente.')}</p></div>`;
+    return a.sections.map((sec) => {
+      const tiles = (sec.kpis || []).map((k) => tile({
+        label: k.label, hint: k.hint, format: k.format || 'int', currency: k.currency || p.currency,
+        value: k.of ? ratio(mNum(p, k.metrics), mNum(p, k.of)) : mNum(p, k.metrics),
+      })).join('');
+      const cards = [
+        ...(sec.funnels || []).map((f) => {
+          const row = Object.fromEntries(f.steps.map((st) => [st.key, mNum(p, st.metrics)]));
+          return `<div class="card"><h3>${esc(f.title)}</h3>${f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}<div class="funnel">${funnelHtml(f.steps, row, color)}</div></div>`;
+        }),
+        ...(sec.daily || []).map((d) => `
+          <div class="card"><h3>${esc(d.title)}</h3>${d.note ? `<p class="sub">${esc(d.note)}</p>` : ''}
+            ${chart(barChart({ points: seriesPoints(mRows(p, d.metrics), d.key), format: 'int', color, height: 220 }))}</div>`),
+        ...(sec.tables || []).map((t) => `
+          <div class="card${t.wide ? ' span-2' : ''}"><h3>${esc(t.title)}</h3>${t.note ? `<p class="sub">${esc(t.note)}</p>` : ''}
+            ${table({ columns: t.columns, rows: mRows(p, t.metrics), currency: p.currency })}</div>`),
+      ];
+      return `
+        <h3 class="group-title">${esc(sec.title)}${sec.note ? ` <span>· ${esc(sec.note)}</span>` : ''}</h3>
+        ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
+        ${cards.length ? `<div class="grid g-2" style="margin-top:12px">${cards.join('')}</div>` : ''}`;
+    }).join('');
+  }
+
+  // Métricas de los productos por período: { estado, projects }, como las de PostHog.
+  const metricsPeriod = {};
+  async function loadMetricsPeriod(r) {
+    const k = rangeKey(r);
+    if (metricsPeriod[k]) return;
+    metricsPeriod[k] = { estado: 'cargando' };
+    try {
+      if (location.protocol === 'file:') throw new Error();
+      const res = await fetch(`/api/metricas?desde=${r.desde}&hasta=${r.hasta}`);
+      if (!res.ok) throw new Error();
+      const body = await res.json();
+      metricsPeriod[k] = { estado: 'ok', projects: body.projects || {} };
+    } catch (e) {
+      metricsPeriod[k] = { estado: 'error' };
+    }
+    const y = window.scrollY;
+    render();
+    window.scrollTo({ top: y });
+  }
+  function metricsNotice(p) {
+    const r = scopeRange();
+    if (!r || !mReal(p)) return '';
+    const st = (metricsPeriod[rangeKey(r)] || {}).estado;
+    if (st === 'error') return `<p class="note period-note">No se pudieron traer de ${esc(p.metrics.source)} los datos de ese período (necesita la conexión en vivo). Se muestra el histórico.</p>`;
+    if (st !== 'ok') return `<p class="note period-note">Cargando de ${esc(p.metrics.source)} los datos de ese período…</p>`;
+    return '';
+  }
+
   function adsTotals(rows) {
     const t = sumRows(rows, ['spend', 'impressions', 'clicks', 'landing', 'results']);
     t.ctr = ratio(t.clicks, t.impressions);
@@ -1129,7 +1236,7 @@
   // Días del mes elegido, sin huecos (un día sin datos cuenta como 0).
   function revenueRows(p) {
     const r = p.revenue || {};
-    const src = r.daily || (r.query ? phRows(p, r.query) : []);
+    const src = r.daily || (r.metrics ? mRows(p, r.metrics) : r.query ? phRows(p, r.query) : []);
     const subs = dailyPoints(src, r.subsKey || 'suscriptores');
     const rev = dailyPoints(src, r.revenueKey || 'ingresos');
     return subs.map((d, i) => ({ date: d.date, subs: d.value, rev: rev[i].value }));
@@ -1182,23 +1289,24 @@
     const u = p.usability || {};
     // KPI con `query`: suma de la columna en PostHog (y con `of`, el cociente).
     const kpiValue = (k) => {
+      if (k.metrics) return k.of ? ratio(mNum(p, k.metrics), mNum(p, k.of)) : mNum(p, k.metrics);
       if (!k.query) return k.value;
       const v = phSum(p, k.query, k.key);
       return k.of ? ratio(v, phSum(p, k.query, k.of)) : v;
     };
-    const tiles = (u.kpis || []).map((k) => tile({ ...k, value: kpiValue(k), prev: k.query ? undefined : k.prev, currency: p.currency })).join('');
+    const tiles = (u.kpis || []).map((k) => tile({ ...k, value: kpiValue(k), prev: k.query || k.metrics ? undefined : k.prev, currency: p.currency })).join('');
     const groups = (u.funnelGroups || []).map((g) => funnelGroupHtml(p, g, color)).join('');
     const volume = u.features ? featuresHtml(p, u.features, color) : '';
     const cards = [];
-    if (u.funnel) {
-      const row = phRows(p, u.funnel.query)[0] || {};
-      cards.push(`<div class="card"><h3>${esc(u.funnel.title)}</h3>${u.funnel.note ? `<p class="sub">${esc(u.funnel.note)}</p>` : ''}
-        <div class="funnel">${funnelHtml(u.funnel.steps, row, color, { relative: 'first', baseLabel: u.funnel.baseLabel })}</div></div>`);
-    }
+    [].concat(u.funnel || [], u.funnels || []).forEach((f) => {
+      const row = f.metrics ? mGet(p, f.metrics) || {} : phRows(p, f.query)[0] || {};
+      cards.push(`<div class="card"><h3>${esc(f.title)}</h3>${f.note ? `<p class="sub">${esc(f.note)}</p>` : ''}
+        <div class="funnel">${funnelHtml(f.steps, row, color, { relative: f.relative || 'first', baseLabel: f.baseLabel })}</div></div>`);
+    });
     (u.tables || []).forEach((t) => cards.push(`
       <div class="card${t.wide ? ' span-2' : ''}">
         <h3>${esc(t.title)}</h3>${t.note ? `<p class="sub">${esc(t.note)}</p>` : ''}
-        ${table({ columns: t.columns, rows: t.query ? phRows(p, t.query) : t.rows, heat: t.heat, currency: p.currency })}
+        ${table({ columns: t.columns, rows: t.metrics ? mRows(p, t.metrics) : t.query ? phRows(p, t.query) : t.rows, heat: t.heat, currency: p.currency })}
       </div>`));
     return `
       ${tiles ? `<div class="tiles">${tiles}</div>` : ''}
@@ -1254,35 +1362,41 @@
     const color = ACCENTS[i % ACCENTS.length];
     const f = nsmFigures(p);
     const { ns, prev, list, value } = f;
-    const realUsability = !p.usability.noData && p.posthog;
+    const realUsability = !p.usability.noData && (phReal(p) || mReal(p));
     const acq = p.acquisition;
-    const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound', prospects: 'Outbound' }[acq.type];
+    const acqTitle = { funnel: 'Embudo por canal', paid: 'Registros, pagos y ROI', outbound: 'Outbound', prospects: 'Outbound', pipeline: 'Prospección y demos' }[acq.type];
     const acqBadge = acq.type === 'funnel' ? phBadge(p)
-      : acq.type === 'prospects' ? badge(null, `Datos reales · ${esc(acq.source)}, ${acq.live ? 'en vivo' : `actualizado el ${dayTip(acq.snapshotAt)}`}`)
-        : badge(acq);
-    const renderAcq = { funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound, prospects: renderProspects }[acq.type];
+      : acq.type === 'pipeline' ? mBadge(p)
+        : acq.type === 'prospects' ? badge(null, `Datos reales · ${esc(acq.source)}, ${acq.live ? 'en vivo' : `actualizado el ${dayTip(acq.snapshotAt)}`}`)
+          : badge(acq);
+    const renderAcq = { funnel: renderFunnelAcq, paid: renderPaid, outbound: renderOutbound, prospects: renderProspects, pipeline: renderPipeline }[acq.type];
+    const first = acq.type === 'prospects' || acq.type === 'pipeline';
+    const acqSub = acq.subtitle || 'prospectados → contactados → interesados → suscriptores';
     // Pide a PostHog los datos de los períodos elegidos que todavía no estén.
     ['producto', 'distribucion'].forEach((name) => {
       const r = periodRange(state.filters[name]);
       if (r && p.posthog && !periodData[rangeKey(r)]) loadPeriod(r);
+      if (r && mReal(p) && !metricsPeriod[rangeKey(r)]) loadMetricsPeriod(r);
     });
     const productoHtml = inScope('producto', () => `
         ${periodBar('producto')}
         ${periodNotice(p)}
-        <h2 class="section">Funnels y usabilidad <span>· ${realUsability ? periodText(scopeRange()) : 'sin fuente conectada'}</span> ${realUsability ? phBadge(p) : badge(p.usability)}</h2>
+        ${p.usability.kpis && p.usability.kpis.some((k) => k.metrics) ? metricsNotice(p) : ''}
+        <h2 class="section">Funnels y usabilidad <span>· ${realUsability ? periodText(scopeRange()) : 'sin fuente conectada'}</span> ${realUsability ? (phReal(p) ? phBadge(p) : mBadge(p)) : badge({ noData: true })}</h2>
         ${renderUsability(p, color)}`);
     const distribucionHtml = inScope('distribucion', () => `
         ${periodBar('distribucion')}
         ${acq.type === 'funnel' ? periodNotice(p) : ''}
-        ${acq.type === 'prospects' ? `
-        <h2 class="section">${acqTitle} <span>· prospectados → contactados → interesados → suscriptores</span> ${acqBadge}</h2>
+        ${acq.type === 'pipeline' ? metricsNotice(p) : ''}
+        ${first ? `
+        <h2 class="section">${acqTitle} <span>· ${esc(acqSub)}</span> ${acqBadge}</h2>
         ${renderAcq(p, color)}` : ''}
 
         ${p.ads ? `
         <h2 class="section">Pauta en ${esc(p.ads.source)} <span>· ${periodText(scopeRange())}</span> ${badge(null, `Datos reales · ${adsUpdated(p.ads)}`)}</h2>
         ${renderAds(p, color)}` : ''}
 
-        ${acq.type !== 'prospects' ? `
+        ${!first ? `
         <h2 class="section">${acqTitle} ${acqBadge}</h2>
         ${renderAcq(p, color)}` : ''}`);
 
@@ -1318,7 +1432,7 @@
       </div>
 
       ${p.revenue ? `
-      <h2 class="section">Suscriptores e ingresos ${p.revenue.noData ? badge(p.revenue) : phBadge(p)}</h2>
+      <h2 class="section">Suscriptores e ingresos ${p.revenue.noData ? badge(p.revenue) : p.revenue.metrics ? mBadge(p) : phBadge(p)}</h2>
       ${renderRevenue(p, color)}` : ''}
       </section>
 
@@ -1473,7 +1587,7 @@
     resizeTimer = setTimeout(drawCharts, 80);
   }).observe(main);
 
-  const noData = PROJECTS.some((p) => [p.northStar, p.revenue, p.acquisition, p.usability].some((b) => b && b.noData));
+  const noData = PROJECTS.some((p) => [p.northStar, p.revenue, p.acquisition, p.usability].some((b) => noSource(p, b)));
   if (noData) $('#sample').hidden = false;
   if (DATA.team && DATA.team.length) $('#team').textContent = `Seguimiento de proyectos · ${DATA.team.join(' y ')}`;
   $('#foot').textContent = `Datos actualizados al ${new Date(`${DATA.updatedAt}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
@@ -1558,6 +1672,31 @@
     } catch (e) { /* queda la foto de data.js */ }
   }
 
+  // Métricas de habita. y Turnia en vivo (función /api/metricas en Vercel).
+  async function loadLiveMetrics() {
+    if (location.protocol === 'file:' || !PROJECTS.some((p) => p.metrics)) return;
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 25000);
+      const res = await fetch('/api/metricas', { signal: ctrl.signal });
+      if (!res.ok) return;
+      const live = await res.json();
+      let changed = false;
+      PROJECTS.forEach((p) => {
+        const data = p.metrics && live.projects && live.projects[p.id];
+        if (!data) return;
+        p.metrics.data = data;
+        p.metrics.live = true;
+        changed = true;
+      });
+      if (!changed) return;
+      $('#sample').hidden = !PROJECTS.some((p) => [p.northStar, p.revenue, p.acquisition, p.usability].some((b) => noSource(p, b)));
+      const y = window.scrollY;
+      render();
+      window.scrollTo({ top: y });
+    } catch (e) { /* queda la foto de data.js */ }
+  }
+
   // Etapas editadas a mano, compartidas (función /api/ediciones en Vercel).
   async function loadStageEdits() {
     const list = PROJECTS.filter((p) => p.acquisition.type === 'prospects');
@@ -1584,4 +1723,5 @@
   loadLiveAds();
   loadLivePosthog();
   loadLiveProspects();
+  loadLiveMetrics();
 })();
