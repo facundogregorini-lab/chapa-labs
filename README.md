@@ -33,7 +33,7 @@ Cada app tiene su `GET /api/metricas`, que devuelve solo totales y series por d�
 
 1. Inventar dos claves largas (32 caracteres o más), por ejemplo con `openssl rand -hex 32`.
 2. En Vercel → proyecto de **habita.** (amoblaia) → `METRICS_SECRET` con la primera. En el proyecto de **Turnia** (turniasalud) → `METRICS_SECRET` con la segunda. Redeploy de los dos.
-3. En Vercel → proyecto `chapa-labs` → `HABITA_METRICS_SECRET` y `TURNIA_METRICS_SECRET` con esas mismas claves. Si las apps no están en `amoblaia.vercel.app` y `turniasalud.vercel.app`, también `HABITA_METRICS_URL` y `TURNIA_METRICS_URL` (la URL completa de `/api/metricas`). **Redeploy.**
+3. En Vercel → proyecto `chapa-labs` → `HABITA_METRICS_SECRET` y `TURNIA_METRICS_SECRET` con esas mismas claves. Si las apps no están en `habitaia.vercel.app` y `turniasalud.vercel.app`, también `HABITA_METRICS_URL` y `TURNIA_METRICS_URL` (la URL completa de `/api/metricas`). **Redeploy.**
 
 El tablero las trae al abrirse (5 minutos de caché) y con el filtro de fechas pide ese período. Sin conexión, habita. muestra la foto guardada en `data.js` y Turnia, "Sin datos". Qué devuelve cada una: `docs/METRICAS_TABLERO.md` en amoblaia y `ESTADO_Y_PRIORIDADES.md` en turniasalud.
 
