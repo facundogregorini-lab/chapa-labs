@@ -835,7 +835,14 @@
     state.pending = null;
     $('#confirm').classList.remove('on');
     if (!p || !yes) return;
-    await act(p.id, { type: 'sent', channel: p.channel, template: p.key, kind: p.kind }, { label: `${p.kind === 'saludo' ? 'Saludo' : 'Mensaje'} a ${p.name} registrado`, undoable: true });
+    const ok = await act(p.id, { type: 'sent', channel: p.channel, template: p.key, kind: p.kind }, { label: `${p.kind === 'saludo' ? 'Saludo' : 'Mensaje'} a ${p.name} registrado`, undoable: true });
+    // El mensaje ya salió: si no se pudo registrar, se reintenta sin volver a abrir WhatsApp.
+    if (!ok) {
+      state.pending = p;
+      const c = $('#confirm');
+      c.innerHTML = `<p>No se pudo registrar el ${p.kind === 'saludo' ? 'saludo' : 'mensaje'} a <strong>${esc(p.name)}</strong>. Ya salió: reintentá cuando quieras.</p><button class="btn primary" type="button" data-confirm="yes">Reintentar</button><button class="btn ghost" type="button" data-confirm="no">Descartar</button>`;
+      c.classList.add('on');
+    }
   }
 
   async function copy(text) {
