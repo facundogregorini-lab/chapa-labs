@@ -93,6 +93,8 @@ a { color: inherit; }
 .brand strong { display: block; font-size: 17px; letter-spacing: -0.2px; }
 .brand small { display: block; font-size: 12px; color: var(--muted); }
 .controls { display: flex; align-items: center; gap: 8px; }
+.prospecting-link { font-size: 14px; font-weight: 600; text-decoration: none; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); }
+.prospecting-link:hover { background: var(--surface-2); }
 .month-pick { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 select, .theme {
   height: 36px; border: 1px solid var(--border); border-radius: 8px;

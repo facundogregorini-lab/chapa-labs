@@ -2,6 +2,10 @@
 
 Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coach**, **habita.** (ex Amobla IA; la pestaña sigue en `#amobla-ia`) y **Turnia**. Es una página estática (`index.html`, `styles.css`, `main.js` y `data.js`), sin compilación ni dependencias: se abre `index.html` directo en el navegador. Para publicarla alcanza con importar el repo en Vercel (o activar GitHub Pages sobre `main`); `vercel.json` le agrega `noindex` para que no aparezca en buscadores.
 
+## Prospección (`/prospecting`)
+
+La operación comercial de Turnia y habita. en un solo panel: un motor común (cola del día, embudo, cuentas, mensajes) y encima el foco de cada unidad (ICP, propuesta, plantillas, cadencia). Lee y escribe la planilla de Google de cada una y suma lo que pasa en el producto desde `/api/metricas`. Interfaz liquid glass. Tiene login (`PROSPECTING_PASSWORD`) porque muestra nombres y teléfonos. Puesta en marcha, cómo se mide y cómo sumar una unidad: [`docs/PROSPECCION.md`](docs/PROSPECCION.md). `npm test` corre sus pruebas.
+
 ## De dónde salen los datos
 
 | Sección | Fuente | Estado |

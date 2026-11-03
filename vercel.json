@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/prospecting", "destination": "/prospecting/index.html" },
+    { "source": "/prospecting/:unit(todas|turnia|habita)", "destination": "/prospecting/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -7,6 +11,13 @@
           "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
         }
+      ]
+    },
+    {
+      "source": "/prospecting/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
       ]
     }
   ]

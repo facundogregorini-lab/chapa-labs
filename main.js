@@ -1099,10 +1099,16 @@
     const byDate = new Map(rows.map((r) => [r.date, Number(r[key]) || 0]));
     return dayRange(rows).map((date) => ({ date, label: dayLabel(date), tip: dayTip(date), value: byDate.get(date) || 0 }));
   }
+  // La operación de la prospección (cola del día, fichas, embudo por segmento) vive en /prospecting.
+  const PROSPECTING = { 'amobla-ia': 'habita', turnia: 'turnia' };
+  function prospectingLink(p) {
+    return PROSPECTING[p.id] ? `<p class="sub"><a href="/prospecting/${PROSPECTING[p.id]}?vista=embudo">Abrir la prospección de ${esc(p.name)} →</a> Cola del día, fichas y embudo por segmento.</p>` : '';
+  }
+
   function renderPipeline(p, color) {
     const a = p.acquisition;
-    if (!mReal(p)) return `<div class="card"><p class="sub">${esc(a.emptyNote || 'Todavía no hay datos de esta fuente.')}</p></div>`;
-    return a.sections.map((sec) => {
+    if (!mReal(p)) return `${prospectingLink(p)}<div class="card"><p class="sub">${esc(a.emptyNote || 'Todavía no hay datos de esta fuente.')}</p></div>`;
+    return prospectingLink(p) + a.sections.map((sec) => {
       const tiles = (sec.kpis || []).map((k) => tile({
         label: k.label, hint: k.hint, format: k.format || 'int', currency: k.currency || p.currency,
         value: k.of ? ratio(mNum(p, k.metrics), mNum(p, k.of)) : mNum(p, k.metrics),
