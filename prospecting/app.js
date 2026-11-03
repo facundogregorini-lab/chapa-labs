@@ -235,7 +235,8 @@
       <p class="sub">El panel lee y escribe la planilla de Google de cada unidad. Se configura una vez en Vercel (proyecto chapa-labs):</p>
       <ul style="margin:0;padding:0;list-style:none;display:grid;gap:6px">
         ${item(s.auth, '<code>PROSPECTING_PASSWORD</code>: la contraseña del equipo (opcional: sin ella, cualquiera con el link entra).')}
-        ${item(s.google, '<code>GOOGLE_SERVICE_ACCOUNT_JSON</code>: la clave de la cuenta de servicio.')}
+        ${item(s.google, '<code>GOOGLE_SERVICE_ACCOUNT_JSON</code>: el archivo JSON entero de la cuenta de servicio.')}
+        ${s.googleProblem ? `<li style="color:var(--bad-text)">${esc(s.googleProblem)}</li>` : ''}
         ${s.units.map((u) => item(u.sheet, `<code>${esc(u.sheetEnv)}</code>: la planilla de ${esc(unitOf(u.id).name.replace(/\.$/, ''))}.`)).join('')}
       </ul>
       <p class="sub">Los pasos están en <code>docs/PROSPECCION.md</code> del repo.</p>

@@ -12,19 +12,35 @@ const crypto = require('node:crypto');
 const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const API = 'https://sheets.googleapis.com/v4/spreadsheets';
 
+const pem = (k) => String(k || '').trim().replace(/^"|"$/g, '').replace(/\\n/g, '\n');
+
 function credentials() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const raw = (process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '').trim();
+  const emailVar = (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || '').trim();
+  // También se acepta solo la clave privada («-----BEGIN PRIVATE KEY-----…»), con el email aparte.
+  if (!raw.startsWith('{') && raw.includes('BEGIN PRIVATE KEY')) {
+    if (!emailVar) throw Object.assign(new Error('GOOGLE_SERVICE_ACCOUNT_JSON tiene solo la clave privada: pegá el archivo JSON entero (empieza con «{»), o agregá GOOGLE_SERVICE_ACCOUNT_EMAIL con el email de la cuenta de servicio.'), { code: 'NO_GOOGLE' });
+    return { email: emailVar, key: pem(raw) };
+  }
   if (raw) {
     try {
       const j = JSON.parse(raw);
-      if (j.client_email && j.private_key) return { email: j.client_email, key: j.private_key };
+      if (j.client_email && j.private_key) return { email: j.client_email, key: pem(j.private_key) };
     } catch { /* cae al error de abajo */ }
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es un JSON de cuenta de servicio válido.');
+    throw Object.assign(new Error('GOOGLE_SERVICE_ACCOUNT_JSON no es el JSON de una cuenta de servicio: pegá el archivo entero, desde «{» hasta «}».'), { code: 'NO_GOOGLE' });
   }
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-  if (!email || !key) return null;
-  return { email, key };
+  const key = pem(process.env.GOOGLE_PRIVATE_KEY);
+  if (!emailVar || !key) return null;
+  return { email: emailVar, key };
+}
+
+// Qué falta para conectar con Google (para mostrarlo en la pantalla de conexión).
+function problem() {
+  try {
+    return credentials() ? null : 'Falta GOOGLE_SERVICE_ACCOUNT_JSON en Vercel.';
+  } catch (err) {
+    return err.message;
+  }
 }
 
 const b64url = (v) => Buffer.from(typeof v === 'string' ? v : JSON.stringify(v)).toString('base64url');
@@ -140,4 +156,4 @@ async function appendRows(id, tabName, rows) {
   });
 }
 
-module.exports = { configured: () => Boolean(credentials()), serviceEmail: () => credentials()?.email || null, tabs, readTabs, addTabs, writeCells, writeRange, appendRows, colLetter };
+module.exports = { configured: () => Boolean(credentials()), problem, serviceEmail: () => { try { return credentials()?.email || null; } catch { return null; } }, tabs, readTabs, addTabs, writeCells, writeRange, appendRows, colLetter };

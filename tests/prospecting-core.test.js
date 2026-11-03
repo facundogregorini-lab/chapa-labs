@@ -196,3 +196,26 @@ test('planillas reales: columnas de habita. y estados de la app de Turnia', () =
   assert.deepEqual(accounts.map((a) => a.stage), ['saludado', 'contactado', 'invalido']);
   assert.deepEqual(accounts.map((a) => a.phoneKind), ['celular', 'compartido', 'fijo']);
 });
+
+test('credenciales de Google: JSON entero, o solo la clave con el email aparte', () => {
+  const path = require('node:path');
+  const file = path.resolve(__dirname, '../api/_google.js');
+  const load = (env) => {
+    for (const k of ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SERVICE_ACCOUNT_EMAIL', 'GOOGLE_PRIVATE_KEY']) delete process.env[k];
+    Object.assign(process.env, env);
+    delete require.cache[file];
+    return require(file);
+  };
+  const key = '-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n';
+  let g = load({ GOOGLE_SERVICE_ACCOUNT_JSON: key });
+  assert.match(g.problem(), /solo la clave privada/);
+  g = load({ GOOGLE_SERVICE_ACCOUNT_JSON: key, GOOGLE_SERVICE_ACCOUNT_EMAIL: 'bot@x.iam.gserviceaccount.com' });
+  assert.equal(g.problem(), null);
+  assert.equal(g.serviceEmail(), 'bot@x.iam.gserviceaccount.com');
+  g = load({ GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({ client_email: 'b@x.iam.gserviceaccount.com', private_key: key }) });
+  assert.equal(g.problem(), null);
+  g = load({});
+  assert.match(g.problem(), /Falta/);
+  delete require.cache[file];
+  for (const k of ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SERVICE_ACCOUNT_EMAIL']) delete process.env[k];
+});

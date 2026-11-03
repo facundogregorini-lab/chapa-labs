@@ -66,7 +66,7 @@ Es un «usuario robot» de Google: un email del tipo `chapa-labs@proyecto.iam.gs
 1. [Google Cloud Console](https://console.cloud.google.com/) → el proyecto de Turnia (el de Calendar) u otro → APIs y servicios → Biblioteca → **Google Sheets API** → Habilitar.
 2. IAM y administración → **Cuentas de servicio** → Crear (por ejemplo `chapa-labs-prospeccion`). Sin roles.
 3. En la cuenta → Claves → Agregar clave → JSON. Se descarga un archivo: no subirlo al repo (es público).
-4. En Vercel → proyecto `chapa-labs` → Settings → Environment Variables → `GOOGLE_SERVICE_ACCOUNT_JSON` con el contenido entero del archivo.
+4. En Vercel → proyecto `chapa-labs` → Settings → Environment Variables → `GOOGLE_SERVICE_ACCOUNT_JSON` con el contenido entero del archivo (empieza con `{` y termina con `}`). Si se pegó solo la clave privada (`-----BEGIN PRIVATE KEY-----…`), también anda, pero hay que agregar `GOOGLE_SERVICE_ACCOUNT_EMAIL` con el `client_email` del archivo. La pantalla de conexión de `/prospecting` dice qué falta.
 
 ### 2. Contraseña del equipo (opcional)
 

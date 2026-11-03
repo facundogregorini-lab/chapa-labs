@@ -165,7 +165,8 @@ module.exports = async (req, res) => {
         auth: session.configured(),
         open: session.open(),
         google: googleReady(),
-        serviceEmail: user ? google.serviceEmail() : null,
+        googleProblem: google.problem ? google.problem() : null,
+        serviceEmail: google.serviceEmail(),
         user: user ? { name: user.name } : null,
         units: Object.values(UNITS).map((u) => ({ id: u.id, sheet: Boolean(sheetOf(u)), sheetEnv: u.sheetEnv })),
       });
