@@ -61,35 +61,36 @@ Lo que quedó en `glass.js` y `glass.css`:
 
 ### 1. Cuenta de servicio de Google
 
-1. [Google Cloud Console](https://console.cloud.google.com/) → un proyecto (puede ser el de Turnia) → APIs y servicios → Biblioteca → **Google Sheets API** → Habilitar.
+Es un «usuario robot» de Google: un email del tipo `chapa-labs@proyecto.iam.gserviceaccount.com` con una clave. El servidor de chapa-labs la usa para leer y escribir las planillas sin que nadie tenga que iniciar sesión con su Google ni reconectar cada 7 días. Solo ve las planillas que se comparten con ese email, como si fuera una persona más.
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → el proyecto de Turnia (el de Calendar) u otro → APIs y servicios → Biblioteca → **Google Sheets API** → Habilitar.
 2. IAM y administración → **Cuentas de servicio** → Crear (por ejemplo `chapa-labs-prospeccion`). Sin roles.
 3. En la cuenta → Claves → Agregar clave → JSON. Se descarga un archivo: no subirlo al repo (es público).
 4. En Vercel → proyecto `chapa-labs` → Settings → Environment Variables → `GOOGLE_SERVICE_ACCOUNT_JSON` con el contenido entero del archivo.
 
-### 2. Contraseña del equipo
+### 2. Contraseña del equipo (opcional)
 
-- `PROSPECTING_PASSWORD`: 12 caracteres o más. Cada persona entra con su nombre (queda en cada contacto que registra) y esta contraseña. La sesión dura 30 días.
-- Opcional, `PROSPECTING_SECRET` (32 caracteres o más) para firmar la cookie. Sin ella se deriva de la contraseña: cambiarla cierra todas las sesiones.
-- El tablero general sigue sin login; la prospección no, porque muestra nombres y teléfonos.
+- `PROSPECTING_PASSWORD` (12 caracteres o más). **Hoy no está puesta**: el panel queda abierto y solo pide un nombre (queda en cada contacto que se registra). Ojo: así, cualquiera que tenga el link ve nombres y teléfonos y puede registrar contactos en habita. Cuando se ponga, cada persona entra con su nombre y la contraseña, y la sesión dura 30 días.
+- Opcional, `PROSPECTING_SECRET` (32 caracteres o más) para firmar la cookie.
 
 ### 3. La planilla de cada unidad
 
-Compartir cada planilla con el email de la cuenta de servicio (`...@...iam.gserviceaccount.com`) como **Editor** y cargar su id (lo que va entre `/d/` y `/edit`) en Vercel. Después, **Redeploy** y, en el panel, «Preparar la planilla» (agrega las columnas, la pestaña **Actividad** y la pestaña **Mensajes** con las plantillas de fábrica).
+| Unidad | Variable | Planilla | Pestaña | Modo |
+| --- | --- | --- | --- | --- |
+| habita. | `HABITA_PROSPECTING_SHEET_ID` | «Prospecting Habita» | `Prospectos` | Lee y escribe |
+| Turnia | `TURNIA_PROSPECTING_SHEET_ID` | «Turnia · Prospección y pedidos de demo» | `Prospección` | Solo lectura |
 
-| Unidad | Variable | Pestaña (por defecto) |
-| --- | --- | --- |
-| Turnia | `TURNIA_PROSPECTING_SHEET_ID` | `Prospectos` (cambiar con `TURNIA_PROSPECTING_TAB`) |
-| habita. | `HABITA_PROSPECTING_SHEET_ID` | `Prospectos` (cambiar con `HABITA_PROSPECTING_TAB`) |
+El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel y no acá porque el repo es público. Cada planilla se comparte con el email de la cuenta de servicio (`...@...iam.gserviceaccount.com`): **Editor** la de habita., **Lector** alcanza para la de Turnia. Después, **Redeploy**.
 
-**habita.** Sirve la planilla «Prospecting amobla IA» tal como está (pestaña «Prospectos»). El panel reconoce sus columnas (Inmobiliaria, SDR, Estado, Fecha envío, WhatsApp, Confianza del número…) y escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando.
+**habita.** El panel reconoce sus columnas (Inmobiliaria, SDR, Número, Confianza del número, Estado, Fecha envío, Grupo Habita…), escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando. «Motivo / próximo paso» (la nota de la investigación) se muestra como señal y no se pisa: el próximo paso del panel va en una columna propia que se agrega al primer cambio. En la vista de la unidad, «Preparar la planilla» agrega las pestañas Actividad y Mensajes.
 
-**Turnia.** La planilla «Turnia · Prospección y pedidos de demo» **no sirve** como planilla del panel: Turnia la reescribe entera con cada cambio de su panel y se perderían los cambios hechos acá. Pasos:
+**Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel (un contacto, un estado, una demo abierta) reescribe la pestaña «Prospección» entera. Por eso:
 
-1. Crear una planilla nueva («Turnia · Prospección · Chapa Labs»).
-2. En la planilla de Turnia, pestaña «Prospección» → clic derecho → Copiar en → la planilla nueva. Renombrar la copia a `Prospectos`. Las columnas (Código, Nombre, Trato, Saludo, Consultorio, Teléfono, De quién es el teléfono, Estado, Mensajes…) se reconocen solas.
-3. Su id va en `TURNIA_PROSPECTING_SHEET_ID`.
-4. Opcional y recomendado: compartir también la planilla de Turnia (como Lector alcanza) y cargar su id en `TURNIA_SIGNALS_SHEET_ID`. El panel la lee sin escribirla y trae, por código o teléfono, «Abrió su demo», «Probó la demo» y el link de cada uno: las señales que registra la app cuando el odontólogo abre su `/p/<código>`.
-5. Desde ese día se trabaja en `/prospecting/turnia`. El panel de Turnia no ve los cambios hechos acá (y al revés): no usar los dos a la vez.
+- Siempre está al día con el panel de Turnia, sin hacer nada. Si alguna vez deja de actualizarse, en el panel de Turnia → Prospección → Google Sheets: «Copiar ahora» (o «Reconectar» si Google lo pide; en modo prueba el permiso vence a los 7 días).
+- En `/prospecting/turnia` es de **solo lectura**: se mira, se mide y se filtra, y para contactar se abre el panel de Turnia (que tiene el WhatsApp, las demos `/p/<código>` y su seguimiento). Si el panel escribiera en esta planilla, la próxima copia de Turnia lo borraría.
+- «Contactado» sin mensajes y con «Saludo enviado» se lee como «Saludado» (esperan la demo); «Sin WhatsApp» como número inválido. Los fijos que no respondieron no cuentan, como en el panel de Turnia.
+- Sin pestaña Actividad, el ritmo diario cuenta primeros contactos.
+- Para operar Turnia desde acá hace falta que Turnia acepte las acciones por API (ver Pendiente).
 
 ### Qué se escribe en la planilla
 
@@ -108,7 +109,8 @@ Compartir cada planilla con el email de la cuenta de servicio (`...@...iam.gserv
 
 ## Pendiente
 
-- Probar en vivo con las dos planillas reales (solo se probó con una planilla simulada y con el modo de ejemplo).
+- Probar en vivo con las dos planillas reales (se probó con planillas simuladas con sus mismas columnas y con el modo de ejemplo).
+- **Operar Turnia desde acá:** un `POST /api/prospeccion` en Turnia (con clave, como `/api/metricas`) que reciba las mismas acciones (contacto confirmado, estado, nota, próximo paso). El panel las mandaría ahí en vez de a la planilla, y la planilla seguiría siendo el espejo.
 - Señales de demo de habita. por cuenta (hoy su `/api/metricas` da solo totales): un endpoint por cuenta en amoblaia, o que su panel escriba «Abrió la demo» en la planilla.
 - Leer respuestas solas desde WAHA (Turnia) para no tener que marcar «Respondió» a mano.
 - Pasar de la planilla a una base cuando el volumen lo pida: el motor no cambia, solo `api/prospecting.js`.

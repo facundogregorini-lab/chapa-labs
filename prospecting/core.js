@@ -21,23 +21,24 @@
     ['org', 'Organización', /^(organizaci[oó]n|consultorio|empresa|marca)$/i],
     ['greeting', 'Saludo', /^saludo$/i],
     ['title', 'Trato', /^trato$/i],
-    ['phone', 'Teléfono', /^(tel[eé]fono|celular|whatsapp|n[uú]mero|tel[eé]fono \/ whatsapp)$/i],
+    ['phone', 'Teléfono', /^(tel[eé]fono|celular|whatsapp|tel[eé]fono \/ whatsapp)$|^n[uú]mero\b/i],
     ['phoneKind', 'Tipo de teléfono', /de qui[eé]n es el tel|tipo de tel|confianza del n[uú]mero/i],
     ['email', 'Email', /^(e-?mail|correo)/i],
     ['instagram', 'Instagram', /instagram/i],
     ['web', 'Web', /^(web|sitio)/i],
     ['address', 'Dirección', /^direcci[oó]n/i],
     ['zone', 'Zona', /^(zona|localidad|ciudad|barrio)/i],
-    ['segment', 'Segmento', /^(segmento|especialidad|tipo de cuenta|rubro)/i],
+    ['segment', 'Segmento', /^(segmento|especialidad|tipo de cuenta|rubro|grupo)/i],
     ['priority', 'Prioridad', /^prioridad/i],
     ['score', 'Score', /^(score|puntaje)\b/i],
     ['sdr', 'SDR', /\bsdr\b|^responsable/i],
     ['campaign', 'Campaña', /campa[nñ]a|^lista$/i],
     ['source', 'Fuente', /^fuente$/i],
     ['stage', 'Etapa', /^(etapa|estado)$/i],
-    ['nextStep', 'Próximo paso', /^(pr[oó]ximo paso|motivo \/ pr[oó]ximo paso|pr[oó]xima acci[oó]n)$/i],
+    ['nextStep', 'Próximo paso', /^(pr[oó]ximo paso|pr[oó]xima acci[oó]n)$/i],
     ['nextAt', 'Fecha del próximo paso', /fecha.*pr[oó]xim|^seguimiento$/i],
     ['touches', 'Mensajes', /^mensajes( enviados)?$/i],
+    ['greetingSent', 'Saludo enviado', /^saludo enviado$/i],
     ['firstContact', 'Primer contacto', /^(primer contacto|fecha (de )?env[ií]o|fecha)$/i],
     ['lastContact', 'Último contacto', /^[uú]ltimo contacto/i],
     ['lastChannel', 'Último canal', /^([uú]ltimo canal|canal)$/i],
@@ -50,7 +51,8 @@
     ['customer', 'Cliente', /^cliente$/i],
     ['lostReason', 'Motivo de pérdida', /motivo de p[eé]rdida/i],
     ['optOut', 'Baja', /^(baja|no recibir m[aá]s)$/i],
-    ['signals', 'Señales', /^se[ñn]ales/i],
+    // En habita. «Motivo / próximo paso» es la nota de la investigación: se muestra, no se pisa.
+    ['signals', 'Señales', /^se[ñn]ales|^motivo \/ pr[oó]ximo paso/i],
     ['notes', 'Notas', /^notas?/i],
     ['updated', 'Actualizado', /^actualizado/i],
   ];
@@ -172,7 +174,7 @@
       a.stageRaw = a.stage;
       a.stage = stageFromText(a.stage);
       // Fechas o «Sí»; cualquier otro texto en Baja también cuenta como baja.
-      for (const k of ['nextAt', 'firstContact', 'lastContact', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
+      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
       a.optOut = parseDate(a.optOut) || (a.optOut && !/^(no|false|falso|-)$/i.test(a.optOut) ? 'sí' : '');
       a.touches = Number(String(a.touches).replace(',', '.')) || 0;
       a.score = a.score === '' ? null : Number(String(a.score).replace(',', '.'));
@@ -198,7 +200,7 @@
     if (/consultorio|oficina|empresa|recepci/.test(s)) return 'compartido';
     if (/verificad|propio|persona|celular|movil/.test(s)) return 'celular';
     if (/revisar|probable|confirmar/.test(s)) return 'revisar';
-    return s;
+    return String(t).trim();
   }
 
   function slug(s) {
@@ -321,6 +323,8 @@
       else if (e.type === 'cliente') bump(d, 'clientes');
     }
     for (const a of accounts) if (counted(a, unit) && a.firstContact) bump(dayOf(a.firstContact), 'nuevos');
+    // Sin pestaña Actividad (una planilla de solo lectura): los primeros contactos hacen de contactos.
+    if (!events.length) for (const d of days.values()) d.contactos = d.nuevos;
     return [...days.values()].sort((x, y) => x.date.localeCompare(y.date));
   }
 

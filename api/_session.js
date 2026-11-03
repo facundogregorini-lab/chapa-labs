@@ -1,9 +1,10 @@
 // Sesión del panel de prospección: contraseña compartida del equipo y cookie firmada
-// (HttpOnly, 30 días). El tablero general sigue sin login; la prospección no, porque
-// muestra nombres y teléfonos.
+// (HttpOnly, 30 días) con el nombre de quien opera.
 //
 // Variables de entorno en Vercel:
-//   PROSPECTING_PASSWORD   la contraseña que usa el equipo (12 caracteres o más).
+//   PROSPECTING_PASSWORD   la contraseña que usa el equipo (12 caracteres o más). Sin ella el
+//                          panel queda abierto: cualquiera con el link ve nombres y teléfonos y
+//                          puede registrar contactos; solo se pide un nombre.
 //   PROSPECTING_SECRET     opcional; clave para firmar la cookie (32 caracteres o más).
 //                          Sin ella se deriva de la contraseña: cambiarla cierra todas las sesiones.
 
@@ -14,10 +15,11 @@ const DAYS = 30;
 
 const password = () => (process.env.PROSPECTING_PASSWORD || '').trim();
 const configured = () => password().length >= 12;
+const open = () => !configured();
 
 function key() {
   const secret = (process.env.PROSPECTING_SECRET || '').trim();
-  return secret.length >= 32 ? secret : crypto.createHash('sha256').update(`chapa-labs:${password()}`).digest('hex');
+  return secret.length >= 32 ? secret : crypto.createHash('sha256').update(`chapa-labs:${password() || 'abierto'}`).digest('hex');
 }
 
 const sign = (payload) => crypto.createHmac('sha256', key()).update(payload).digest('base64url');
@@ -29,7 +31,7 @@ function safeEqual(a, b) {
 }
 
 function checkPassword(given) {
-  if (!configured()) return false;
+  if (open()) return true;
   // Comparación en tiempo constante sobre hashes del mismo largo.
   const h = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
   return safeEqual(h(given), h(password()));
@@ -45,7 +47,6 @@ function cookies(req) {
 }
 
 function read(req) {
-  if (!configured()) return null;
   const raw = cookies(req)[COOKIE];
   if (!raw) return null;
   const [payload, sig] = raw.split('.');
@@ -71,4 +72,4 @@ function end(res) {
   res.setHeader('Set-Cookie', cookieHeader('', 0));
 }
 
-module.exports = { configured, checkPassword, read, start, end };
+module.exports = { configured, open, checkPassword, read, start, end };

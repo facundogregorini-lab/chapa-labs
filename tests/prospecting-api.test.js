@@ -4,12 +4,13 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 
 process.env.PROSPECTING_PASSWORD = 'una-clave-larga-de-prueba';
+process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
 process.env.TURNIA_PROSPECTING_SHEET_ID = 'sheet-turnia';
 delete process.env.TURNIA_SIGNALS_SHEET_ID;
 
 // Planilla falsa: pestañas como matrices de texto.
 const book = {
-  title: 'Turnia · Prospección',
+  title: 'Prospecting Habita',
   tabs: {
     Prospectos: [
       ['Código', 'Nombre', 'Teléfono', 'De quién es el teléfono', 'Zona', 'Estado', 'Notas'],
@@ -54,7 +55,7 @@ function call(op, { method = 'GET', body, query = {}, cookie } = {}) {
 let cookie = '';
 
 test('sin sesión no devuelve datos', async () => {
-  const r = await call('data', { query: { unit: 'turnia' } });
+  const r = await call('data', { query: { unit: 'habita' } });
   assert.equal(r.statusCode, 401);
 });
 
@@ -69,13 +70,13 @@ test('login, lectura y una acción que escribe la fila y la actividad', async ()
   cookie = login.headers['set-cookie'].split(';')[0];
   assert.match(login.headers['set-cookie'], /HttpOnly/);
 
-  const data = await call('data', { query: { unit: 'turnia' }, cookie });
+  const data = await call('data', { query: { unit: 'habita' }, cookie });
   assert.equal(data.statusCode, 200);
   assert.equal(data.body.accounts.length, 2);
   assert.ok(data.body.sheet.missingColumns.includes('Primer contacto'));
   const laura = data.body.accounts.find((a) => a.id === 'abc');
 
-  const act = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'abc', version: laura.updated, action: { type: 'sent', kind: 'saludo', channel: 'whatsapp', template: 'whatsapp_saludo' } } });
+  const act = await call('action', { method: 'POST', cookie, body: { unit: 'habita', id: 'abc', version: laura.updated, action: { type: 'sent', kind: 'saludo', channel: 'whatsapp', template: 'whatsapp_saludo' } } });
   assert.equal(act.statusCode, 200, JSON.stringify(act.body));
   const head = book.tabs.Prospectos[0];
   const row = book.tabs.Prospectos[1];
@@ -87,32 +88,56 @@ test('login, lectura y una acción que escribe la fila y la actividad', async ()
   assert.equal(book.tabs.Actividad[1][7], 'Axel');
 
   // Con la versión vieja, no se pisa: 409 y la cuenta nueva.
-  const stale = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'abc', version: laura.updated, action: { type: 'note', text: 'hola' } } });
+  const stale = await call('action', { method: 'POST', cookie, body: { unit: 'habita', id: 'abc', version: laura.updated, action: { type: 'note', text: 'hola' } } });
   assert.equal(stale.statusCode, 409);
   assert.equal(stale.body.account.stage, 'saludado');
 });
 
 test('una fila sin ID recibe uno estable al primer cambio', async () => {
-  const data = await call('data', { query: { unit: 'turnia' }, cookie });
+  const data = await call('data', { query: { unit: 'habita' }, cookie });
   const sin = data.body.accounts.find((a) => a.name === 'Sin Código');
   assert.equal(sin.id, 'fila-sin-codigo');
-  const r = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: sin.id, version: sin.updated, action: { type: 'note', text: 'Llamar a la tarde' } } });
+  const r = await call('action', { method: 'POST', cookie, body: { unit: 'habita', id: sin.id, version: sin.updated, action: { type: 'note', text: 'Llamar a la tarde' } } });
   assert.equal(r.statusCode, 200);
   assert.equal(book.tabs.Prospectos[2][0], 'fila-sin-codigo');
   assert.match(book.tabs.Prospectos[2][book.tabs.Prospectos[0].indexOf('Notas')], /importada a mano\n\d{4}-\d{2}-\d{2}: Llamar a la tarde/);
 });
 
 test('preparar la planilla agrega pestañas, columnas y plantillas', async () => {
-  const r = await call('setup', { method: 'POST', cookie, body: { unit: 'turnia' } });
+  const r = await call('setup', { method: 'POST', cookie, body: { unit: 'habita' } });
   assert.equal(r.statusCode, 200, JSON.stringify(r.body));
   assert.ok(book.tabs.Mensajes.length > 3);
   assert.equal(book.tabs.Mensajes[0][0], 'Clave');
   assert.ok(book.tabs.Prospectos[0].includes('Fecha del próximo paso'));
 });
 
+test('Turnia es de solo lectura: su planilla la escribe la app', async () => {
+  const r = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'abc', action: { type: 'note', text: 'x' } } });
+  assert.equal(r.statusCode, 403);
+  const s = await call('setup', { method: 'POST', cookie, body: { unit: 'turnia' } });
+  assert.equal(s.statusCode, 403);
+});
+
+test('sin contraseña el panel queda abierto y solo pide un nombre', async () => {
+  const saved = process.env.PROSPECTING_PASSWORD;
+  delete process.env.PROSPECTING_PASSWORD;
+  try {
+    const s = await call('session');
+    assert.equal(s.body.open, true);
+    assert.equal(s.body.user, null);
+    const login = await call('login', { method: 'POST', body: { name: 'Facu' } });
+    assert.equal(login.statusCode, 200);
+    const c = login.headers['set-cookie'].split(';')[0];
+    const again = await call('session', { cookie: c });
+    assert.equal(again.body.user.name, 'Facu');
+  } finally {
+    process.env.PROSPECTING_PASSWORD = saved;
+  }
+});
+
 test('unidad sin planilla configurada', async () => {
-  delete process.env.HABITA_PROSPECTING_SHEET_ID;
-  const r = await call('data', { query: { unit: 'habita' }, cookie });
+  delete process.env.TURNIA_PROSPECTING_SHEET_ID;
+  const r = await call('data', { query: { unit: 'turnia' }, cookie });
   assert.equal(r.statusCode, 503);
   assert.equal(r.body.code, 'NO_SHEET');
 });

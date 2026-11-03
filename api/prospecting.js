@@ -98,6 +98,7 @@ async function doAction(req, res, user) {
   const unit = UNITS[unitId];
   const sheet = unit && sheetOf(unit);
   if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
+  if (unit.readOnly) return fail(res, 403, `${unit.name} se opera en ${unit.appName}: su planilla la escribe la app y se actualiza sola.`);
   if (!id || !action || typeof action.type !== 'string') return fail(res, 400, 'Falta la cuenta o la acción.');
   const data = await readUnit(unit, sheet);
   if (data.missingTab) return fail(res, 409, `La planilla no tiene la pestaña «${sheet.tab}».`);
@@ -130,6 +131,7 @@ async function doSetup(req, res, user) {
   const unit = UNITS[(req.body || {}).unit];
   const sheet = unit && sheetOf(unit);
   if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
+  if (unit.readOnly) return fail(res, 403, `La planilla de ${unit.name} es de solo lectura.`);
   const meta = await google.tabs(sheet.id);
   const add = [sheet.tab, core.ACTIVITY_TAB, TEMPLATES_TAB].filter((t) => !meta.tabs.includes(t));
   await google.addTabs(sheet.id, add);
@@ -161,6 +163,7 @@ module.exports = async (req, res) => {
       const user = session.read(req);
       return res.status(200).json({
         auth: session.configured(),
+        open: session.open(),
         google: googleReady(),
         serviceEmail: user ? google.serviceEmail() : null,
         user: user ? { name: user.name } : null,
@@ -169,7 +172,6 @@ module.exports = async (req, res) => {
     }
     if (op === 'login' && req.method === 'POST') {
       const { name, password } = req.body || {};
-      if (!session.configured()) return fail(res, 503, 'Falta configurar PROSPECTING_PASSWORD en Vercel.');
       const who = String(name || '').trim().slice(0, 40);
       if (!who) return fail(res, 400, 'Poné tu nombre: queda en cada contacto que registres.');
       if (!session.checkPassword(password || '')) {
@@ -199,6 +201,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         unit: unit.id,
         readAt: new Date().toISOString(),
+        readOnly: Boolean(unit.readOnly),
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts: data.accounts,
         events: data.events.slice(-8000),

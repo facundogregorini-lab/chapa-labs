@@ -178,3 +178,21 @@ test('habita.: la fecha de envío se escribe como día, igual que su planilla', 
   assert.equal(C.cellValue('firstContact', '2026-11-03 09:10', turnia), '2026-11-03 09:10');
   assert.equal(C.cellValue('stage', 'contactado', habita), 'Enviado');
 });
+
+test('planillas reales: columnas de habita. y estados de la app de Turnia', () => {
+  const habitaHead = ['Prioridad', 'Score Habita /100', 'Inmobiliaria', 'SDR', 'Quién decide', 'Abrir WhatsApp', 'Número (sin 0 ni 15)', 'Confianza del número', 'Fuente del número', 'Estado', 'Fecha envío', 'Notas', 'Propiedades publicadas (Argenprop)', 'Avisos vistos en muestra', 'Pts contacto /20', 'Pts decisión /15', 'Pts cartera /25', 'Pts encaje /40', 'Dirección', 'Zona', 'Web', 'Instagram', 'Email', 'Perfil Argenprop', 'Otros teléfonos', 'Grupo Habita', 'Motivo / próximo paso'];
+  const m = C.mapHeaders(habitaHead);
+  assert.equal(m.phone, 6);
+  assert.equal(m.score, 1);
+  assert.equal(m.segment, 25);
+  assert.equal(m.signals, 26, 'la nota de investigación no es el próximo paso del panel');
+  assert.equal(m.nextStep, undefined);
+  const { accounts } = C.toAccounts([
+    ['Código', 'Nombre', 'Teléfono', 'De quién es el teléfono', 'Estado', 'Mensajes', 'Saludo enviado', 'Primer contacto'],
+    ['a', 'Ana', '2231', 'Celular de la persona', 'Contactado', '0', '2026-11-02 21:24', '2026-11-02 21:24'],
+    ['b', 'Beto', '2232', 'Celular del consultorio', 'Contactado', '1', '2026-11-02 21:24', '2026-11-02 21:24'],
+    ['c', 'Caro', '2233', 'Fijo', 'Sin WhatsApp', '0', '', ''],
+  ], turnia);
+  assert.deepEqual(accounts.map((a) => a.stage), ['saludado', 'contactado', 'invalido']);
+  assert.deepEqual(accounts.map((a) => a.phoneKind), ['celular', 'compartido', 'fijo']);
+});

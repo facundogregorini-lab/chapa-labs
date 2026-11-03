@@ -19,10 +19,17 @@
     color: 's3',
     sheetEnv: 'TURNIA_PROSPECTING_SHEET_ID',
     tabEnv: 'TURNIA_PROSPECTING_TAB',
-    tab: 'Prospectos',
-    // La planilla que Turnia ya escribe sola (espejo de su panel): se lee para traer
-    // «Abrió su demo», «Probó la demo» y el link de cada uno, sin escribirla nunca.
+    // La planilla que escribe la app de Turnia (espejo de su panel: se reescribe entera con
+    // cada cambio). Por eso es de solo lectura: lo que se escribiera acá se perdería. Se opera
+    // en el panel de Turnia, que tiene WhatsApp, las demos y su seguimiento.
+    tab: 'Prospección',
+    readOnly: true,
+    appUrl: 'https://turniasalud.vercel.app/panel/prospeccion',
+    appName: 'el panel de Turnia',
+    // Para cuando el panel escriba en una planilla propia: trae las señales de la app.
     signals: { env: 'TURNIA_SIGNALS_SHEET_ID', tab: 'Prospección', fields: ['demoOpened', 'demoTried', 'demoUrl'] },
+    // En la planilla de Turnia, «Contactado» sin mensajes y con el saludo enviado es «saludado».
+    enrich: (a) => (a.stage === 'contactado' && !a.touches && a.greetingSent ? Object.assign(a, { stage: 'saludado' }) : a),
     metricsKey: 'turnia',
     dashboardHash: '#turnia',
     entity: { one: 'odontólogo', many: 'odontólogos', org: 'Consultorio' },
@@ -145,7 +152,7 @@
       ['Ya hacemos home staging', 'Para las propiedades vacías que no lo justifican: en segundos y sin mover un mueble.'],
       ['No tengo tiempo', 'La demo ya está armada con tus avisos: son dos minutos para verla.'],
     ],
-    dims: [['sdr', 'SDR'], ['campaign', 'Campaña'], ['zone', 'Zona'], ['priority', 'Prioridad'], ['lastChannel', 'Canal']],
+    dims: [['sdr', 'SDR'], ['segment', 'Grupo'], ['zone', 'Zona'], ['campaign', 'Campaña'], ['lastChannel', 'Canal']],
     stageNames: {
       por_contactar: 'Pendiente', saludado: 'Saludado', contactado: 'Enviado', respondio: 'Respondió', interesado: 'Interesado',
       reunion: 'Reunión', cliente: 'Cliente', perdido: 'No interesado', invalido: 'Número incorrecto', baja: 'Baja',

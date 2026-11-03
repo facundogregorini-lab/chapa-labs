@@ -194,14 +194,14 @@
     renderTop();
     if (!state.session) return;
     const s = state.session;
-    if (!state.demo && (!s.auth || !s.google)) { main.innerHTML = setupScreen(); return after(); }
+    if (!state.demo && !s.google) { main.innerHTML = setupScreen(); return after(); }
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
     if (state.unit === 'todas') main.innerHTML = renderOverview();
     else {
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + ({ hoy: renderToday, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
@@ -209,6 +209,15 @@
     window.LiquidGlass && window.LiquidGlass.scan();
     requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb));
     bindCharts();
+  }
+
+  // Unidades cuya planilla escribe su propia app (Turnia): acá se mira y se mide; se opera allá.
+  const isReadOnly = (id) => { const u = unitOf(id); return Boolean(u && u.readOnly && !state.demo); };
+  function readOnlyBanner(id) {
+    if (!isReadOnly(id)) return '';
+    const u = unitOf(id);
+    const d = state.data[id];
+    return `<div class="notice glass"><span class="badge live">Se actualiza sola</span><span>La planilla de ${esc(u.name)} la escribe ${esc(u.appName)} con cada cambio${d && d.readAt ? ` · leída ${esc(when(C.nowLocal(new Date(d.readAt))))}` : ''}. Acá se mira y se mide; para contactar, abrí el panel.</span><a class="btn small primary" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a></div>`;
   }
 
   function demoBanner() {
@@ -225,7 +234,7 @@
       <h1 id="setup-title">Falta conectar las planillas</h1>
       <p class="sub">El panel lee y escribe la planilla de Google de cada unidad. Se configura una vez en Vercel (proyecto chapa-labs):</p>
       <ul style="margin:0;padding:0;list-style:none;display:grid;gap:6px">
-        ${item(s.auth, '<code>PROSPECTING_PASSWORD</code>: la contraseña del equipo.')}
+        ${item(s.auth, '<code>PROSPECTING_PASSWORD</code>: la contraseña del equipo (opcional: sin ella, cualquiera con el link entra).')}
         ${item(s.google, '<code>GOOGLE_SERVICE_ACCOUNT_JSON</code>: la clave de la cuenta de servicio.')}
         ${s.units.map((u) => item(u.sheet, `<code>${esc(u.sheetEnv)}</code>: la planilla de ${esc(unitOf(u.id).name.replace(/\.$/, ''))}.`)).join('')}
       </ul>
@@ -241,7 +250,7 @@
       <h1 id="login-title">Entrar a Prospección</h1>
       <p class="sub">Tu nombre queda en cada contacto que registres.</p>
       <label class="field">Tu nombre<input name="name" autocomplete="nickname" required value="${esc(last)}"></label>
-      <label class="field">Contraseña del equipo<input name="password" type="password" autocomplete="current-password" required></label>
+      ${state.session.auth ? '<label class="field">Contraseña del equipo<input name="password" type="password" autocomplete="current-password" required></label>' : ''}
       <p class="sub" id="login-error" role="alert"></p>
       <button class="btn primary" type="submit">Entrar</button>
       <button class="btn ghost" type="button" data-action="demo">Ver con datos de ejemplo</button>
@@ -483,12 +492,16 @@
     const next = C.nextTemplate(a, u);
     const tpl = next && templatesOf(u.id)[next.key];
     let action = '';
+    if (isReadOnly(u.id)) return accountRowHtml(a, u, `<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Panel</a>`);
     if (block === 'conversations') action = a.phone ? `<button type="button" class="btn small" data-chat="${esc(a.id)}">${icon.wa} Abrir chat</button>` : '';
     else if (next && tpl && (next.channel === 'whatsapp' || next.channel === 'email' || next.channel === 'instagram')) {
       action = `<button type="button" class="btn small primary" data-send="${esc(a.id)}" data-key="${esc(next.key)}">${next.channel === 'email' ? icon.mail : next.channel === 'instagram' ? icon.ig : icon.wa} ${esc(tpl.title)}</button>`;
     }
+    return accountRowHtml(a, u, action);
+  }
+  function accountRowHtml(a, u, action) {
     return `<div class="arow" data-open-account="${esc(a.id)}" tabindex="0" role="button" aria-label="Abrir la ficha de ${esc(a.name)}">
-      <div class="who"><strong>${esc(a.name)}</strong><div class="meta">${a.org && a.org !== a.name ? `<span>${esc(a.org)}</span>·` : ''}<span>${esc(a.zone || 'Sin zona')}</span>${a.priority ? `<span>· P${a.priority}</span>` : ''}${stagePill(a, u)}${a.touches ? `<span>${int(a.touches)} msj.</span>` : ''}${a.lastContact ? `<span>últ. ${esc(when(a.lastContact))}</span>` : ''}${signals(a)}</div></div>
+      <div class="who"><strong>${esc(a.name)}</strong><div class="meta">${a.org && a.org !== a.name ? `<span>${esc(a.org)}</span>·` : ''}<span>${esc(a.zone || 'Sin zona')}</span>${a.priority && a.priority <= 5 ? `<span>· P${a.priority}</span>` : ''}${stagePill(a, u)}${a.touches ? `<span>${int(a.touches)} msj.</span>` : ''}${a.lastContact ? `<span>últ. ${esc(when(a.lastContact))}</span>` : ''}${signals(a)}</div></div>
       <div class="acts">${action}</div></div>`;
   }
 
@@ -532,7 +545,7 @@
   }
   function sheetWarnings(id) {
     const s = state.data[id].sheet;
-    if (!s || state.demo) return '';
+    if (!s || state.demo || isReadOnly(id)) return '';
     if (s.missingTab) return `<div class="notice glass"><strong>La planilla no tiene la pestaña «${esc(s.tab)}».</strong><button class="btn small primary" type="button" data-action="setup">Preparar la planilla</button></div>`;
     if (s.missingColumns && s.missingColumns.length) return `<div class="notice glass"><span>Faltan columnas que el panel completa (${esc(s.missingColumns.join(', '))}). Se agregan solas al primer cambio, o ahora:</span><button class="btn small" type="button" data-action="setup">Preparar la planilla</button></div>`;
     return '';
@@ -640,7 +653,8 @@
       <div class="drawer-body">
         ${a.optOut || a.stage === 'baja' ? `<div class="notice glass"><strong>Pidió no recibir más.</strong> No se le escribe por ningún canal.</div>` : ''}
         ${a.nextStep || a.nextAt ? `<div class="section"><h3>Próximo paso</h3><div><strong>${esc(a.nextStep || 'Seguimiento')}</strong>${a.nextAt ? ` · ${esc(when(a.nextAt))}` : ''}</div></div>` : ''}
-        ${C.canMessage(a, u) || a.instagram ? `<div class="section"><h3>Mensaje</h3>
+        ${isReadOnly(state.unit) ? `<div class="section"><h3>Contactar</h3><p class="sub" style="margin:0">${esc(u.name)} se opera en ${esc(u.appName)}: ahí está su WhatsApp, su demo y el seguimiento. Lo que hagas allá aparece acá solo.</p><div class="btns"><a class="btn primary" href="${esc(u.appUrl)}" target="_blank" rel="noopener" data-autofocus>${icon.ext} Abrir ${esc(u.appName)}</a></div></div>` : ''}
+        ${!isReadOnly(state.unit) && (C.canMessage(a, u) || a.instagram) ? `<div class="section"><h3>Mensaje</h3>
           <label class="field">Plantilla<select data-tpl>${Object.entries(tpls).map(([k, x]) => `<option value="${esc(k)}" ${k === key ? 'selected' : ''}>${esc(x.title)}${next && next.key === k ? ' · sugerida' : ''}</option>`).join('')}</select></label>
           ${t.hint ? `<p class="sub" style="margin:0">${esc(t.hint)}</p>` : ''}
           <label class="field"><span class="sr">Texto</span><textarea data-text rows="6">${esc(text)}</textarea></label>
@@ -652,7 +666,7 @@
             <button class="btn" type="button" data-action="copy">${icon.copy} Copiar</button>
           </div>
           <p class="sub" style="margin:0">Abrir el chat no cuenta como contacto: después te preguntamos si salió.</p></div>` : ''}
-        <div class="section"><h3>Qué pasó</h3>
+        ${isReadOnly(state.unit) ? '' : `<div class="section"><h3>Qué pasó</h3>
           <div class="btns">
             ${a.phone ? `<button class="btn small" type="button" data-log="call">${icon.phone} Llamé</button>` : ''}
             <button class="btn small" type="button" data-log="visit">Lo visité</button>
@@ -673,7 +687,7 @@
         </div>
         <div class="section"><h3>Agendar</h3>
           <div class="btns" style="align-items:flex-end"><label class="field" style="flex:1 1 140px">Fecha<input type="date" data-next-at value="${esc(C.dayOf(a.nextAt))}"></label><label class="field" style="flex:2 1 180px">Qué hacer<input data-next-step value="${esc(a.nextStep)}"></label><button class="btn small" type="button" data-action="schedule">Guardar</button></div>
-        </div>
+        </div>`}
         <div class="section"><h3>Datos</h3>
           <dl class="facts">
             ${a.org && a.org !== a.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(a.org)}</dd>` : ''}
@@ -694,19 +708,19 @@
             <a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(`${a.org || a.name} ${a.zone || ''}`)}">Buscar en Google</a>
             ${!a.instagram ? `<a class="btn small" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(`site:instagram.com ${a.org || a.name} ${a.zone || ''}`)}">Buscar su Instagram</a>` : ''}
           </div>
-          <details><summary class="sub" style="cursor:pointer">Editar datos</summary>
+          ${isReadOnly(state.unit) ? '' : `<details><summary class="sub" style="cursor:pointer">Editar datos</summary>
             <form class="grid" data-edit style="margin-top:10px;gap:8px">
               ${[['name', 'Nombre'], ['org', u.entity.org], ['greeting', 'Saludo (nombre de pila)'], ['phone', 'Teléfono'], ['email', 'Email'], ['instagram', 'Instagram'], ['web', 'Web'], ['zone', 'Zona'], ['sdr', 'SDR'], ['demoUrl', 'Link de su demo']].map(([k, l]) => `<label class="field">${esc(l)}<input name="${k}" value="${esc(a[k] || '')}"></label>`).join('')}
               <label class="field">De quién es el teléfono<select name="phoneKind">${[['', 'Sin dato'], ['celular', 'Celular de la persona (verificado)'], ['compartido', 'Del consultorio u oficina'], ['fijo', 'Fijo'], ['revisar', 'Por revisar']].map(([v, l]) => `<option value="${v}" ${a.phoneKind === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
               <button class="btn small" type="submit">Guardar datos</button>
-            </form></details>
+            </form></details>`}
         </div>
         <div class="section"><h3>Notas</h3>
           ${a.notes ? `<p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(a.notes)}</p>` : ''}
-          <form class="btns" data-note><input class="input" name="note" placeholder="Agregar una nota" style="flex:1 1 200px" aria-label="Nueva nota"><button class="btn small" type="submit">Agregar</button></form>
+          ${isReadOnly(state.unit) ? (a.notes ? '' : '<p class="sub" style="margin:0">Sin notas.</p>') : '<form class="btns" data-note><input class="input" name="note" placeholder="Agregar una nota" style="flex:1 1 200px" aria-label="Nueva nota"><button class="btn small" type="submit">Agregar</button></form>'}
         </div>
         <div class="section"><h3>Historia</h3>
-          ${events.length ? `<ul class="history">${events.map((e) => `<li><time>${esc(when(e.at))}</time><span><strong>${esc(eventLabel(e, u))}</strong>${e.detail ? ` · ${esc(e.detail)}` : ''}${e.by ? ` <span class="sub">· ${esc(e.by)}</span>` : ''}</span></li>`).join('')}</ul>` : '<p class="sub" style="margin:0">Sin actividad registrada desde el panel.</p>'}
+          ${events.length ? `<ul class="history">${events.map((e) => `<li><time>${esc(when(e.at))}</time><span><strong>${esc(eventLabel(e, u))}</strong>${e.detail ? ` · ${esc(e.detail)}` : ''}${e.by ? ` <span class="sub">· ${esc(e.by)}</span>` : ''}</span></li>`).join('')}</ul>` : `<p class="sub" style="margin:0">${isReadOnly(state.unit) ? `El historial completo está en ${esc(u.appName)}.` : 'Sin actividad registrada desde el panel.'}</p>`}
         </div>
       </div>`;
     window.LiquidGlass && window.LiquidGlass.scan();
