@@ -1006,6 +1006,15 @@
     render();
   });
 
+  // Foto de fondo: si está prospecting/fondo.jpg, se usa; si no, queda la luz de color.
+  const photo = new Image();
+  photo.onload = () => {
+    const el = document.querySelector('.ambient .photo');
+    if (el) el.style.backgroundImage = `url(${photo.src})`;
+    document.documentElement.classList.add('has-photo');
+  };
+  photo.src = '/prospecting/fondo.jpg';
+
   // Tema compartido con el tablero.
   const root = document.documentElement;
   try { const saved = localStorage.getItem('chapa-theme'); if (saved) root.dataset.theme = saved; } catch { /* sin storage */ }
