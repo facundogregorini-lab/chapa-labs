@@ -113,10 +113,10 @@
     targets: [
       { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
       { key: 'demos', label: 'Demos enviadas', rate: 0.15, sheet: (a) => a.touches >= 1 },
-      { key: 'visitadas', label: 'Visitadas', hint: 'Clínicas de demo creadas', rate: 0.65, sheet: (a) => Boolean(a.demoClinic || a.demoTried) },
-      { key: 'interaccion', label: 'Con interacción', hint: 'Clínicas de demo con conversación', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
-      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Clínicas reales (no demo), total', rate: 0.5, metrics: 'uso.clinicas' },
-      { key: 'activas', label: 'Cuentas activas', hint: 'Con turnos en 30 días', rate: 0.5, metrics: 'uso.clinicas_activas' },
+      { key: 'visitadas', label: 'Visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
+      { key: 'interaccion', label: 'Con interacción', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Clínicas con acceso real (no demo), total de Turnia', rate: 0.5, metrics: 'uso.clinicas' },
+      { key: 'activas', label: 'Cuentas activas', hint: 'Con turnos en 30 días, total de Turnia', rate: 0.5, metrics: 'uso.clinicas_activas' },
       { key: 'pagos', label: 'Clientes pagos', hint: 'Marcados «Cliente»', rate: 0.25, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
     ],
     // Lo que sigue al embudo comercial, desde /api/metricas de Turnia (totales, sin datos personales).

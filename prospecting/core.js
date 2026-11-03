@@ -332,7 +332,10 @@
         let actual = null;
         let source = 'none';
         if (s.sheet) {
-          actual = (i === 0 ? cohort : cohort).filter(s.sheet).length;
+          // Cada paso incluye a los siguientes (quien conversó en la demo también la visitó): así el
+          // embudo nunca sube aunque una señal se haya registrado sin la anterior.
+          const later = steps.slice(i).filter((x) => x.sheet).map((x) => x.sheet);
+          actual = cohort.filter((a) => later.some((f) => f(a))).length;
           source = 'sheet';
         } else if (s.metrics && metrics) {
           const v = pathGet(metrics, s.metrics);

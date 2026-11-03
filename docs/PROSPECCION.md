@@ -44,6 +44,9 @@ Las etapas son las mismas para todas (`por_contactar`, `saludado`, `contactado`,
 
 ## Liquid glass
 
+Fondo: `prospecting/fondo.jpg`, «St. Moritz on an evening during the winter in Switzerland», de [GoodFreePhotos](https://www.goodfreephotos.com/Free-Stock-Photos/st-moritz-on-an-evening-during-the-winter-in-switzerland.jpg.php) (CC0, dominio público). Para cambiarlo alcanza con reemplazar el archivo; sin archivo queda la luz de color.
+
+
 Investigación (noviembre de 2026):
 
 - [kube.io · Liquid Glass in the browser](https://kube.io/blog/liquid-glass-css-svg/): la técnica de referencia. Refracción real con un mapa de desplazamiento calculado para un bisel convexo y aplicado con `backdrop-filter: url(#filtro)`.
@@ -99,13 +102,13 @@ En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (s
 | --- | --- | --- | --- |
 | Saludos enviados | 250 por semana | Planilla: saludo o primer contacto | Planilla: «Enviado» |
 | Demos enviadas | 15% | Planilla: al menos un mensaje con la demo | App: demos publicadas de las cuentas prospectadas |
-| Visitadas | 65% | Planilla: clínica de la demo creada (o probó la demo) | App: entraron a su demo |
+| Visitadas | 65% | Planilla: abrieron su demo (`/p/…`) | App: entraron a su demo |
 | Con interacción | 50% | Planilla: conversó con Sofi en la demo | App: interactuaron con su demo |
-| Cuentas creadas | 50% | App: clínicas reales (no demo), total | App: crearon o reclamaron su cuenta |
-| Cuentas activas | 50% | App: clínicas con turnos en 30 días | App: primera ambientación propia |
+| Cuentas creadas | 50% | App: clínicas con acceso real (no demo), total de Turnia | App: crearon o reclamaron su cuenta |
+| Cuentas activas | 50% | App: clínicas con turnos en 30 días, total de Turnia | App: primera ambientación propia |
 | Clientes pagos | 25% | Planilla: «Cliente» | App: primer pago aprobado |
 
-Las metas están en `targets` de cada unidad (`prospecting/units.js`). Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su `/api/metricas`. Sin dato, el paso dice «Sin datos».
+Cada paso de la planilla incluye a los siguientes (quien conversó en la demo también cuenta como visita). Las metas están en `targets` de cada unidad (`prospecting/units.js`). Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su `/api/metricas`. Sin dato, el paso dice «Sin datos».
 
 ### Qué se escribe en la planilla
 

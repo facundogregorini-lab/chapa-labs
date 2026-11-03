@@ -241,3 +241,20 @@ test('embudo contra la meta: base por semana, conversión por paso y fuente', ()
   assert.equal(tf.steps[0].onTarget, false);
   assert.deepEqual(tf.steps.map((s) => s.source), ['sheet', 'sheet', 'app', 'none']);
 });
+
+test('embudo contra la meta de Turnia con datos como los de su planilla: visitadas incluye a quienes conversaron', () => {
+  const { turnia } = require('../prospecting/units').UNITS;
+  const a = (o) => ({ firstContact: '2026-11-02 10:00', greetingSent: '2026-11-02 10:00', touches: 1, stage: 'contactado', phoneKind: 'celular', ...o });
+  const accounts = [
+    a({ demoOpened: '2026-11-02 11:00' }),
+    a({ demoOpened: '2026-11-02 11:00', demoTried: '2026-11-02 11:01', demoClinic: '2026-11-02 11:01' }),
+    a({ demoOpened: '2026-11-02 11:00', demoTried: '2026-11-02 11:01', demoClinic: '2026-11-02 11:01', demoChat: '2026-11-02 11:02' }),
+    a({ demoChat: '2026-11-02 11:02' }), // conversó sin que se registrara la apertura: igual cuenta como visita
+    a({ touches: 0 }),
+    a({ touches: 0, stage: 'saludado' }),
+  ];
+  const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03', metrics: { uso: { clinicas: 1, clinicas_activas: 1 } } });
+  const by = Object.fromEntries(tf.steps.map((s) => [s.key, s.actual]));
+  assert.deepEqual(by, { saludos: 6, demos: 4, visitadas: 4, interaccion: 2, cuentas: 1, activas: 1, pagos: 0 });
+  for (let i = 1; i < 4; i++) assert.ok(tf.steps[i].actual <= tf.steps[i - 1].actual, tf.steps[i].key);
+});

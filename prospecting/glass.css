@@ -115,7 +115,7 @@ body[data-unit="habita"] .ambient i:nth-child(3) { background: radial-gradient(c
    Un velo la aclara (u oscurece) lo justo para leer encima; el vidrio la refracta. */
 .ambient .photo { position: absolute; inset: -2%; background: center / cover no-repeat; opacity: 0; transition: opacity 0.8s ease; }
 .has-photo .ambient .photo { opacity: 1; }
-.has-photo .ambient::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(236, 238, 241, 0.62) 55%, rgba(236, 238, 241, 0.82)); }
+.has-photo .ambient::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(246, 247, 249, 0.5), rgba(236, 238, 241, 0.72) 45%, rgba(236, 238, 241, 0.86)); }
 .has-photo .ambient::after, .has-photo .ambient i { display: none; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]).has-photo .ambient::before { background: linear-gradient(180deg, rgba(8, 10, 14, 0.45), rgba(8, 10, 14, 0.72) 55%, rgba(8, 10, 14, 0.86)); }
