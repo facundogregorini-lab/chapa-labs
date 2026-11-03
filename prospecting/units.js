@@ -23,7 +23,9 @@
     // cada cambio). Por eso es de solo lectura: lo que se escribiera acá se perdería. Se opera
     // en el panel de Turnia, que tiene WhatsApp, las demos y su seguimiento.
     tab: 'Prospección',
-    readOnly: true,
+    // Por eso las acciones no se escriben en la planilla: van a la API de Turnia (POST /api/prospeccion),
+    // que aplica las mismas reglas que su panel y vuelve a copiar la planilla. Sin la clave, solo lectura.
+    api: { urlEnv: 'TURNIA_PROSPECTING_API_URL', url: 'https://turniasalud.vercel.app/api/prospeccion', secretEnvs: ['TURNIA_PROSPECTING_SECRET', 'TURNIA_METRICS_SECRET'] },
     appUrl: 'https://turniasalud.vercel.app/panel/prospeccion',
     appName: 'el panel de Turnia',
     // Para cuando el panel escriba en una planilla propia: trae las señales de la app.
@@ -107,6 +109,16 @@
       instagram: { title: 'Instagram', hint: 'Sin link: los pedidos de mensaje con links se filtran.', channel: 'instagram', text: 'Hola {saludo}! Soy Axel, de Turnia. Armé una demo de Sofi con tu consultorio: contesta el WhatsApp cuando estás atendiendo o fuera de horario y da los turnos sola. ¿Te paso el link para probarla? Es un minuto.' },
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
     },
+    // Embudo con metas: la base es por semana; cada paso, la conversión esperada del anterior.
+    targets: [
+      { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
+      { key: 'demos', label: 'Demos enviadas', rate: 0.15, sheet: (a) => a.touches >= 1 },
+      { key: 'visitadas', label: 'Visitadas', hint: 'Clínicas de demo creadas', rate: 0.65, sheet: (a) => Boolean(a.demoClinic || a.demoTried) },
+      { key: 'interaccion', label: 'Con interacción', hint: 'Clínicas de demo con conversación', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Clínicas reales (no demo), total', rate: 0.5, metrics: 'uso.clinicas' },
+      { key: 'activas', label: 'Cuentas activas', hint: 'Con turnos en 30 días', rate: 0.5, metrics: 'uso.clinicas_activas' },
+      { key: 'pagos', label: 'Clientes pagos', hint: 'Marcados «Cliente»', rate: 0.25, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
+    ],
     // Lo que sigue al embudo comercial, desde /api/metricas de Turnia (totales, sin datos personales).
     product: [
       { label: 'Demos de Sofi', path: 'demos.iniciadas', hint: 'Web, WhatsApp o llamada' },
@@ -183,6 +195,15 @@
       email_2: { title: 'Paso 2 · Email', hint: 'Tres días hábiles después.', channel: 'email', subject: 'Re: las propiedades de {inmobiliaria}', text: 'Hola {saludo},\n\nTe reenvío la demo por si quedó abajo de otros mails: {link}\n\n¿Te la muestro en 10 minutos esta semana?\n\nSaludos,\nhabita.' },
       email_3: { title: 'Paso 3 · Email', hint: 'Último paso.', channel: 'email', subject: '¿Lo dejamos acá?', text: 'Hola {saludo},\n\nÚltimo mail, prometido. ¿Te muestro la demo en 10 minutos o lo dejamos acá?\n\nSaludos,\nhabita.' },
     },
+    targets: [
+      { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.firstContact) || a.stage !== 'por_contactar' && a.stage !== 'invalido' && a.stage !== 'baja' },
+      { key: 'demos', label: 'Demos enviadas', hint: 'Demos publicadas de las cuentas prospectadas', rate: 0.15, metrics: 'prospeccion.demos.sent' },
+      { key: 'visitadas', label: 'Visitadas', hint: 'Entraron a su demo', rate: 0.65, metrics: 'prospeccion.demos.entered' },
+      { key: 'interaccion', label: 'Con interacción', hint: 'Interactuaron con su demo', rate: 0.5, metrics: 'prospeccion.demos.interacted' },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta', rate: 0.5, metrics: 'prospeccion.vinculados' },
+      { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia', rate: 0.5, metrics: 'prospeccion.activados' },
+      { key: 'pagos', label: 'Clientes pagos', hint: 'Primer pago aprobado', rate: 0.25, metrics: 'prospeccion.clientes' },
+    ],
     product: [
       { label: 'Demos publicadas', path: 'demos.publicadas' },
       { label: 'Vinculadas', path: 'prospeccion.vinculados', hint: 'Crearon o reclamaron su cuenta' },

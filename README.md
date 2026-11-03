@@ -4,7 +4,7 @@ Dashboard ejecutivo de los proyectos que llevamos adelante con Axel: **Maru Coac
 
 ## Prospección (`/prospecting`)
 
-La operación comercial de Turnia y habita. en un solo panel: un motor común (cola del día, embudo, cuentas, mensajes) y encima el foco de cada unidad (ICP, propuesta, plantillas, cadencia). Lee y escribe la planilla de Google de cada una y suma lo que pasa en el producto desde `/api/metricas`. Interfaz liquid glass. Turnia se lee de la planilla que escribe su app (solo lectura); habita. se lee y se escribe. Login opcional con `PROSPECTING_PASSWORD`. Puesta en marcha, cómo se mide y cómo sumar una unidad: [`docs/PROSPECCION.md`](docs/PROSPECCION.md). `npm test` corre sus pruebas.
+La operación comercial de Turnia y habita. en un solo panel: un motor común (cola del día, embudo, cuentas, mensajes) y encima el foco de cada unidad (ICP, propuesta, plantillas, cadencia). Lee y escribe la planilla de Google de cada una y suma lo que pasa en el producto desde `/api/metricas`. Interfaz liquid glass. Turnia se lee de la planilla que escribe su app y se opera por la API de Turnia; habita. se lee y se escribe en su planilla. Embudo de cada unidad contra la meta. Login opcional con `PROSPECTING_PASSWORD`. Puesta en marcha, cómo se mide y cómo sumar una unidad: [`docs/PROSPECCION.md`](docs/PROSPECCION.md). `npm test` corre sus pruebas.
 
 ## De dónde salen los datos
 

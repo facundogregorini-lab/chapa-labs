@@ -45,6 +45,8 @@
     ['demoUrl', 'Demo', /^(demo|link de su demo|link demo|link de la demo)$/i],
     ['demoOpened', 'Abrió la demo', /^abri[oó] (su |la )?demo/i],
     ['demoTried', 'Probó la demo', /^prob[oó] (su |la )?demo/i],
+    ['demoClinic', 'Clínica de la demo', /^cl[ií]nica de (su |la )?demo/i],
+    ['demoChat', 'Conversó en la demo', /^convers[oó] en (su |la )?demo/i],
     ['replied', 'Respondió', /^respondi[oó]$/i],
     ['interested', 'Interesado', /^interesad[oa]$/i],
     ['meeting', 'Reunión', /^reuni[oó]n$/i],
@@ -174,7 +176,7 @@
       a.stageRaw = a.stage;
       a.stage = stageFromText(a.stage);
       // Fechas o «Sí»; cualquier otro texto en Baja también cuenta como baja.
-      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
+      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
       a.optOut = parseDate(a.optOut) || (a.optOut && !/^(no|false|falso|-)$/i.test(a.optOut) ? 'sí' : '');
       a.touches = Number(String(a.touches).replace(',', '.')) || 0;
       a.score = a.score === '' ? null : Number(String(a.score).replace(',', '.'));
@@ -301,6 +303,50 @@
     }
     return [...groups.entries()].map(([value, list]) => ({ value, ...funnel(list, unit, opts) }))
       .sort((x, y) => y.contactados - x.contactados || y.prospectados - x.prospectados);
+  }
+
+  // ─── Embudo con metas ───────────────────────────────────────
+  // La base (saludos) tiene una meta por semana que se escala al período; cada paso siguiente tiene
+  // una conversión esperada sobre el anterior. Lo real sale de la planilla (cohorte del período) o del
+  // /api/metricas de la app (mismo período). Sin dato, el paso queda «Sin datos» y no se inventa.
+  function periodWeeks(accounts, range, todayDay) {
+    const t = todayDay || today();
+    if (range && range.from) return Math.max(1, daysBetween(range.from, range.to || t) + 1) / 7;
+    const firsts = accounts.map((a) => dayOf(a.firstContact)).filter(Boolean).sort();
+    return firsts.length ? Math.max(1, daysBetween(firsts[0], t) + 1) / 7 : 1;
+  }
+  const pathGet = (obj, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+
+  function targetFunnel(accounts, unit, { range, todayDay, metrics } = {}) {
+    const steps = (unit && unit.targets) || [];
+    if (!steps.length) return null;
+    const base = accounts.filter((a) => counted(a, unit));
+    const cohort = base.filter((a) => (range && (range.from || range.to) ? inRange(dayOf(a.firstContact), range) : true));
+    const weeks = periodWeeks(base, range, todayDay);
+    let target = null;
+    let prevActual = null;
+    return {
+      weeks,
+      steps: steps.map((s, i) => {
+        target = i === 0 ? (s.perWeek || 0) * weeks : target * (s.rate || 0);
+        let actual = null;
+        let source = 'none';
+        if (s.sheet) {
+          actual = (i === 0 ? cohort : cohort).filter(s.sheet).length;
+          source = 'sheet';
+        } else if (s.metrics && metrics) {
+          const v = pathGet(metrics, s.metrics);
+          if (typeof v === 'number') { actual = v; source = 'app'; }
+        }
+        const rate = i === 0 || actual == null || prevActual == null ? null : ratio(actual, prevActual);
+        const out = { key: s.key, label: s.label, hint: s.hint || '', target, targetRate: i === 0 ? null : s.rate, actual, rate, source,
+          // En meta si llega a la cantidad; para la conversión, si la iguala o la supera.
+          onTarget: actual == null ? null : actual >= target - 1e-9,
+          rateOk: rate == null ? null : rate >= s.rate - 1e-9 };
+        prevActual = actual;
+        return out;
+      }),
+    };
   }
 
   // ─── Actividad por día ──────────────────────────────────────
@@ -581,6 +627,6 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, targetFunnel, periodWeeks, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

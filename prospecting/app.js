@@ -94,6 +94,7 @@
   }
 
   async function loadMetrics() {
+    if (state.demo && window.ProspectingFixture) { state.metrics = window.ProspectingFixture.metrics(); return; }
     const r = periodRange();
     const q = r.from ? `?desde=${r.from}&hasta=${r.to}` : '';
     try {
@@ -212,12 +213,12 @@
   }
 
   // Unidades cuya planilla escribe su propia app (Turnia): acá se mira y se mide; se opera allá.
-  const isReadOnly = (id) => { const u = unitOf(id); return Boolean(u && u.readOnly && !state.demo); };
+  const isReadOnly = (id) => { const d = state.data[id]; return Boolean(d && d.readOnly && !state.demo); };
   function readOnlyBanner(id) {
     if (!isReadOnly(id)) return '';
     const u = unitOf(id);
     const d = state.data[id];
-    return `<div class="notice glass"><span class="badge live">Se actualiza sola</span><span>La planilla de ${esc(u.name)} la escribe ${esc(u.appName)} con cada cambio${d && d.readAt ? ` · leída ${esc(when(C.nowLocal(new Date(d.readAt))))}` : ''}. Acá se mira y se mide; para contactar, abrí el panel.</span><a class="btn small primary" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a></div>`;
+    return `<div class="notice glass"><span class="badge off">Solo lectura</span><span>La planilla de ${esc(u.name)} la escribe ${esc(u.appName)}. Para operar desde acá falta la clave de su API en Vercel (${esc((u.api && u.api.secretEnvs.join(' o ')) || '')}); mientras tanto, para contactar, abrí el panel.</span><a class="btn small primary" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a></div>`;
   }
 
   function demoBanner() {
@@ -284,8 +285,7 @@
       }
       return `<button type="button" class="unit-card card glass" data-goto="${u.id}" data-view-to="embudo" aria-label="Ver el embudo de ${esc(u.name)}">
         <div class="card-head" style="margin:0"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)}</span><h2>${int(x.f.clientes)} clientes de ${int(x.f.contactados)} contactados</h2><p class="sub">${esc(u.icp)}</p></div><span class="badge ${state.demo ? 'demo' : 'live'}">${state.demo ? 'Ejemplo' : 'Planilla'}</span></div>
-        ${funnelHtml(x.f, u, { compact: true })}
-        ${productStrip(u)}
+        ${targetHtml(u, state.data[u.id].accounts, { compact: true })}
       </button>`;
     }).join('');
 
@@ -334,6 +334,32 @@
       }).join('')}</div></div>`;
   }
 
+  // Embudo con metas: barra = real, marca = meta. Al lado, la conversión real contra la esperada.
+  function targetHtml(u, accounts, { compact } = {}) {
+    const metrics = state.metrics && state.metrics.projects ? state.metrics.projects[u.metricsKey] : null;
+    const tf = C.targetFunnel(accounts, u, { range: periodRange(), metrics });
+    if (!tf) return '';
+    const num = (v) => (v == null ? '—' : v < 10 && v % 1 ? v.toLocaleString('es-AR', { maximumFractionDigits: 1 }) : int(v));
+    const status = (ok, text) => (ok == null ? '' : `<span class="tstat ${ok ? 'ok' : 'low'}">${ok ? '✓' : '↓'} ${text}</span>`);
+    const src = { sheet: 'Planilla', app: 'App', none: 'Sin datos' };
+    const rows = tf.steps.map((st, i) => {
+      // Cada fila en su escala (la meta de abajo es chica): se ve cuánto falta o cuánto sobra.
+      const max = Math.max(st.target || 0, st.actual || 0, 1e-9) * 1.12;
+      const w = st.actual == null ? 0 : Math.max(st.actual ? 1.5 : 0, (st.actual / max) * 100);
+      const t = Math.min(100, ((st.target || 0) / max) * 100);
+      const conv = i === 0 ? `<span class="sub">meta ${int(Math.round(tf.steps[0].target))}${state.period === 'all' ? ` en ${num(tf.weeks)} sem.` : ''}</span>`
+        : `${pct(st.rate)} <span class="sub">/ ${pct(st.targetRate)}</span> ${compact ? '' : status(st.rateOk, st.rateOk ? 'en meta' : `${Math.round(((st.targetRate || 0) - (st.rate || 0)) * 100)} pts`)}`;
+      return `<div class="trow" role="listitem" aria-label="${esc(st.label)}: ${num(st.actual)} de una meta de ${num(st.target)}">
+        <span class="tname">${esc(st.label)}${!compact && st.hint ? `<small>${esc(st.hint)}</small>` : ''}</span>
+        <span class="ttrack" title="Real ${num(st.actual)} · Meta ${num(st.target)}"><span class="tbar" style="width:${w}%;--c:${color(u)}"></span><span class="tmark" style="left:${t}%"></span></span>
+        <span class="tval num">${st.actual == null ? '<span class="sub">Sin datos</span>' : `${num(st.actual)}<span class="sub"> / ${num(st.target)}</span>`}</span>
+        ${compact ? '' : `<span class="tconv num">${conv}</span><span class="tsrc"><span class="badge plain">${src[st.source]}</span></span>`}
+      </div>`;
+    }).join('');
+    return `<div class="tfunnel${compact ? ' compact' : ''}" role="list">${compact ? '' : '<div class="trow thead" aria-hidden="true"><span>Paso</span><span>Real (barra) contra meta (marca), cada paso en su escala</span><span>Real / meta</span><span>Conversión / meta</span><span>Fuente</span></div>'}${rows}</div>
+      <div class="legend"><span><i style="background:${color(u)}"></i>Real</span><span><i class="mark"></i>Meta del período (${state.period === 'all' ? 'desde el primer contacto' : 'período elegido'}: ${int(u.targets[0].perWeek)} saludos por semana)</span></div>`;
+  }
+
   const kpi = (label, value, foot) => `<div class="kpi"><div class="label">${label}</div><div class="value num">${value}</div>${foot ? `<div class="foot">${foot}</div>` : ''}</div>`;
 
   // ─── Embudo ─────────────────────────────────────────────────
@@ -363,6 +389,7 @@
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Embudo</span><h1>${int(f.contactados)} contactados, ${int(f.respondieron)} respondieron</h1><p>${esc(u.icp)}</p></div>${periodSeg()}</section>
       ${crumbs(id)}
+      <section class="card glass"><div class="card-head"><div><h2>Embudo contra la meta</h2><p class="sub">Saludos: ${int(u.targets[0].perWeek)} por semana. Cada paso, la conversión esperada sobre el anterior. Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su <code>/api/metricas</code>.</p></div></div>${targetHtml(u, list)}</section>
       <section class="card glass"><div class="kpis">
         ${kpi('Prospectados', int(f.prospectados), `${int(f.porContactar)} por contactar con canal`)}
         ${kpi('Contactados', int(f.contactados), state.period === 'all' ? 'Histórico' : 'Primer contacto en el período')}
@@ -675,7 +702,7 @@
             <button class="btn small" type="button" data-outcome="interesado">Interesado</button>
             <button class="btn small" type="button" data-outcome="reunion">Reunión</button>
             <button class="btn small" type="button" data-outcome="cliente">Cliente</button>
-            ${link ? `<button class="btn small" type="button" data-demo="opened">Abrió la demo</button><button class="btn small" type="button" data-demo="tried">Probó la demo</button>` : ''}
+            ${link && !u.api ? `<button class="btn small" type="button" data-demo="opened">Abrió la demo</button><button class="btn small" type="button" data-demo="tried">Probó la demo</button>` : ''}
           </div>
           <div class="btns">
             <button class="btn small ghost" type="button" data-outcome="perdido">${esc(u.stageLabel('perdido'))}</button>

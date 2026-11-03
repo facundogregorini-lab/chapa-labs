@@ -93,13 +93,50 @@ async function appendEvents(sheet, tabs, events) {
   await google.appendRows(sheet.id, core.ACTIVITY_TAB, events.map(core.eventRow));
 }
 
+// Unidades cuya planilla la escribe su app (Turnia): las acciones van a la API de la app.
+function apiOf(unit) {
+  if (!unit.api) return null;
+  const secret = unit.api.secretEnvs.map((k) => (process.env[k] || '').trim()).find((v) => v.length >= 32);
+  return secret ? { url: (process.env[unit.api.urlEnv] || '').trim() || unit.api.url, secret } : null;
+}
+const readOnlyOf = (unit) => Boolean(unit.readOnly || (unit.api && !apiOf(unit)));
+
+async function actionViaApi(res, unit, user, id, action) {
+  const api = apiOf(unit);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  let r;
+  let body;
+  try {
+    r = await fetch(api.url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${api.secret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: id, action, by: user.name }),
+      signal: ctrl.signal,
+    });
+    body = await r.json().catch(() => ({}));
+  } catch (err) {
+    return fail(res, 502, err.name === 'AbortError' ? `${unit.name} no respondió a tiempo.` : `No pudimos hablar con ${unit.name}.`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!r.ok) return fail(res, r.status === 401 ? 502 : r.status, r.status === 401 ? `${unit.name} rechazó la clave: revisá que sea la misma en los dos proyectos.` : body.error || `${unit.name} respondió ${r.status}.`);
+  const { accounts } = core.toAccounts([body.header, body.row], unit);
+  const account = accounts[0];
+  // Para la historia de la ficha (la de Turnia queda en su panel).
+  let events = [];
+  try { events = core.applyAction(account, action, { unit, by: user.name }).events; } catch { /* sin historia */ }
+  return res.status(200).json({ account, events });
+}
+
 async function doAction(req, res, user) {
   const { unit: unitId, id, version, action } = req.body || {};
   const unit = UNITS[unitId];
   const sheet = unit && sheetOf(unit);
   if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
-  if (unit.readOnly) return fail(res, 403, `${unit.name} se opera en ${unit.appName}: su planilla la escribe la app y se actualiza sola.`);
   if (!id || !action || typeof action.type !== 'string') return fail(res, 400, 'Falta la cuenta o la acción.');
+  if (unit.api && apiOf(unit)) return actionViaApi(res, unit, user, id, action);
+  if (readOnlyOf(unit)) return fail(res, 403, `${unit.name} se opera en ${unit.appName}: falta la clave de su API (${unit.api ? unit.api.secretEnvs.join(' o ') : ''}).`);
   const data = await readUnit(unit, sheet);
   if (data.missingTab) return fail(res, 409, `La planilla no tiene la pestaña «${sheet.tab}».`);
   const account = data.accounts.find((a) => a.id === id);
@@ -131,7 +168,7 @@ async function doSetup(req, res, user) {
   const unit = UNITS[(req.body || {}).unit];
   const sheet = unit && sheetOf(unit);
   if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
-  if (unit.readOnly) return fail(res, 403, `La planilla de ${unit.name} es de solo lectura.`);
+  if (unit.readOnly || unit.api) return fail(res, 403, `La planilla de ${unit.name} la escribe su app: no se prepara desde acá.`);
   const meta = await google.tabs(sheet.id);
   const add = [sheet.tab, core.ACTIVITY_TAB, TEMPLATES_TAB].filter((t) => !meta.tabs.includes(t));
   await google.addTabs(sheet.id, add);
@@ -202,7 +239,8 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         unit: unit.id,
         readAt: new Date().toISOString(),
-        readOnly: Boolean(unit.readOnly),
+        readOnly: readOnlyOf(unit),
+        viaApi: Boolean(unit.api && apiOf(unit)),
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts: data.accounts,
         events: data.events.slice(-8000),

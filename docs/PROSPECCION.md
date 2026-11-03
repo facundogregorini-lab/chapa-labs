@@ -78,19 +78,34 @@ Es un «usuario robot» de Google: un email del tipo `chapa-labs@proyecto.iam.gs
 | Unidad | Variable | Planilla | Pestaña | Modo |
 | --- | --- | --- | --- | --- |
 | habita. | `HABITA_PROSPECTING_SHEET_ID` | «Prospecting Habita» | `Prospectos` | Lee y escribe |
-| Turnia | `TURNIA_PROSPECTING_SHEET_ID` | «Turnia · Prospección y pedidos de demo» | `Prospección` | Solo lectura |
+| Turnia | `TURNIA_PROSPECTING_SHEET_ID` | «Turnia · Prospección y pedidos de demo» | `Prospección` | Lee la planilla; escribe por la API de Turnia |
 
 El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel y no acá porque el repo es público. Cada planilla se comparte con el email de la cuenta de servicio (`...@...iam.gserviceaccount.com`): **Editor** la de habita., **Lector** alcanza para la de Turnia. Después, **Redeploy**.
 
 **habita.** El panel reconoce sus columnas (Inmobiliaria, SDR, Número, Confianza del número, Estado, Fecha envío, Grupo Habita…), escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando. «Motivo / próximo paso» (la nota de la investigación) se muestra como señal y no se pisa: el próximo paso del panel va en una columna propia que se agrega al primer cambio. En la vista de la unidad, «Preparar la planilla» agrega las pestañas Actividad y Mensajes.
 
-**Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel (un contacto, un estado, una demo abierta) reescribe la pestaña «Prospección» entera. Por eso:
+**Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel reescribe la pestaña «Prospección» entera. Por eso el panel la **lee** (siempre al día) pero **no la escribe**: cada acción de `/prospecting/turnia` va a la API de Turnia (`POST https://turniasalud.vercel.app/api/prospeccion`), que aplica las mismas reglas que su panel (saludo primero, tres mensajes, la baja para siempre, PostHog) y vuelve a copiar la planilla.
 
-- Siempre está al día con el panel de Turnia, sin hacer nada. Si alguna vez deja de actualizarse, en el panel de Turnia → Prospección → Google Sheets: «Copiar ahora» (o «Reconectar» si Google lo pide; en modo prueba el permiso vence a los 7 días).
-- En `/prospecting/turnia` es de **solo lectura**: se mira, se mide y se filtra, y para contactar se abre el panel de Turnia (que tiene el WhatsApp, las demos `/p/<código>` y su seguimiento). Si el panel escribiera en esta planilla, la próxima copia de Turnia lo borraría.
-- «Contactado» sin mensajes y con «Saludo enviado» se lee como «Saludado» (esperan la demo); «Sin WhatsApp» como número inválido. Los fijos que no respondieron no cuentan, como en el panel de Turnia.
-- Sin pestaña Actividad, el ritmo diario cuenta primeros contactos.
-- Para operar Turnia desde acá hace falta que Turnia acepte las acciones por API (ver Pendiente).
+- La clave: `TURNIA_METRICS_SECRET` en chapa-labs (la misma que `METRICS_SECRET` en Turnia, que ya usa `/api/metricas`). Si se quiere una clave aparte para escribir: `TURNIA_PROSPECTING_SECRET` acá y `PROSPECTING_API_SECRET` en Turnia. Otra URL: `TURNIA_PROSPECTING_API_URL`.
+- Sin clave, Turnia queda en solo lectura y la ficha lleva al panel de Turnia.
+- «Contactado» sin mensajes y con «Saludo enviado» se lee como «Saludado» (esperan la demo); «Sin WhatsApp» como número inválido. «Interesado» se guarda en Turnia como «Respondió» con el detalle. Abrir o probar la demo lo registra Turnia sola.
+- La historia completa de cada persona queda en el panel de Turnia (acá no hay pestaña Actividad).
+
+### Embudo contra la meta
+
+En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (se escala al período; en «Histórico», desde el primer contacto). Cada paso tiene la conversión esperada sobre el anterior:
+
+| Paso | Meta | Turnia | habita. |
+| --- | --- | --- | --- |
+| Saludos enviados | 250 por semana | Planilla: saludo o primer contacto | Planilla: «Enviado» |
+| Demos enviadas | 15% | Planilla: al menos un mensaje con la demo | App: demos publicadas de las cuentas prospectadas |
+| Visitadas | 65% | Planilla: clínica de la demo creada (o probó la demo) | App: entraron a su demo |
+| Con interacción | 50% | Planilla: conversó con Sofi en la demo | App: interactuaron con su demo |
+| Cuentas creadas | 50% | App: clínicas reales (no demo), total | App: crearon o reclamaron su cuenta |
+| Cuentas activas | 50% | App: clínicas con turnos en 30 días | App: primera ambientación propia |
+| Clientes pagos | 25% | Planilla: «Cliente» | App: primer pago aprobado |
+
+Las metas están en `targets` de cada unidad (`prospecting/units.js`). Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su `/api/metricas`. Sin dato, el paso dice «Sin datos».
 
 ### Qué se escribe en la planilla
 
@@ -110,7 +125,6 @@ El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel
 ## Pendiente
 
 - Probar en vivo con las dos planillas reales (se probó con planillas simuladas con sus mismas columnas y con el modo de ejemplo).
-- **Operar Turnia desde acá:** un `POST /api/prospeccion` en Turnia (con clave, como `/api/metricas`) que reciba las mismas acciones (contacto confirmado, estado, nota, próximo paso). El panel las mandaría ahí en vez de a la planilla, y la planilla seguiría siendo el espejo.
 - Señales de demo de habita. por cuenta (hoy su `/api/metricas` da solo totales): un endpoint por cuenta en amoblaia, o que su panel escriba «Abrió la demo» en la planilla.
 - Leer respuestas solas desde WAHA (Turnia) para no tener que marcar «Respondió» a mano.
 - Pasar de la planilla a una base cuando el volumen lo pida: el motor no cambia, solo `api/prospecting.js`.

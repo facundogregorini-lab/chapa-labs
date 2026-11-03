@@ -219,7 +219,7 @@ body[data-unit="habita"] .ambient i:nth-child(3) { background: radial-gradient(c
 select.input { padding-right: 28px; }
 
 /* ─── Estructura ─────────────────────────────────────────── */
-main { width: min(1240px, calc(100% - 20px)); margin: 18px auto 80px; display: grid; gap: 16px; }
+main { width: min(1240px, calc(100% - 20px)); margin: 18px auto 80px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .card { padding: 20px; }
 .card h2, .card h3 { margin: 0; letter-spacing: -0.015em; }
 .card h2 { font-size: 18px; }
@@ -392,4 +392,30 @@ tr.click:hover td { background: var(--glass-soft); }
   .arow { grid-template-columns: 1fr; }
   .arow .acts { justify-content: flex-start; }
   .kpi .value { font-size: 24px; }
+}
+
+/* ─── Embudo contra la meta (bullet) ─────────────────────── */
+.tfunnel { display: grid; gap: 4px; min-width: 0; }
+.trow > * { min-width: 0; }
+.trow { display: grid; grid-template-columns: minmax(130px, 190px) minmax(120px, 1fr) 110px 150px 80px; gap: 12px; align-items: center; padding: 6px; border-radius: 12px; }
+.tfunnel.compact .trow { grid-template-columns: minmax(110px, 150px) 1fr 90px; padding: 3px 6px; }
+.trow.thead { font-size: 12px; color: var(--muted); font-weight: 600; padding-bottom: 0; }
+.tname { font-weight: 600; font-size: 14px; display: grid; }
+.tname small { font-weight: 500; font-size: 12px; color: var(--muted); }
+.ttrack { position: relative; height: 22px; border-radius: 4px 8px 8px 4px; background: var(--glass-soft); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.tbar { position: absolute; left: 0; top: 3px; bottom: 3px; border-radius: 3px 6px 6px 3px; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 78%, white)); transition: width 0.6s cubic-bezier(0.2, 0.9, 0.2, 1); }
+.tmark { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--glass-strong); }
+.tval { text-align: right; font-weight: 700; }
+.tconv { font-size: 13px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.tstat { font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--glass-soft); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.tstat.ok { color: var(--good-text); }
+.tstat.low { color: var(--bad-text); }
+.legend i.mark { width: 3px; height: 12px; border-radius: 2px; background: var(--ink); vertical-align: -2px; }
+@media (max-width: 760px) {
+  .trow { grid-template-columns: 1fr 90px; }
+  .trow .ttrack { grid-column: 1 / -1; order: 3; }
+  .trow .tconv { grid-column: 1; order: 4; }
+  .trow .tsrc { order: 5; text-align: right; }
+  .trow.thead { display: none; }
+  .tfunnel.compact .trow { grid-template-columns: 1fr 80px; }
 }

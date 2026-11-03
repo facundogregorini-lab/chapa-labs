@@ -141,3 +141,36 @@ test('unidad sin planilla configurada', async () => {
   assert.equal(r.statusCode, 503);
   assert.equal(r.body.code, 'NO_SHEET');
 });
+
+test('Turnia con la clave: las acciones van a su API y vuelve la fila nueva', async () => {
+  process.env.TURNIA_PROSPECTING_SHEET_ID = 'sheet-turnia';
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  book.tabs['Prospección'] = [['Código', 'Nombre', 'Estado', 'Mensajes'], ['ana-111', 'Ana', 'Por contactar', '0']];
+  const realFetch = global.fetch;
+  let sent = null;
+  global.fetch = async (url, opts) => {
+    sent = { url: String(url), auth: opts.headers.Authorization, body: JSON.parse(opts.body) };
+    return { ok: true, status: 200, json: async () => ({ header: ['Código', 'Nombre', 'Estado', 'Mensajes', 'Saludo enviado'], row: ['ana-111', 'Ana', 'Contactado', 0, '2026-11-03 10:00'] }) };
+  };
+  try {
+    const data = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.equal(data.body.readOnly, false);
+    assert.equal(data.body.viaApi, true);
+    const r = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'ana-111', action: { type: 'sent', channel: 'whatsapp', kind: 'saludo' } } });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.equal(sent.url, 'https://turniasalud.vercel.app/api/prospeccion');
+    assert.equal(sent.auth, `Bearer ${'s'.repeat(40)}`);
+    assert.deepEqual(sent.body.action, { type: 'sent', channel: 'whatsapp', kind: 'saludo' });
+    assert.equal(sent.body.code, 'ana-111');
+    assert.equal(r.body.account.stage, 'saludado');
+    // La planilla de Turnia no se toca: la escribe su app.
+    assert.equal(book.tabs['Prospección'][1][2], 'Por contactar');
+    global.fetch = async () => ({ ok: false, status: 422, json: async () => ({ error: 'Ya le escribiste tres veces.' }) });
+    const no = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'ana-111', action: { type: 'sent' } } });
+    assert.equal(no.statusCode, 422);
+    assert.equal(no.body.error, 'Ya le escribiste tres veces.');
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});

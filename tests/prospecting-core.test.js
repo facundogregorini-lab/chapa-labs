@@ -219,3 +219,25 @@ test('credenciales de Google: JSON entero, o solo la clave con el email aparte',
   delete require.cache[file];
   for (const k of ['GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SERVICE_ACCOUNT_EMAIL']) delete process.env[k];
 });
+
+test('embudo contra la meta: base por semana, conversión por paso y fuente', () => {
+  const unit = { targets: [
+    { key: 'saludos', perWeek: 250, sheet: (a) => Boolean(a.firstContact) },
+    { key: 'demos', rate: 0.15, sheet: (a) => a.touches >= 1 },
+    { key: 'cuentas', rate: 0.5, metrics: 'uso.clinicas' },
+    { key: 'pagos', rate: 0.25, metrics: 'nada.aca' },
+  ] };
+  const accounts = [
+    { id: 'a', firstContact: '2026-11-02 10:00', touches: 1, stage: 'contactado' },
+    { id: 'b', firstContact: '2026-11-03 10:00', touches: 0, stage: 'saludado' },
+    { id: 'c', firstContact: '', touches: 0, stage: 'por_contactar' },
+  ];
+  const tf = C.targetFunnel(accounts, unit, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03', metrics: { uso: { clinicas: 3 } } });
+  assert.equal(tf.weeks, 1);
+  assert.deepEqual(tf.steps.map((s) => s.actual), [2, 1, 3, null]);
+  assert.deepEqual(tf.steps.map((s) => Math.round(s.target * 100) / 100), [250, 37.5, 18.75, 4.69]);
+  assert.equal(tf.steps[1].rate, 0.5);
+  assert.equal(tf.steps[1].rateOk, true);
+  assert.equal(tf.steps[0].onTarget, false);
+  assert.deepEqual(tf.steps.map((s) => s.source), ['sheet', 'sheet', 'app', 'none']);
+});

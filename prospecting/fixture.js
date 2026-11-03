@@ -79,7 +79,7 @@
         a.touches = s;
         a.lastContact = at(day, 10);
         a.stage = 'contactado';
-        if (unit.id === 'turnia' && r() < 0.32) { a.demoOpened = at(day, 12); events.push({ at: a.demoOpened, id, account: a.name, type: 'abrio_demo', by: '' }); if (r() < 0.4) a.demoTried = at(day, 13); }
+        if (unit.id === 'turnia' && r() < 0.32) { a.demoOpened = at(day, 12); events.push({ at: a.demoOpened, id, account: a.name, type: 'abrio_demo', by: '' }); if (r() < 0.4) { a.demoTried = at(day, 13); a.demoClinic = a.demoTried; if (r() < 0.6) a.demoChat = at(day, 14); } }
         if (r() < (unit.id === 'turnia' ? 0.12 : 0.09)) { replied = true; break; }
         day = C.addBusinessDays(day, unit.cadence[Math.min(s - 1, unit.cadence.length - 1)]);
       }
@@ -112,5 +112,14 @@
     };
   }
 
-  window.ProspectingFixture = { build };
+  // Métricas de la app, de ejemplo (las de verdad salen de /api/metricas de cada una).
+  const metrics = () => ({
+    projects: {
+      turnia: { uso: { clinicas: 2, clinicas_activas: 1 }, demos: { iniciadas: 31 }, pedidos: { pedidos: 6 } },
+      'amobla-ia': { prospeccion: { vinculados: 4, activados: 2, clientes: 1, demos: { sent: 19, entered: 13, interacted: 7 } }, demos: { publicadas: 22 }, ingresos: { ingresos: 54000 } },
+    },
+    errors: {},
+  });
+
+  window.ProspectingFixture = { build, metrics };
 })();
