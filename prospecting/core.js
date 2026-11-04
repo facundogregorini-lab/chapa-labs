@@ -490,6 +490,78 @@
     };
   }
 
+  // ─── Envíos hechos fuera del panel, en lote ─────────────────
+  // Lee una lista pegada (tabla Markdown o «número | demo | seguimiento») y arma qué pasos falta
+  // registrar a cada persona: saludo (0), demo (1) y seguimiento (2). Busca por número (los últimos
+  // 10 dígitos) y, si no hay número, por nombre o consultorio.
+  const YES = /^(s[ií]|si|x|ok|✓|true|yes)$/i;
+  function parseBulk(text) {
+    const out = [];
+    for (const raw of String(text || '').split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line || /^\|?\s*:?-{3,}/.test(line) || /n[uú]mero|chat\s*\|/i.test(line) && /demo/i.test(line) && /seguimiento/i.test(line)) continue;
+      let cells = line.includes('|') ? line.split('|').map((c) => c.trim()).filter((c, i, arr) => !(c === '' && (i === 0 || i === arr.length - 1))) : [line];
+      if (cells.length > 1 && /^\d{1,4}$/.test(cells[0])) cells = cells.slice(1); // columna «#»
+      const who = cells[0] || '';
+      const digits = who.replace(/\D+/g, '');
+      const phone = digits.length >= 10 ? digits.slice(-10) : '';
+      const name = (phone ? (who.match(/\(([^)]+)\)/) || [])[1] || '' : who.replace(/\((chat con nombre|grupo)\)/i, '')).trim();
+      const flags = cells.slice(1).map((c) => YES.test(c));
+      const demo = cells.length > 1 ? flags[0] : true;
+      const seg = cells.length > 2 ? flags[1] : false;
+      if (!phone && !name) continue;
+      out.push({ line, phone, name, demo, seg });
+    }
+    return out;
+  }
+
+  // Por nombre: las palabras que distinguen (no «odontología», «consultorio»…) tienen que aparecer en
+  // el nombre o el consultorio. Sirve también para usuarios pegados («consultorioslorenarojas»).
+  const GENERIC = new Set(['odontologia', 'odontologico', 'odontologica', 'odontologa', 'odontologo', 'consultorio', 'consultorios', 'integral', 'dental', 'salud', 'clinica', 'centro', 'dras', 'dra', 'dres', 'dr', 'chat', 'con', 'nombre', 'del', 'los', 'las', 'de', 'la', 'el', 'y']);
+  function byName(text, accounts) {
+    const words = norm(text).replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w.length >= 3 && !GENERIC.has(w));
+    const glued = norm(text).replace(/[^a-z0-9]+/g, '');
+    // Solo palabras genéricas («Salud Dental»): tiene que aparecer la frase entera.
+    if (!words.length) {
+      const phrase = norm(text).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+      if (phrase.length < 6) return [];
+      return accounts.filter((a) => ` ${norm(`${a.name} ${a.org}`).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ')} `.includes(` ${phrase} `));
+    }
+    let best = [];
+    let top = 0;
+    for (const a of accounts) {
+      const hay = norm(`${a.name} ${a.org}`).replace(/[^a-z0-9 ]+/g, ' ');
+      const tokens = hay.split(/\s+/).filter((w) => w.length >= 4 && !GENERIC.has(w));
+      let score = words.filter((w) => tokens.includes(w)).length;
+      if (!score && words.length <= 1) score = tokens.filter((t) => t.length >= 5 && glued.includes(t)).length >= 2 ? 2 : 0;
+      if (score > top) { top = score; best = [a]; } else if (score && score === top) best.push(a);
+    }
+    return best;
+  }
+
+  function planBulk(rows, accounts, unit) {
+    const key = (p) => String(p || '').replace(/\D+/g, '').slice(-10);
+    return rows.map((r) => {
+      let matches = r.phone ? accounts.filter((a) => key(a.phone) === r.phone) : [];
+      if (!matches.length && r.name) matches = byName(r.name, accounts);
+      // Un número compartido: es la persona a la que ya se le escribió (la de más mensajes).
+      if (r.phone && matches.length > 1) matches = [...matches].sort((x, y) => (y.touches || 0) - (x.touches || 0) || (y.greetingSent ? 1 : 0) - (x.greetingSent ? 1 : 0)).slice(0, 1);
+      const target = r.seg ? 2 : r.demo ? 1 : 0;
+      const plan = (a) => {
+        const steps = [];
+        if (!a.greetingSent && !a.touches && unit && unit.greetingFirst) steps.push(0);
+        for (let t = (a.touches || 0) + 1; t <= target; t++) steps.push(t);
+        return steps;
+      };
+      if (matches.length === 1) {
+        const a = matches[0];
+        const steps = closed(a) || a.optOut ? [] : plan(a);
+        return { ...r, account: a, matches, steps, status: closed(a) || a.optOut ? 'cerrada' : steps.length ? 'registrar' : 'al-dia' };
+      }
+      return { ...r, account: null, matches, steps: [], status: matches.length ? 'ambigua' : 'no-esta', plan };
+    });
+  }
+
   // ─── Plantillas ─────────────────────────────────────────────
   function firstName(a) {
     const g = a.greeting || String(a.name).split(/\s+/)[0] || '';
@@ -711,6 +783,6 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, freshContacts, usedPhones, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, parseBulk, planBulk, freshContacts, usedPhones, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

@@ -306,3 +306,53 @@ test('nuevos como en Turnia: un número ya usado no es nuevo y un número compar
   assert.equal(q.freshTotal, 2);
   assert.equal(C.funnel(accounts, turnia).porContactar, 2);
 });
+
+test('lote: lee la tabla pegada (con columna #, nombres y Sí/No)', () => {
+  const rows = C.parseBulk([
+    '| # | Número / chat | Demo | Seguimiento |',
+    '|---|---|---|---|',
+    '| 1 | +54 9 2262 30-4337 (Ceirano) | Sí | No |',
+    '| 2 | +54 9 2266 44-5122 | Sí | Sí |',
+    '| 3 | Marotta Odontología (chat con nombre) | Sí | Sí |',
+    '+54 9 223 500-1111 | No | No',
+  ].join('\n'));
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows.map((r) => [r.phone, r.name, r.demo, r.seg]), [
+    ['2262304337', 'Ceirano', true, false],
+    ['2266445122', '', true, true],
+    ['', 'Marotta Odontología', true, true],
+    ['2235001111', '', false, false],
+  ]);
+});
+
+test('lote: arma los pasos que faltan y busca por número o por nombre', () => {
+  const accounts = [
+    { id: 'a', name: 'Ana', org: '', phone: '+54 9 2262 30-4337', touches: 1, greetingSent: new Date(), stage: 'contactado' },
+    { id: 'b', name: 'Beto', org: 'Eira Odontología Integral', phone: '', touches: 0, stage: 'por_contactar' },
+    { id: 'c', name: 'Caro', org: 'Salud Dental', phone: '2235000000', touches: 1, greetingSent: new Date(), stage: 'contactado' },
+    { id: 'd', name: 'Lorena Rojas', org: 'Consultorios Lorena Rojas', phone: '', touches: 0, stage: 'por_contactar' },
+    { id: 'e1', name: 'Bárbara', org: 'Odontología Centro', phone: '2236000000', touches: 0, stage: 'por_contactar' },
+    { id: 'e2', name: 'Johana', org: 'Odontología Centro', phone: '2236000000', touches: 1, greetingSent: new Date(), stage: 'contactado' },
+    { id: 'f', name: 'Fede', org: '', phone: '2237000000', touches: 1, greetingSent: new Date(), stage: 'perdido' },
+  ];
+  const plan = C.planBulk(C.parseBulk([
+    '2262304337 | Sí | Sí',
+    'Eira Odontología Integral | Sí | Sí',
+    'Salud Dental | Sí | Sí',
+    'consultorioslorenarojas | Sí | No',
+    '2236000000 | Sí | Sí',
+    '2237000000 | Sí | Sí',
+    '2262304337 | Sí | No',
+    '1100000000 | Sí | Sí',
+  ].join('\n')), accounts, turnia);
+  assert.deepEqual(plan.map((p) => [p.status, p.account && p.account.id, p.steps.join(',')]), [
+    ['registrar', 'a', '2'],
+    ['registrar', 'b', '0,1,2'],
+    ['registrar', 'c', '2'],
+    ['registrar', 'd', '0,1'],
+    ['registrar', 'e2', '2'], // número compartido: la persona a la que ya se le escribió
+    ['cerrada', 'f', ''],
+    ['al-dia', 'a', ''],
+    ['no-esta', null, ''],
+  ]);
+});

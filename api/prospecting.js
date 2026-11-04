@@ -256,6 +256,35 @@ async function actionViaApi(res, unit, user, id, action) {
   return res.status(200).json({ account, events });
 }
 
+// Registrar en lote envíos hechos fuera del panel (por ejemplo, desde el WhatsApp del celular).
+// { unit, items: [{ id, actions: [{ type: 'sent', step, ... }] }] }. Solo unidades con API (Turnia):
+// cada paso es idempotente («step»), así que repetir el lote no duplica. Va de a pocos por llamada.
+async function doBulk(req, res, user) {
+  const { unit: unitId, items } = req.body || {};
+  const unit = UNITS[unitId];
+  if (!unit || !unit.api) return fail(res, 400, 'El registro en lote es para unidades que se operan por API (Turnia). En habita. se edita la planilla.');
+  if (!apiOf(unit)) return fail(res, 403, `Falta la clave de la API de ${unit.name}.`);
+  if (!Array.isArray(items) || !items.length || items.length > 20) return fail(res, 400, 'Mandá entre 1 y 20 personas por vez.');
+  const results = [];
+  for (const it of items) {
+    const actions = Array.isArray(it.actions) ? it.actions.slice(0, 5) : [];
+    let account = null;
+    let error = null;
+    for (const action of actions) {
+      if (!action || action.type !== 'sent' || !Number.isInteger(action.step) || action.step < 0 || action.step > 3) { error = 'Acción inválida.'; break; }
+      try {
+        const out = await callApi(unit, { method: 'POST', body: { code: it.id, action, by: user.name } });
+        account = core.toAccounts([out.header, out.row], unit).accounts[0];
+      } catch (err) {
+        error = err.message;
+        break;
+      }
+    }
+    results.push({ id: it.id, ok: !error, error, account });
+  }
+  return res.status(200).json({ results });
+}
+
 async function doAction(req, res, user) {
   const { unit: unitId, id, version, action } = req.body || {};
   const unit = UNITS[unitId];
@@ -404,6 +433,7 @@ module.exports = async (req, res) => {
     if (op === 'action' && req.method === 'POST') return await doAction(req, res, user);
     if (op === 'setup' && req.method === 'POST') return await doSetup(req, res, user);
     if (op === 'template' && req.method === 'POST') return await doTemplate(req, res);
+    if (op === 'bulk' && req.method === 'POST') return await doBulk(req, res, user);
     if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {

@@ -762,6 +762,7 @@
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Cuentas</span><h1>${int(list.length)} ${esc(u.entity.many)}</h1><p>La base completa de la planilla. Los cambios se guardan en la misma fila.</p></div>
         ${state.data[id].sheet && state.data[id].sheet.url ? `<a class="btn" href="${esc(state.data[id].sheet.url)}" target="_blank" rel="noopener">${icon.ext} Abrir la planilla</a>` : ''}</section>
       ${sheetWarnings(id)}
+      ${u.api && !isReadOnly(id) ? bulkCard(id) : ''}
       ${crumbs(id)}
       <section class="card glass">
         <div class="toolbar"><input class="input search" type="search" placeholder="Buscar por nombre, zona, teléfono…" aria-label="Buscar" value="${esc(f.q)}" data-search>
@@ -772,6 +773,80 @@
         </tbody></table></div>
         ${list.length > shown.length ? `<div style="text-align:center;margin-top:12px"><button class="btn" type="button" data-action="more">Ver ${int(Math.min(100, list.length - shown.length))} más</button></div>` : ''}
       </section>`;
+  }
+  // ─── Envíos hechos fuera del panel (desde el celular), en lote ─────
+  const STEP_LABEL = ['saludo', 'demo', 'seguimiento', 'último'];
+  const BULK_STATUS = { registrar: 'Falta registrar', 'al-dia': 'Ya está al día', ambigua: 'Hay más de una: elegí', 'no-esta': 'No está en la base', cerrada: 'Cerrada o pidió la baja' };
+  function bulkPlan(id) {
+    const b = state.bulk;
+    const u = unitOf(id);
+    return C.planBulk(C.parseBulk(b.text), state.data[id].accounts, u).map((p) => {
+      if (p.status !== 'ambigua' || !b.picks[p.line]) return p;
+      const a = p.matches.find((m) => m.id === b.picks[p.line]);
+      if (!a) return p;
+      const steps = C.closed(a) || a.optOut ? [] : p.plan(a);
+      return { ...p, account: a, steps, status: C.closed(a) || a.optOut ? 'cerrada' : steps.length ? 'registrar' : 'al-dia' };
+    });
+  }
+  function bulkCard(id) {
+    const b = state.bulk;
+    if (!b || b.unit !== id) {
+      return `<section class="card glass"><div class="card-head"><div><h2>Mensajes mandados desde el celular</h2><p class="sub">Pegá la lista de chats (número, demo, seguimiento) y se registran los pasos que falten en ${esc(unitOf(id).name)}.</p></div><button class="btn small" type="button" data-action="bulk-open" data-testid="bulk-open">Registrar envíos en lote</button></div></section>`;
+    }
+    const plan = b.reviewed ? bulkPlan(id) : [];
+    const todo = plan.filter((p) => p.status === 'registrar');
+    const counts = {};
+    for (const p of plan) counts[p.status] = (counts[p.status] || 0) + 1;
+    const res = b.results || {};
+    return `<section class="card glass" data-testid="bulk-card"><div class="card-head"><div><h2>Registrar envíos en lote</h2><p class="sub">Una fila por chat: el número (o el nombre del consultorio si no se ve) y, separados por «|», si se mandó la demo y el seguimiento (Sí/No). Sirve la tabla tal cual. Repetir la misma lista no duplica nada. Quedan con la fecha de hoy.</p></div><button class="btn small ghost" type="button" data-action="bulk-close">Cerrar</button></div>
+      <textarea class="input" rows="8" data-bulk-text placeholder="+54 9 223 512-3456 | Sí | Sí&#10;Consultorio Pérez | Sí | No" style="width:100%;font-family:inherit">${esc(b.text)}</textarea>
+      <div class="btns" style="margin-top:10px"><button class="btn" type="button" data-action="bulk-review" data-testid="bulk-review">Revisar</button>
+        ${todo.length ? `<button class="btn primary" type="button" data-action="bulk-run" data-testid="bulk-run" ${b.running ? 'disabled' : ''}>${b.running ? `Registrando… ${int(b.progress || 0)}/${int(todo.length)}` : `Registrar ${int(todo.length)}`}</button>` : ''}</div>
+      ${b.reviewed ? `<p class="sub" style="margin:10px 0">${Object.entries(counts).map(([k, n]) => `${esc(BULK_STATUS[k])}: <strong>${int(n)}</strong>`).join(' · ') || 'No reconocimos ninguna fila.'}</p>
+      <div class="table-wrap"><table><thead><tr><th>Chat</th><th>En la base</th><th>Msj.</th><th>Qué se registra</th></tr></thead><tbody>
+        ${plan.map((p) => {
+          const r = p.account && res[p.account.id];
+          const who = p.status === 'ambigua' && !p.account
+            ? `<select class="input" data-bulk-pick="${esc(p.line)}" aria-label="Elegí la cuenta"><option value="">Elegí…</option>${p.matches.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}${m.org && m.org !== m.name ? ` · ${esc(m.org)}` : ''}</option>`).join('')}</select>`
+            : p.account ? `<strong class="click" data-open-account="${esc(p.account.id)}" tabindex="0" style="text-decoration:underline">${esc(p.account.name)}</strong>${p.account.org && p.account.org !== p.account.name ? `<div class="sub">${esc(p.account.org)}</div>` : ''}` : '<span class="sub">—</span>';
+          const what = r ? (r.ok ? '✓ Registrado' : `✕ ${esc(r.error)}`) : p.status === 'registrar' ? esc(p.steps.map((s) => STEP_LABEL[s]).join(' + ')) : esc(BULK_STATUS[p.status]);
+          return `<tr><td>${esc(p.phone ? `${p.phone}${p.name ? ` (${p.name})` : ''}` : p.name)}<div class="sub">${p.demo ? 'demo' : 'sin demo'} · ${p.seg ? 'seguimiento' : 'sin seguimiento'}</div></td><td>${who}</td><td class="n">${p.account ? int(p.account.touches) : ''}</td><td>${what}</td></tr>`;
+        }).join('')}
+      </tbody></table></div>` : ''}
+    </section>`;
+  }
+  async function runBulk(id) {
+    const b = state.bulk;
+    if (state.demo) { toast('En el ejemplo no se registra nada.', true); return; }
+    const todo = bulkPlan(id).filter((p) => p.status === 'registrar');
+    const items = [...new Map(todo.map((p) => [p.account.id, { id: p.account.id, actions: p.steps.map((step) => ({ type: 'sent', step, channel: 'whatsapp' })) }])).values()];
+    b.running = true;
+    b.progress = 0;
+    b.results = {};
+    render();
+    let ok = 0;
+    let bad = 0;
+    for (let i = 0; i < items.length; i += 20) {
+      const chunk = items.slice(i, i + 20);
+      try {
+        const r = await api('bulk', { method: 'POST', body: { unit: id, items: chunk } });
+        for (const x of r.results) {
+          b.results[x.id] = x;
+          if (x.account) replaceAccount(id, x.account);
+          if (x.ok) ok++; else bad++;
+        }
+      } catch (err) {
+        for (const x of chunk) b.results[x.id] = { ok: false, error: err.message };
+        bad += chunk.length;
+        if (err.status === 401) break;
+      }
+      b.progress = Math.min(items.length, i + 20);
+      render();
+    }
+    b.running = false;
+    render();
+    toast(bad ? `Registradas ${ok}; ${bad} con error (revisá la lista).` : `Registradas ${ok} personas.`, Boolean(bad));
+    loadUnit(id, { quiet: true }).then(render);
   }
   function dimSelect(id, k, label) {
     const values = [...new Set(state.data[id].accounts.map((a) => dimValue(a, k)))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
@@ -1292,6 +1367,10 @@
         break;
       }
       case 'more': state.shown += 100; render(); break;
+      case 'bulk-open': state.bulk = { unit: state.unit, text: '', picks: {}, reviewed: false }; render(); { const ta = $('[data-bulk-text]'); if (ta) ta.focus(); } break;
+      case 'bulk-close': if (!state.bulk || !state.bulk.running) { state.bulk = null; render(); } break;
+      case 'bulk-review': if (state.bulk) { state.bulk.reviewed = true; state.bulk.results = null; render(); } break;
+      case 'bulk-run': if (state.bulk && !state.bulk.running) { if (!state.bulk.reviewed) { state.bulk.reviewed = true; render(); } else await runBulk(state.unit); } break;
       case 'cancel-tpl': state.editing = null; render(); break;
       case 'edit-targets': state.editingTargets = state.unit; render(); break;
       case 'cancel-targets': state.editingTargets = null; render(); break;
@@ -1345,6 +1424,7 @@
       return;
     }
     if (e.target.matches('[data-tpl-form] input[name="subject"]') && state.editing) { state.editing.subject = e.target.value; return; }
+    if (e.target.matches('[data-bulk-text]') && state.bulk) { state.bulk.text = e.target.value; state.bulk.reviewed = false; return; }
     if (e.target.matches('[data-search]')) {
       filt(state.unit).q = e.target.value;
       clearTimeout(e.target._t);
@@ -1358,6 +1438,7 @@
       render();
     }
     if (e.target.matches('[data-tpl]')) { $('#drawer').dataset.key = e.target.value; renderDrawer(); }
+    if (e.target.matches('[data-bulk-pick]') && state.bulk) { state.bulk.picks[e.target.dataset.bulkPick] = e.target.value; render(); }
   });
   document.addEventListener('submit', async (e) => {
     e.preventDefault();

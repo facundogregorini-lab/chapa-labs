@@ -259,3 +259,33 @@ test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por
     delete process.env.TURNIA_METRICS_SECRET;
   }
 });
+
+test('Turnia: registrar en lote manda cada paso con «step» y devuelve cada fila', async () => {
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  const realFetch = global.fetch;
+  const sent = [];
+  global.fetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    sent.push(body);
+    if (body.code === 'mal-1') return { ok: false, status: 422, json: async () => ({ error: 'Pidió no recibir más mensajes.' }) };
+    return { ok: true, status: 200, json: async () => ({ header: ['Código', 'Nombre', 'Estado', 'Mensajes'], row: [body.code, 'X', 'Contactado', body.action.step] }) };
+  };
+  try {
+    const r = await call('bulk', { method: 'POST', cookie, body: { unit: 'turnia', items: [
+      { id: 'ana-111', actions: [{ type: 'sent', step: 1, channel: 'whatsapp' }, { type: 'sent', step: 2, channel: 'whatsapp' }] },
+      { id: 'mal-1', actions: [{ type: 'sent', step: 2 }] },
+    ] } });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.deepEqual(sent.map((s) => [s.code, s.action.step]), [['ana-111', 1], ['ana-111', 2], ['mal-1', 2]]);
+    assert.equal(r.body.results[0].ok, true);
+    assert.equal(r.body.results[0].account.touches, 2);
+    assert.deepEqual([r.body.results[1].ok, r.body.results[1].error], [false, 'Pidió no recibir más mensajes.']);
+    const bad = await call('bulk', { method: 'POST', cookie, body: { unit: 'turnia', items: [{ id: 'x', actions: [{ type: 'outcome', step: 1 }] }] } });
+    assert.equal(bad.body.results[0].error, 'Acción inválida.');
+    const habita = await call('bulk', { method: 'POST', cookie, body: { unit: 'habita', items: [{ id: 'abc', actions: [] }] } });
+    assert.equal(habita.statusCode, 400);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});
