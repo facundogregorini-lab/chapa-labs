@@ -270,3 +270,17 @@ test('Turnia: cuentas creadas y activas son por persona (no cuenta clínicas de 
   assert.deepEqual(by.activas, [1, 'sheet']);
   assert.deepEqual(C.toAccounts([['Código', 'Nombre', 'Cuenta creada', 'Clínica de la cuenta', 'Cuenta activa'], ['x', 'X', '2026-11-03 10:00', 'Clínica X', '']], turnia).accounts[0].accountClinic, 'Clínica X');
 });
+
+test('modo Enviar: WhatsApp Web directo, franjas horarias y un reintento no se registra dos veces', () => {
+  assert.equal(C.waWebLink('223 512-3456', 'Hola Ana'), 'https://web.whatsapp.com/send?phone=5492235123456&text=Hola%20Ana');
+  const unit = { sendWindows: [['08:30', '09:30'], ['13:00', '14:30']] };
+  assert.equal(C.inSendWindow(unit, '2026-11-04 08:45'), true);
+  assert.equal(C.inSendWindow(unit, '2026-11-04 09:30'), false);
+  assert.equal(C.nextSendWindow(unit, '2026-11-04 10:00'), 'hoy a las 13:00');
+  assert.equal(C.nextSendWindow(unit, '2026-11-04 15:00'), 'mañana a las 08:30');
+  const ev = [{ id: 'a', type: 'saludo', template: 'whatsapp_saludo', at: '2026-11-04 08:40' }];
+  assert.equal(C.isReplay(ev, 'a', 'saludo', 'whatsapp_saludo', '2026-11-04 08:41'), true);
+  assert.equal(C.isReplay(ev, 'a', 'saludo', 'whatsapp_saludo', '2026-11-04 08:45'), false, 'pasados 2 minutos es otro envío');
+  assert.equal(C.isReplay(ev, 'a', 'mensaje', 'whatsapp_1', '2026-11-04 08:41'), false, 'otro paso no es reintento');
+  assert.equal(C.isReplay([...ev, { id: 'a', type: 'deshacer', at: '2026-11-04 08:41' }], 'a', 'saludo', 'whatsapp_saludo', '2026-11-04 08:41'), false);
+});

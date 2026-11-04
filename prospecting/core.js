@@ -482,12 +482,51 @@
     return unit && unit.nextTemplate ? unit.nextTemplate(a) : null;
   }
 
-  function waLink(phone, text) {
+  // El número como lo pide WhatsApp: solo dígitos, con 549 para los celulares argentinos.
+  function waDigits(phone) {
     let d = String(phone || '').replace(/\D+/g, '');
     if (!d) return '';
     if (d.length === 10) d = `549${d}`; // número argentino sin código de país
     else if (d.length === 12 && d.startsWith('54') && d[2] !== '9') d = `549${d.slice(2)}`;
-    return `https://wa.me/${d}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
+    return d;
+  }
+  function waLink(phone, text) {
+    const d = waDigits(phone);
+    return d ? `https://wa.me/${d}${text ? `?text=${encodeURIComponent(text)}` : ''}` : '';
+  }
+  // WhatsApp Web directo (sin la página intermedia de wa.me): en la computadora.
+  function waWebLink(phone, text) {
+    const d = waDigits(phone);
+    return d ? `https://web.whatsapp.com/send?phone=${d}${text ? `&text=${encodeURIComponent(text)}` : ''}` : '';
+  }
+
+  // ¿Ahora (hora de Buenos Aires) cae en alguna franja de envío? Sin franjas, siempre.
+  function inSendWindow(unit, at) {
+    const w = unit && unit.sendWindows;
+    if (!w || !w.length) return true;
+    const hm = (at || nowLocal()).slice(11, 16);
+    return w.some(([from, to]) => hm >= from && hm < to);
+  }
+  function nextSendWindow(unit, at) {
+    const w = (unit && unit.sendWindows) || [];
+    const hm = (at || nowLocal()).slice(11, 16);
+    const later = w.find(([from]) => from > hm);
+    return later ? `hoy a las ${later[0]}` : w.length ? `mañana a las ${w[0][0]}` : '';
+  }
+
+  // Un reintento o un doble clic no registra dos veces el mismo envío: mismo tipo y plantilla,
+  // para la misma cuenta, dentro de 2 minutos.
+  function isReplay(events, id, type, template, at) {
+    const now = new Date(`${(at || nowLocal()).replace(' ', 'T')}:00Z`).getTime();
+    for (let i = events.length - 1; i >= 0; i--) {
+      const e = events[i];
+      if (e.id !== id) continue;
+      if (e.type === 'deshacer') return false;
+      if (!CONTACT_TYPES.includes(e.type)) continue;
+      const t = new Date(`${String(e.at).replace(' ', 'T')}:00Z`).getTime();
+      return e.type === type && (e.template || '') === (template || '') && now - t <= 2 * 60000;
+    }
+    return false;
   }
 
   // ─── Acciones ───────────────────────────────────────────────
@@ -641,6 +680,6 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, targetFunnel, periodWeeks, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

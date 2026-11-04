@@ -209,3 +209,17 @@ test('mensajes: en la planilla se guardan en la pestaña Mensajes; en Turnia, po
     delete process.env.TURNIA_METRICS_SECRET;
   }
 });
+
+test('el mismo envío confirmado dos veces seguidas se registra una sola vez', async () => {
+  process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
+  const data = await call('data', { query: { unit: 'habita' }, cookie });
+  const acc = data.body.accounts.find((a) => a.stage === 'por_contactar' || !a.firstContact) || data.body.accounts[0];
+  const before = (book.tabs.Actividad || []).length;
+  const send = (version) => call('action', { method: 'POST', cookie, body: { unit: 'habita', id: acc.id, version, action: { type: 'sent', channel: 'whatsapp', template: 'whatsapp_1', kind: 'mensaje' } } });
+  const first = await send(acc.updated);
+  assert.equal(first.statusCode, 200);
+  const second = await send(first.body.account.updated);
+  assert.equal(second.statusCode, 200);
+  assert.equal(second.body.replayed, true);
+  assert.equal(book.tabs.Actividad.length, before + 1);
+});

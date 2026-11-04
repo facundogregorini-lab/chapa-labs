@@ -42,6 +42,34 @@ Las etapas son las mismas para todas (`por_contactar`, `saludado`, `contactado`,
 - **Abajo**: en el Embudo de cada unidad, tocar una fila de «Por segmento» filtra todo el panel por ese valor (zona, SDR, prioridad…); tocar una etapa del embudo lleva a esas cuentas; tocar una cuenta abre su ficha.
 - El período (histórico, 7 días, 30 días, este mes) aplica al embudo, a los desgloses y a `/api/metricas`.
 
+## Enviar con un agente de IA (`?vista=enviar`)
+
+Una sola tarjeta en un lugar fijo, para una persona o para un agente con computer use (por ejemplo, Claude en Chrome, que alterna entre este panel y la pestaña de WhatsApp Web). En la vista están las **instrucciones para el agente**, listas para copiar.
+
+- **Orden:** seguimientos que tocan hoy (primero quienes abrieron o probaron su demo), saludos por revisar (¿respondió?) y nuevos hasta la meta del día. «Saltar» lo manda al final de la sesión. Las conversaciones abiertas no entran: las contesta una persona.
+- **Estado en `data-state`** de `[data-testid="agent"]`: `ready` (se puede abrir), `check` (mirar si respondió el saludo), `opened` (falta confirmar), `wait` (pausa entre envíos), `paused` (fuera de horario o solo lectura), `done` (meta cumplida o cola vacía), `stopped` (tres «no salió» seguidos: revisar WhatsApp).
+- **Datos para verificar:** `agent-name`, `agent-phone` (con 549), `agent-message` (el texto exacto), y en la tarjeta `data-account-id`, `data-phone`, `data-expected-name`, `data-template` y `data-wa-url` (el link de WhatsApp Web).
+- **Botones:** `agent-open-whatsapp`, `agent-confirm-sent`, `agent-not-sent`, `agent-no-whatsapp`, `agent-skip`, `agent-open-chat`, `agent-replied` y `agent-override-hours`.
+- **Ritmo:** después de cada envío confirmado, una pausa al azar de 45 a 90 segundos (`pacing` en `units.js`). Franjas de envío (`sendWindows`): Turnia 8:30–9:30 y 13–14:30; habita. 9–12:30 y 15–18. Fuera de franja, «Mandar igual» (con confirmación) vale hasta el fin del día.
+- **WhatsApp:** abre WhatsApp Web directo (`web.whatsapp.com/send`), sin la página intermedia de `wa.me`; en el celular, `wa.me` abre la app. WhatsApp Web no deja que otra página reutilice su pestaña (política de aislamiento), así que cada apertura es una pestaña nueva: el agente la cierra después de enviar.
+
+### Auditoría contra los paneles originales (04/11/2026)
+
+| Tema | Turnia (`/panel/prospeccion`) | habita. (`/admin/prospeccion`) | Este panel, antes | Ahora |
+| --- | --- | --- | --- | --- |
+| Abrir WhatsApp | WhatsApp Web directo en la computadora | `wa.me` en una pestaña nueva | `wa.me` y una pestaña nueva por envío | WhatsApp Web directo; `wa.me` solo en el celular |
+| Cuándo cuenta el contacto | Al tocar (se deshace si no salió) | Al confirmar que salió | Al confirmar | Igual, y la pregunta «¿salió?» sobrevive a una recarga |
+| Doble registro | — | Clave de idempotencia | Posible | Un reintento del mismo paso en 2 minutos no suma (planilla y API de Turnia); doble clic bloqueado |
+| Confirmaciones | — | En la página | `confirm()` del navegador | En la página, con doble toque (los diálogos del navegador traban a los agentes) |
+| Selectores estables | — | `data-testid` | No | `data-testid` en cola, botones, confirmación y ficha |
+| Ritmo y horario | Reglas escritas | — | Solo texto | Pausa al azar entre envíos y franjas horarias en el modo Enviar |
+| Para un agente | — | Guía de operación | — | Modo Enviar + instrucciones copiables |
+
+**Lo que sigue (no hecho):**
+- Un bloqueo por persona mientras alguien la está contactando (habita. lo tiene): hoy, si una persona y un agente operan la misma cola a la vez, podrían abrir el mismo contacto. Mientras tanto: un solo operador por unidad.
+- Leer las respuestas solas (WAHA en Turnia) en vez de mirar el chat para «¿respondió el saludo?».
+- Detectar en WhatsApp Web el aviso de número inválido sin que el agente lo tenga que leer.
+
 ## Liquid glass
 
 Fondo: `prospecting/fondo.jpg`, «St. Moritz on an evening during the winter in Switzerland», de [GoodFreePhotos](https://www.goodfreephotos.com/Free-Stock-Photos/st-moritz-on-an-evening-during-the-winter-in-switzerland.jpg.php) (CC0, dominio público). Para cambiarlo alcanza con reemplazar el archivo; sin archivo queda la luz de color.

@@ -45,6 +45,9 @@
     window: 7,
     greetingFirst: true,
     hours: 'De 8:30 a 9:30 y de 13 a 14:30. Nunca después de las 21.',
+    // Modo Enviar: franjas en las que se manda (hora de Buenos Aires) y pausa al azar entre envíos.
+    sendWindows: [['08:30', '09:30'], ['13:00', '14:30']],
+    pacing: [45, 90],
     rules: [
       'Primero el saludo, sin link: un número desconocido que manda un link de entrada termina bloqueado.',
       'A la persona que decide. Si el número es del consultorio, el mensaje va a nombre del odontólogo y le habla a la recepción.',
@@ -152,6 +155,8 @@
     window: 7,
     greetingFirst: false,
     hours: 'De 9 a 12:30 y de 15 a 18, días hábiles.',
+    sendWindows: [['09:00', '12:30'], ['15:00', '18:00']],
+    pacing: [45, 90],
     rules: [
       'Solo a contactos verificados: un número «por revisar» primero se confirma.',
       'Abrir WhatsApp o el mail no es enviar: el contacto cuenta cuando confirmás que salió.',

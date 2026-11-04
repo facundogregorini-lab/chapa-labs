@@ -208,6 +208,11 @@ async function doAction(req, res, user) {
   if (version !== undefined && version !== null && String(version) !== String(account.updated)) {
     return fail(res, 409, 'Alguien cambió esta cuenta recién. Te mostramos la versión nueva: revisala y volvé a intentar.', { account });
   }
+  // Un reintento (o un doble clic) del mismo envío no se registra dos veces.
+  if (action.type === 'sent') {
+    const type = action.kind === 'saludo' ? 'saludo' : 'mensaje';
+    if (core.isReplay(data.events, account.id, type, action.template || '')) return res.status(200).json({ account, events: [], replayed: true });
+  }
   let result;
   try {
     result = core.applyAction(account, action, { unit, by: user.name });

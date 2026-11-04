@@ -25,6 +25,8 @@
     shown: 100,
     more: {},        // bloques de Hoy desplegados completos
     editing: null,   // mensaje en edición: { unit, key, text, subject }
+    agent: { replied: null, fails: 0, override: false }, // modo Enviar
+    busy: false,     // una acción en curso: un doble clic no la repite
   };
 
   // ─── Utilidades ─────────────────────────────────────────────
@@ -111,7 +113,7 @@
     const m = location.pathname.match(/^\/prospecting\/?(turnia|habita|todas)?/);
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
-    state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'embudo', 'cuentas', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
+    state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'enviar', 'embudo', 'cuentas', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
   }
   function go(unit, view, { replace } = {}) {
     state.unit = unit;
@@ -165,7 +167,7 @@
     $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
     const tabs = state.unit === 'todas'
       ? [['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
+      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
     $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
     document.body.dataset.unit = state.unit;
     const userBtn = $('#user');
@@ -203,11 +205,23 @@
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, enviar: renderSend, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
+  // Cuenta regresiva del modo Enviar y aviso de un envío abierto sin confirmar (por ejemplo, tras recargar).
+  setInterval(() => {
+    const card = document.getElementById('agent');
+    if (card && card.dataset.state === 'wait' && !state.busy) {
+      const left = Math.ceil(((store(`next-${state.unit}`) || 0) - Date.now()) / 1000);
+      if (left <= 0) render();
+      else { const st = card.querySelector('.agent-status'); if (st) st.textContent = `Ritmo seguro: esperá ${left} s para el próximo.`; }
+    }
+  }, 1000);
+
   function after() {
+    const p = storedPending();
+    if (p && !state.pending && state.view !== 'enviar' && !$('#confirm').classList.contains('on')) { state.pending = p; showConfirmBar(p, { again: true }); }
     window.LiquidGlass && window.LiquidGlass.scan();
     requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb));
     bindCharts();
@@ -524,14 +538,123 @@
     if (isReadOnly(u.id)) return accountRowHtml(a, u, `<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Panel</a>`);
     if (block === 'conversations') action = a.phone ? `<button type="button" class="btn small" data-chat="${esc(a.id)}">${icon.wa} Abrir chat</button>` : '';
     else if (next && tpl && (next.channel === 'whatsapp' || next.channel === 'email' || next.channel === 'instagram')) {
-      action = `<button type="button" class="btn small primary" data-send="${esc(a.id)}" data-key="${esc(next.key)}">${next.channel === 'email' ? icon.mail : next.channel === 'instagram' ? icon.ig : icon.wa} ${esc(tpl.title)}</button>`;
+      action = `<button type="button" class="btn small primary" data-testid="send-next" data-send="${esc(a.id)}" data-key="${esc(next.key)}">${next.channel === 'email' ? icon.mail : next.channel === 'instagram' ? icon.ig : icon.wa} ${esc(tpl.title)}</button>`;
     }
     return accountRowHtml(a, u, action);
   }
   function accountRowHtml(a, u, action) {
-    return `<div class="arow" data-open-account="${esc(a.id)}" tabindex="0" role="button" aria-label="Abrir la ficha de ${esc(a.name)}">
+    return `<div class="arow" data-testid="queue-item" data-account-id="${esc(a.id)}" data-open-account="${esc(a.id)}" tabindex="0" role="button" aria-label="Abrir la ficha de ${esc(a.name)}">
       <div class="who"><strong>${esc(a.name)}</strong><div class="meta">${a.org && a.org !== a.name ? `<span>${esc(a.org)}</span>·` : ''}<span>${esc(a.zone || 'Sin zona')}</span>${a.priority && a.priority <= 5 ? `<span>· P${a.priority}</span>` : ''}${stagePill(a, u)}${a.touches ? `<span>${int(a.touches)} msj.</span>` : ''}${a.lastContact ? `<span>últ. ${esc(when(a.lastContact))}</span>` : ''}${signals(a)}</div></div>
       <div class="acts">${action}</div></div>`;
+  }
+
+  // ─── Enviar (uno por vez; pensado también para un agente de IA) ─
+  // Una sola tarjeta en un lugar fijo: quién, a qué número, qué texto y qué botón tocar. El estado
+  // está en data-state y cada botón tiene su data-testid, para que un agente con computer use
+  // (una extensión del navegador que alterna con la pestaña de WhatsApp) lo opere sin adivinar.
+  function agentSkipped(id) {
+    try { return new Set(JSON.parse(sessionStorage.getItem(`cl-pr-skip-${id}`) || '[]')); } catch { return new Set(); }
+  }
+  function skipAgent(accountId) {
+    const set = agentSkipped(state.unit);
+    set.add(accountId);
+    try { sessionStorage.setItem(`cl-pr-skip-${state.unit}`, JSON.stringify([...set])); } catch { /* sin storage */ }
+  }
+  function sendQueue(id) {
+    const u = unitOf(id);
+    const d = state.data[id];
+    const q = C.queue(scoped(id), u, { events: d.events });
+    const wa = (a) => { const n = C.nextTemplate(a, u); return a.phone && C.canMessage(a, u) && n && n.channel === 'whatsapp'; };
+    const items = [
+      ...q.followUps.filter(wa).map((a) => ({ a, step: 'Seguimiento' })),
+      ...q.greeted.filter((a) => a.phone).map((a) => ({ a, step: 'Respondió el saludo' })),
+      ...q.fresh.filter(wa).map((a) => ({ a, step: 'Nuevo', fresh: true })),
+    ];
+    const skipped = agentSkipped(id);
+    return { q, items: [...items.filter((x) => !skipped.has(x.a.id)), ...items.filter((x) => skipped.has(x.a.id))] };
+  }
+
+  function agentInstructions(u) {
+    return [
+      `Sos quien manda los mensajes de prospección de ${u.name} por WhatsApp Web. Trabajás con dos pestañas: este panel (${location.origin}/prospecting/${u.id}?vista=enviar) y WhatsApp Web, que el panel abre siempre en la misma pestaña.`,
+      'Repetí, de a uno:',
+      '1. En el panel, leé la tarjeta (data-testid="agent"): nombre (agent-name), teléfono (agent-phone) y el mensaje exacto (agent-message). Mirá data-state: solo seguís si dice "ready" o "check". Si dice "opened", ya se abrió WhatsApp para esa persona: andá al paso 4.',
+      '2. Si data-state="check" (le mandamos el saludo): tocá «Abrir chat» (agent-open-chat), fijate en WhatsApp si la persona respondió. Si respondió, volvé y tocá «Respondió: mandar la demo» (agent-replied). Si no, «Todavía no» (agent-skip).',
+      '3. Tocá «Abrir WhatsApp» (agent-open-whatsapp): se abre WhatsApp Web en una pestaña nueva con el chat y el texto ya escritos (tarda unos segundos en cargar). Comprobá que el chat sea del mismo número y que el texto sea igual al de la tarjeta. Tocá Enviar una sola vez y esperá el tilde.',
+      '4. Cerrá esa pestaña de WhatsApp (que no se acumulen: WhatsApp Web no deja que el panel la reutilice), volvé al panel y tocá «Sí, se envió» (agent-confirm-sent) solo si viste el mensaje enviado. Si no salió, «No salió» (agent-not-sent). Si WhatsApp dice que el número no es válido o no tiene WhatsApp, «No tiene WhatsApp» (agent-no-whatsapp).',
+      'Si preferís una sola pestaña fija de WhatsApp: en vez de «Abrir WhatsApp», tocalo igual (marca el envío como abierto) y cerrá la pestaña nueva, o navegá tu pestaña de WhatsApp al link de data-wa-url de la tarjeta.',
+      '5. Esperá a que el panel habilite el siguiente (data-state="wait" muestra la cuenta regresiva) y volvé al paso 1.',
+      'Nunca: cambies el texto, respondas o converses con nadie, mandes dos veces, toques otro botón del panel, ni mandes si data-state es "paused", "done" o "stopped".',
+      'Pará y avisá si: WhatsApp muestra un aviso de restricción o de cuenta bloqueada, el número o el nombre no coinciden, aparece un error, o el panel dice que pares.',
+    ].join('\n');
+  }
+
+  function renderSend(id) {
+    const u = unitOf(id);
+    const { q, items } = sendQueue(id);
+    const pending = state.pending && state.pending.inline ? state.pending : storedPending();
+    const cur = pending ? (items.find((x) => x.a.id === pending.id) || { a: findAccount(pending.id), step: 'En curso' }) : items[0];
+    const nextAt = store(`next-${id}`) || 0;
+    const wait = Math.max(0, Math.ceil((nextAt - Date.now()) / 1000));
+    const ro = isReadOnly(id);
+    let phase;
+    let status;
+    if (ro) { phase = 'paused'; status = `Solo lectura: falta la clave de la API de ${u.name}.`; }
+    else if (pending && cur && cur.a) { phase = 'opened'; status = '¿Salió el mensaje? Confirmá antes de seguir.'; }
+    else if (!cur || !cur.a) { phase = 'done'; status = 'No queda nadie para hoy. Pará.'; }
+    else if (state.agent.fails >= 3) { phase = 'stopped'; status = 'Pará: tres envíos seguidos no salieron. Revisá WhatsApp (¿restricción, sesión cerrada?).'; }
+    else if (cur.fresh && q.doneToday >= q.goal) { phase = 'done'; status = `Meta del día cumplida (${int(q.doneToday)} de ${int(q.goal)}). Pará.`; }
+    else if (!C.inSendWindow(u) && store(`override-${id}`) !== C.today()) { phase = 'paused'; status = `Fuera del horario de envío (${esc(u.hours)}). Próxima franja: ${esc(C.nextSendWindow(u))}.`; }
+    else if (cur.step === 'Respondió el saludo' && state.agent.replied !== cur.a.id) { phase = 'check'; status = 'Le mandamos el saludo: mirá si respondió antes de mandar la demo.'; }
+    else if (wait > 0) { phase = 'wait'; status = `Ritmo seguro: esperá ${wait} s para el próximo.`; }
+    else { phase = 'ready'; status = 'Listo para enviar.'; }
+
+    const a = cur && cur.a;
+    const next = a ? (pending ? { key: pending.key } : C.nextTemplate(a, u)) : null;
+    const tpl = next && templatesOf(id)[next.key];
+    const text = a && tpl ? C.renderTemplate(tpl.text, a, u) : '';
+    const digits = a ? C.waDigits(a.phone) : '';
+    const kinds = { celular: 'celular de la persona', compartido: 'del consultorio u oficina', fijo: 'fijo', revisar: 'por revisar' };
+    const btn = (testid, label, attrs = '', cls = '') => `<button type="button" class="btn ${cls}" data-testid="${testid}" ${attrs}>${label}</button>`;
+    let actions = '';
+    if (a && phase === 'check') actions = btn('agent-open-chat', `${icon.wa} Abrir chat`, `data-agent="chat"`) + btn('agent-replied', 'Respondió: mandar la demo', `data-agent="replied"`, 'primary') + btn('agent-skip', 'Todavía no', `data-agent="skip"`, 'ghost');
+    else if (a && phase === 'opened') actions = btn('agent-confirm-sent', 'Sí, se envió', `data-agent="sent"`, 'primary') + btn('agent-not-sent', 'No salió', `data-agent="not-sent"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
+    else if (a && (phase === 'ready' || phase === 'wait' || phase === 'paused')) actions = btn('agent-open-whatsapp', `${icon.wa} Abrir WhatsApp`, `data-agent="open" ${phase === 'ready' ? '' : 'disabled'}`, 'primary') + btn('agent-skip', 'Saltar', `data-agent="skip"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
+    const R = 27; const circ = 2 * Math.PI * R; const ratio = Math.min(1, q.doneToday / q.goal);
+    return `
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Enviar</span><h1>Uno por vez</h1><p>Una tarjeta, un mensaje, una confirmación. Sirve igual para una persona o para un agente de IA que alterna con la pestaña de WhatsApp. ${esc(u.hours)}</p></div>
+        <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos nuevos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">nuevos hoy · ${int(items.length)} en la cola</div></div></div></section>
+      <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, text) : '')}" aria-labelledby="agent-name">
+        <p class="agent-status ${phase}" role="status" aria-live="polite" data-testid="agent-status">${status}${phase === 'paused' && !ro && a ? ` <button type="button" class="btn small ghost" data-testid="agent-override-hours" data-agent="override" data-arm="Confirmar: mandar fuera de horario">Mandar igual</button>` : ''}</p>
+        ${a ? `
+        <div class="agent-grid">
+          <div>
+            <span class="eyebrow">${esc(cur.step)}${tpl ? ` · ${esc(tpl.title)}` : ''}</span>
+            <h2 id="agent-name" data-testid="agent-name">${esc(a.name)}</h2>
+            <p class="sub" style="margin:2px 0 10px">${esc([a.org !== a.name ? a.org : '', a.zone].filter(Boolean).join(' · '))}</p>
+            <dl class="facts">
+              <dt>WhatsApp</dt><dd><strong data-testid="agent-phone">+${esc(digits)}</strong>${a.phoneKind ? ` <span class="sub">(${esc(kinds[a.phoneKind] || a.phoneKind)})</span>` : ''}</dd>
+              ${a.touches ? `<dt>Mensajes</dt><dd>${int(a.touches)} de ${u.maxTouches}</dd>` : ''}
+              ${a.lastContact ? `<dt>Último</dt><dd>${esc(when(a.lastContact))}</dd>` : ''}
+            </dl>
+            ${signals(a) ? `<p style="margin:8px 0 0">${signals(a)}</p>` : ''}
+          </div>
+          <div>
+            <span class="eyebrow">${phase === 'check' ? 'Lo que se manda si respondió' : 'Mensaje exacto'}</span>
+            <pre class="tpl" data-testid="agent-message">${esc(text)}</pre>
+          </div>
+        </div>
+        <div class="btns agent-actions">${actions}</div>` : ''}
+      </section>
+      <section class="card glass">
+        <details><summary><strong>Instrucciones para el agente de IA</strong> <span class="sub">· para pegar en la extensión (por ejemplo, Claude en Chrome)</span></summary>
+          <pre class="tpl" data-testid="agent-instructions" style="margin-top:10px">${esc(agentInstructions(u))}</pre>
+          <div class="btns"><button class="btn small" type="button" data-action="copy-instructions">${icon.copy} Copiar instrucciones</button></div>
+        </details>
+      </section>
+      <section class="card glass"><div class="card-head"><div><h2>Después</h2><p class="sub">El orden de la cola: seguimientos, saludos por revisar y nuevos hasta la meta. Los saltados van al final.</p></div></div>
+        <div class="rows">${items.slice(cur && items[0] && items[0].a.id === (a && a.id) ? 1 : 0, 9).map((x) => `<div class="arow" data-open-account="${esc(x.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(x.a.name)}</strong><div class="meta"><span>${esc(x.step)}</span>·<span>${esc(x.a.zone || '')}</span>${signals(x.a)}</div></div></div>`).join('') || '<p class="empty">Nadie más por ahora.</p>'}</div>
+      </section>`;
   }
 
   // ─── Cuentas ────────────────────────────────────────────────
@@ -714,7 +837,7 @@
           <label class="field"><span class="sr">Texto</span><textarea data-text rows="6">${esc(text)}</textarea></label>
           ${!link && /\{link\}/.test(t.text) ? `<p class="sub" style="margin:0;color:var(--bad-text)">Esta cuenta no tiene link de demo: cargalo en la columna «Demo» antes de mandar.</p>` : ''}
           <div class="btns">
-            ${a.phone && t.channel !== 'email' && t.channel !== 'llamada' ? `<button class="btn primary" type="button" data-send-drawer="whatsapp" data-autofocus>${icon.wa} Abrir WhatsApp</button>` : ''}
+            ${a.phone && t.channel !== 'email' && t.channel !== 'llamada' ? `<button class="btn primary" type="button" data-send-drawer="whatsapp" data-testid="open-whatsapp" data-autofocus>${icon.wa} Abrir WhatsApp</button>` : ''}
             ${a.email && (t.channel === 'email' || !a.phone) ? `<button class="btn primary" type="button" data-send-drawer="email">${icon.mail} Abrir mail</button>` : ''}
             ${a.instagram ? `<button class="btn" type="button" data-send-drawer="instagram">${icon.ig} Copiar y abrir Instagram</button>` : ''}
             <button class="btn" type="button" data-action="copy">${icon.copy} Copiar</button>
@@ -724,16 +847,16 @@
           <div class="btns">
             ${a.phone ? `<button class="btn small" type="button" data-log="call">${icon.phone} Llamé</button>` : ''}
             <button class="btn small" type="button" data-log="visit">Lo visité</button>
-            <button class="btn small" type="button" data-outcome="respondio">Respondió</button>
-            <button class="btn small" type="button" data-outcome="interesado">Interesado</button>
-            <button class="btn small" type="button" data-outcome="reunion">Reunión</button>
-            <button class="btn small" type="button" data-outcome="cliente">Cliente</button>
+            <button class="btn small" type="button" data-outcome="respondio" data-testid="outcome-respondio">Respondió</button>
+            <button class="btn small" type="button" data-outcome="interesado" data-testid="outcome-interesado">Interesado</button>
+            <button class="btn small" type="button" data-outcome="reunion" data-testid="outcome-reunion">Reunión</button>
+            <button class="btn small" type="button" data-outcome="cliente" data-testid="outcome-cliente">Cliente</button>
             ${link && !u.api ? `<button class="btn small" type="button" data-demo="opened">Abrió la demo</button><button class="btn small" type="button" data-demo="tried">Probó la demo</button>` : ''}
           </div>
           <div class="btns">
             <button class="btn small ghost" type="button" data-outcome="perdido">${esc(u.stageLabel('perdido'))}</button>
             <button class="btn small ghost" type="button" data-outcome="invalido">${esc(u.stageLabel('invalido'))}</button>
-            <button class="btn small ghost danger" type="button" data-outcome="baja">Pidió no recibir más</button>
+            <button class="btn small ghost danger" type="button" data-outcome="baja" data-testid="outcome-baja" data-arm="Confirmar: no escribirle nunca más">Pidió no recibir más</button>
             ${C.closed(a) ? '<button class="btn small ghost" type="button" data-action="reopen">Reabrir</button>' : ''}
           </div>
           <label class="field">Detalle o evidencia (qué dijo, por qué)<input data-detail placeholder="Opcional, pero ayuda a medir bien"></label>
@@ -788,7 +911,7 @@
       return `<div class="section"><h3>Cuenta</h3>
         <p style="margin:0"><strong>${esc(a.accountClinic || 'Cuenta creada')}</strong> · desde ${esc(when(a.accountAt))}
           ${a.accountActive ? '<span class="badge live" style="margin-left:6px">Activa</span>' : '<span class="badge off" style="margin-left:6px">Sin turnos en 30 días</span>'}</p>
-        <div class="btns"><button class="btn small ghost" type="button" data-account="">Desvincular</button></div></div>`;
+        <div class="btns"><button class="btn small ghost" type="button" data-account="" data-arm="Confirmar: desvincular">Desvincular</button></div></div>`;
     }
     return `<div class="section"><h3>Cuenta</h3>
       <p class="sub" style="margin:0">Cuando le des acceso a una clínica real, vinculala acá: así cuenta en «cuentas creadas» y, si tiene turnos, en «activas».</p>
@@ -809,7 +932,8 @@
     const u = unitOf(unitId);
     const d = state.data[unitId];
     const a = findAccount(id, unitId);
-    if (!a) return null;
+    if (!a || state.busy) return null;
+    state.busy = true;
     let res;
     try {
       if (state.demo) {
@@ -824,6 +948,8 @@
       render();
       if (state.drawer) renderDrawer();
       return null;
+    } finally {
+      state.busy = false;
     }
     const before = a;
     replaceAccount(unitId, res.account);
@@ -846,7 +972,32 @@
   }
 
   // Abrir el canal y preguntar si salió (abrir no es enviar).
-  function startSend(id, channel, key, text) {
+  // WhatsApp siempre en la misma pestaña («chapa-whatsapp»): en la computadora, WhatsApp Web directo
+  // (sin la página de wa.me); en el celular, wa.me abre la app. Como el panel original de Turnia.
+  function openWhatsApp(phone, text) {
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const url = coarse ? C.waLink(phone, text) : C.waWebLink(phone, text);
+    if (!url) return false;
+    const w = window.open(url, 'chapa-whatsapp');
+    if (w) { try { w.opener = null; } catch { /* otra pestaña */ } }
+    return true;
+  }
+
+  // El envío abierto y sin confirmar sobrevive a una recarga: se vuelve a preguntar si salió.
+  function savePending(p) { store('pending', p ? { ...p, unit: state.unit, at: Date.now() } : null); }
+  function storedPending() {
+    const p = store('pending');
+    return p && p.unit === state.unit && Date.now() - p.at < 6 * 3600000 ? p : null;
+  }
+  function showConfirmBar(p, { again } = {}) {
+    const c = $('#confirm');
+    const mins = again ? Math.round((Date.now() - p.at) / 60000) : 0;
+    c.innerHTML = `<p>${again ? `Abriste WhatsApp para <strong>${esc(p.name)}</strong>${mins ? ` hace ${mins} min` : ''}. ¿Salió el ${p.kind === 'saludo' ? 'saludo' : 'mensaje'}?` : `¿Salió el ${p.kind === 'saludo' ? 'saludo' : 'mensaje'} a <strong>${esc(p.name)}</strong>?`}</p><button class="btn primary" type="button" data-confirm="yes" data-testid="confirm-sent">Sí, se envió</button><button class="btn ghost" type="button" data-confirm="no" data-testid="confirm-not-sent">No salió</button>`;
+    c.classList.add('on');
+    window.LiquidGlass && window.LiquidGlass.refresh(c);
+  }
+
+  function startSend(id, channel, key, text, { inline } = {}) {
     const u = unitOf(state.unit);
     const a = findAccount(id);
     if (!a) return;
@@ -856,7 +1007,7 @@
     const next = C.nextTemplate(a, u);
     const kind = next && next.key === key ? next.kind : /saludo/.test(key) ? 'saludo' : 'mensaje';
     let url = '';
-    if (channel === 'whatsapp') url = C.waLink(a.phone, body);
+    if (channel === 'whatsapp') url = C.waWebLink(a.phone, body);
     else if (channel === 'email') url = `mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent(C.renderTemplate(t.subject || '', a, u))}&body=${encodeURIComponent(body)}`;
     else if (channel === 'instagram') {
       copy(body);
@@ -864,26 +1015,42 @@
       url = `https://ig.me/m/${encodeURIComponent(handle)}`;
     }
     if (!url) { toast('Esta cuenta no tiene ese canal.', true); return; }
-    window.open(url, '_blank', 'noopener');
-    state.pending = { id, channel, key, kind, name: a.name };
-    const c = $('#confirm');
-    c.innerHTML = `<p>¿Salió el ${kind === 'saludo' ? 'saludo' : 'mensaje'} a <strong>${esc(a.name)}</strong>?</p><button class="btn primary" type="button" data-confirm="yes">Sí, se envió</button><button class="btn ghost" type="button" data-confirm="no">No salió</button>`;
-    c.classList.add('on');
-    window.LiquidGlass && window.LiquidGlass.refresh(c);
-    setTimeout(() => { const b = c.querySelector('[data-confirm="yes"]'); if (b) b.focus(); }, 50);
+    if (channel === 'whatsapp') openWhatsApp(a.phone, body);
+    else window.open(url, '_blank', 'noopener');
+    state.pending = { id, channel, key, kind, name: a.name, inline: Boolean(inline) };
+    savePending(state.pending);
+    if (inline) { render(); return; }
+    showConfirmBar(state.pending);
+    setTimeout(() => { const b = $('#confirm [data-confirm="yes"]'); if (b) b.focus(); }, 50);
   }
   async function confirmSend(yes) {
-    const p = state.pending;
+    const p = state.pending || storedPending();
     state.pending = null;
     $('#confirm').classList.remove('on');
-    if (!p || !yes) return;
+    if (!p) return;
+    if (!yes) {
+      savePending(null);
+      if (p.inline) { state.agent.fails++; skipAgent(p.id); render(); }
+      return;
+    }
     const ok = await act(p.id, { type: 'sent', channel: p.channel, template: p.key, kind: p.kind }, { label: `${p.kind === 'saludo' ? 'Saludo' : 'Mensaje'} a ${p.name} registrado`, undoable: true });
     // El mensaje ya salió: si no se pudo registrar, se reintenta sin volver a abrir WhatsApp.
     if (!ok) {
       state.pending = p;
+      if (p.inline) { render(); return; }
       const c = $('#confirm');
-      c.innerHTML = `<p>No se pudo registrar el ${p.kind === 'saludo' ? 'saludo' : 'mensaje'} a <strong>${esc(p.name)}</strong>. Ya salió: reintentá cuando quieras.</p><button class="btn primary" type="button" data-confirm="yes">Reintentar</button><button class="btn ghost" type="button" data-confirm="no">Descartar</button>`;
+      c.innerHTML = `<p>No se pudo registrar el ${p.kind === 'saludo' ? 'saludo' : 'mensaje'} a <strong>${esc(p.name)}</strong>. Ya salió: reintentá cuando quieras.</p><button class="btn primary" type="button" data-confirm="yes" data-testid="confirm-sent">Reintentar</button><button class="btn ghost" type="button" data-confirm="no" data-testid="confirm-not-sent">Descartar</button>`;
       c.classList.add('on');
+      return;
+    }
+    savePending(null);
+    if (p.inline) {
+      // Ritmo seguro: una pausa al azar antes del próximo envío.
+      const [lo, hi] = unitOf(state.unit).pacing || [45, 90];
+      store(`next-${state.unit}`, Date.now() + (lo + Math.random() * (hi - lo)) * 1000);
+      state.agent.fails = 0;
+      state.agent.replied = null;
+      render();
     }
   }
 
@@ -906,6 +1073,16 @@
     const t = e.target.closest('button, [data-open-account], [data-goto], a');
     if (!t) return;
     const ds = t.dataset;
+    // Confirmación en la misma página (sin ventanas del navegador, que traban a los agentes de IA):
+    // el primer clic pide confirmar y el segundo, dentro de 5 s, ejecuta.
+    if (ds.arm && ds.armed !== '1') {
+      ds.armed = '1';
+      ds.label = t.innerHTML;
+      t.textContent = ds.arm;
+      t.classList.add('armed');
+      setTimeout(() => { if (t.isConnected && ds.armed === '1') { ds.armed = ''; t.innerHTML = ds.label; t.classList.remove('armed'); } }, 5000);
+      return;
+    }
     if (ds.unit && t.closest('#units')) { go(ds.unit, state.view === 'resumen' ? 'hoy' : state.view); ensureLoaded(); return; }
     if (ds.view) { go(state.unit, ds.view); return; }
     if (ds.goto) { go(ds.goto, ds.viewTo || 'hoy'); return; }
@@ -933,6 +1110,29 @@
       render();
       return;
     }
+    if (ds.agent) {
+      const card = $('#agent');
+      const id = card && card.dataset.accountId;
+      const key = card && card.dataset.template;
+      switch (ds.agent) {
+        case 'open': if (id) startSend(id, 'whatsapp', key, null, { inline: true }); break;
+        case 'sent': await confirmSend(true); break;
+        case 'not-sent': await confirmSend(false); break;
+        case 'no-wa': {
+          state.pending = null;
+          savePending(null);
+          await act(id, { type: 'outcome', outcome: 'invalido', detail: 'WhatsApp dice que el número no es válido' }, { label: 'Marcado: no tiene WhatsApp' });
+          render();
+          break;
+        }
+        case 'skip': skipAgent(id); state.agent.replied = null; render(); break;
+        case 'chat': { const a = findAccount(id); if (a) openWhatsApp(a.phone, ''); break; }
+        case 'replied': state.agent.replied = id; render(); break;
+        case 'override': store(`override-${state.unit}`, C.today()); render(); break;
+        default: break;
+      }
+      return;
+    }
     if (ds.editTpl) {
       const t = templatesOf(state.unit)[ds.editTpl];
       state.editing = { unit: state.unit, key: ds.editTpl, text: t.text, subject: t.subject || '' };
@@ -954,7 +1154,7 @@
     if (ds.moreBlock) { state.more[ds.moreBlock] = true; render(); return; }
     if (ds.stageFilter) { filt(state.unit).stage = ds.stageFilter; state.shown = 100; render(); return; }
     if (ds.send) { e.stopPropagation(); const a = findAccount(ds.send); const next = a && C.nextTemplate(a, unitOf(state.unit)); startSend(ds.send, next ? next.channel : 'whatsapp', ds.key); return; }
-    if (ds.chat) { e.stopPropagation(); const a = findAccount(ds.chat); if (a) window.open(C.waLink(a.phone, ''), '_blank', 'noopener'); return; }
+    if (ds.chat) { e.stopPropagation(); const a = findAccount(ds.chat); if (a) openWhatsApp(a.phone, ''); return; }
     if (ds.confirm) { confirmSend(ds.confirm === 'yes'); return; }
     if (ds.openAccount && !e.target.closest('button, a')) { openDrawer(ds.openAccount); return; }
     if (ds.sendDrawer) {
@@ -966,7 +1166,6 @@
     if (ds.log) { await act(state.drawer, { type: ds.log, detail: detail() }, { label: ds.log === 'call' ? 'Llamada registrada' : 'Visita registrada', undoable: true }); return; }
     if (ds.outcome) {
       const u = unitOf(state.unit);
-      if (ds.outcome === 'baja' && !confirm('¿Pidió no recibir más mensajes? No se le va a volver a escribir por ningún canal.')) return;
       await act(state.drawer, { type: 'outcome', outcome: ds.outcome, detail: detail() }, { label: `Marcado: ${u.stageLabel(ds.outcome)}`, undoable: true });
       return;
     }
@@ -978,7 +1177,6 @@
       return;
     }
     if (ds.account !== undefined && t.closest('#drawer')) {
-      if (!confirm('¿Desvincular la cuenta de esta persona?')) return;
       await act(state.drawer, { type: 'account', clinicId: null }, { label: 'Cuenta desvinculada' });
       return;
     }
@@ -999,6 +1197,7 @@
       }
       case 'more': state.shown += 100; render(); break;
       case 'cancel-tpl': state.editing = null; render(); break;
+      case 'copy-instructions': copy(agentInstructions(unitOf(state.unit))); break;
       case 'factory-tpl': {
         const t = templatesOf(state.unit)[state.editing.key];
         state.editing.text = t.factory;
@@ -1020,7 +1219,7 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if (state.pending) { confirmSend(false); return; }
+      if (state.pending && !state.pending.inline) { confirmSend(false); return; }
       if (state.drawer) closeDrawer();
     }
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-open-account], tr[data-drill-dim]')) {
@@ -1108,7 +1307,14 @@
 
   $('#user').addEventListener('click', async () => {
     if (state.demo) { state.demo = false; state.data = {}; boot(); return; }
-    if (!confirm('¿Cerrar la sesión?')) return;
+    const u = $('#user');
+    if (u.dataset.armed !== '1') {
+      u.dataset.armed = '1';
+      toast('Tocá de nuevo para cerrar la sesión');
+      setTimeout(() => { u.dataset.armed = ''; }, 5000);
+      return;
+    }
+    u.dataset.armed = '';
     await api('logout', { method: 'POST', body: {} }).catch(() => {});
     state.session.user = null;
     state.data = {};
