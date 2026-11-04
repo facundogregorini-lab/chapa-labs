@@ -107,7 +107,9 @@
       accounts.filter((a) => a.stage === 'reunion' || a.stage === 'cliente').slice(0, 3).forEach((a, i) => {
         a.accountAt = a.meeting || a.replied;
         a.accountClinic = `Clínica de ejemplo ${i + 1}`;
-        if (i < 2) a.accountActive = C.nowLocal();
+        a.clientAt = C.addDays(t, -[20, 9, 3][i]) + ' 10:00';
+        if (i === 0) { a.operationalAt = C.addDays(t, -12) + ' 11:00'; a.firstMonth = 31; a.accountActive = C.nowLocal(); }
+        if (i === 1) { a.operationalAt = C.addDays(t, -2) + ' 09:00'; a.firstMonth = 2; a.accountActive = C.nowLocal(); }
       });
     }
     for (const a of accounts) a.updated = C.nowLocal();

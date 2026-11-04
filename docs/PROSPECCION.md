@@ -126,17 +126,34 @@ El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel
 
 ### Embudo contra la meta
 
-En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (se escala al período; en «Histórico», desde el primer contacto). Cada paso tiene la conversión esperada sobre el anterior:
+En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (se escala al período; en «Histórico», desde el primer contacto). Cada paso tiene la conversión esperada sobre el anterior. Cada unidad tiene el suyo, según cómo vende:
 
-| Paso | Meta | Turnia | habita. |
-| --- | --- | --- | --- |
-| Saludos enviados | 250 por semana | Planilla: saludo o primer contacto | Planilla: «Enviado» |
-| Demos enviadas | 15% | Planilla: al menos un mensaje con la demo | App: demos publicadas de las cuentas prospectadas |
-| Visitadas | 65% | Planilla: abrieron su demo (`/p/…`) | App: entraron a su demo |
-| Con interacción | 50% | Planilla: conversó con Sofi en la demo | App: interactuaron con su demo |
-| Cuentas creadas | 50% | Planilla: le dimos acceso a una clínica real (se vincula en la ficha → Cuenta) | App: crearon o reclamaron su cuenta |
-| Cuentas activas | 50% | Planilla: su clínica tuvo turnos en 30 días | App: primera ambientación propia |
-| Clientes pagos | 25% | Planilla: «Cliente» | App: primer pago aprobado |
+**Turnia** (Programa Fundadores: nadie compra sin una llamada de 15 minutos y el setup se cobra 100% antes de implementar, `src/content/precios.ts`). El embudo termina en el cobro; crear la cuenta y que opere es posventa.
+
+| Paso | Meta | De dónde sale |
+| --- | --- | --- |
+| Saludos enviados | 250 por semana | Planilla: saludo o primer contacto |
+| Demos enviadas | 15% | Planilla: al menos un mensaje con la demo |
+| Visitadas | 65% | Planilla: abrieron su demo (`/p/…`) |
+| Hablaron con Sofi | 50% | Planilla: conversaron con Sofi en su demo |
+| Llamadas agendadas | 45% | Planilla: «Reunión» (15 minutos) |
+| Clientes Fundadores | 50% | Planilla: «Cliente» = setup y mes 1 cobrados |
+
+**habita.** (alta autogestionada con créditos de regalo: crear la cuenta sí es parte del embudo).
+
+| Paso | Meta | De dónde sale |
+| --- | --- | --- |
+| Saludos enviados | 250 por semana | Planilla: «Enviado» |
+| Demos enviadas | 15% | App: demos publicadas de las cuentas prospectadas |
+| Visitadas | 65% | App: entraron a su demo |
+| Con interacción | 50% | App: interactuaron con su demo |
+| Cuentas creadas | 50% | App: crearon o reclamaron su cuenta |
+| Cuentas activas | 50% | App: primera ambientación propia |
+| Clientes pagos | 25% | App: primer pago aprobado |
+
+### Onboarding de Turnia (`?vista=onboarding`)
+
+Posventa, fuera del embudo: por cada cliente (marcado «Cliente» o con cuenta vinculada), las dos garantías del Programa Fundadores. **Operativa en 14 días** desde «Cliente desde» (si no, se devuelve el setup) y **50 interacciones en su primer mes** desde «Operativa desde» (si no, el mes 2 es gratis). «Operativa» es la primera conversación de Sofi en su clínica real (la que se vincula en la ficha, sección Cuenta). Marca en riesgo lo que está por vencer o no llega al ritmo. Los datos salen de las columnas «Cliente desde», «Operativa desde» e «Interacciones del primer mes» de la planilla de Turnia. La garantía de Revenue Growth (100 pacientes dormidos en 30 días) todavía no está.
 
 Cada paso de la planilla incluye a los siguientes (quien conversó en la demo también cuenta como visita). Las metas están en `targets` de cada unidad (`prospecting/units.js`). Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su `/api/metricas`. Sin dato, el paso dice «Sin datos».
 

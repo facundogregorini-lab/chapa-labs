@@ -50,6 +50,9 @@
     ['accountAt', 'Cuenta creada', /^cuenta creada$/i],
     ['accountClinic', 'Clínica de la cuenta', /^cl[ií]nica de la cuenta$/i],
     ['accountActive', 'Cuenta activa', /^cuenta activa$/i],
+    ['clientAt', 'Cliente desde', /^cliente desde$/i],
+    ['operationalAt', 'Operativa desde', /^operativa desde$/i],
+    ['firstMonth', 'Interacciones del primer mes', /^interacciones del primer mes$/i],
     ['replied', 'Respondió', /^respondi[oó]$/i],
     ['interested', 'Interesado', /^interesad[oa]$/i],
     ['meeting', 'Reunión', /^reuni[oó]n$/i],
@@ -179,9 +182,10 @@
       a.stageRaw = a.stage;
       a.stage = stageFromText(a.stage);
       // Fechas o «Sí»; cualquier otro texto en Baja también cuenta como baja.
-      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'accountAt', 'accountActive', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
+      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'accountAt', 'accountActive', 'clientAt', 'operationalAt', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
       a.optOut = parseDate(a.optOut) || (a.optOut && !/^(no|false|falso|-)$/i.test(a.optOut) ? 'sí' : '');
       a.touches = Number(String(a.touches).replace(',', '.')) || 0;
+      a.firstMonth = a.firstMonth === '' ? null : Number(a.firstMonth) || 0;
       a.score = a.score === '' ? null : Number(String(a.score).replace(',', '.'));
       if (Number.isNaN(a.score)) a.score = null;
       a.priority = a.priority === '' ? null : Number(String(a.priority).replace(/\D+/g, '')) || null;

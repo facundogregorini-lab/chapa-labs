@@ -113,16 +113,19 @@
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
     },
     // Embudo con metas: la base es por semana; cada paso, la conversión esperada del anterior.
+    // Modelo comercial de Turnia (Programa Fundadores): nadie compra sin una llamada de 15 minutos y el
+    // setup se cobra 100% antes de implementar. Por eso el embudo termina en «setup cobrado»; crear la
+    // cuenta y que opere es posventa (vista Onboarding, con las garantías).
     targets: [
       { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
       { key: 'demos', label: 'Demos enviadas', rate: 0.15, sheet: (a) => a.touches >= 1 },
       { key: 'visitadas', label: 'Visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
-      { key: 'interaccion', label: 'Con interacción', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
-      // Por persona: la cuenta real que se le dio (se vincula en la ficha) y si su clínica tuvo turnos en 30 días.
-      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Le dimos acceso a una clínica real', rate: 0.5, sheet: (a) => Boolean(a.accountAt) },
-      { key: 'activas', label: 'Cuentas activas', hint: 'Su clínica tuvo turnos en 30 días', rate: 0.5, sheet: (a) => Boolean(a.accountActive) },
-      { key: 'pagos', label: 'Clientes pagos', hint: 'Marcados «Cliente»', rate: 0.25, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
+      { key: 'interaccion', label: 'Hablaron con Sofi', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
+      { key: 'llamadas', label: 'Llamadas agendadas', hint: 'Reunión de 15 minutos («Reunión» en Turnia)', rate: 0.45, sheet: (a) => Boolean(a.meeting) || a.stage === 'reunion' },
+      { key: 'fundadores', label: 'Clientes Fundadores', hint: 'Setup y mes 1 cobrados («Cliente» en Turnia)', rate: 0.5, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
     ],
+    // Posventa: las garantías del Programa Fundadores (src/content/precios.ts en Turnia).
+    onboarding: { setupDays: 14, firstMonthInteractions: 50 },
     // Lo que sigue al embudo comercial, desde /api/metricas de Turnia (totales, sin datos personales).
     product: [
       { label: 'Demos de Sofi', path: 'demos.iniciadas', hint: 'Web, WhatsApp o llamada' },

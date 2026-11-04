@@ -255,20 +255,23 @@ test('embudo contra la meta de Turnia con datos como los de su planilla: visitad
   ];
   const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03', metrics: { uso: { clinicas: 1, clinicas_activas: 1 } } });
   const by = Object.fromEntries(tf.steps.map((s) => [s.key, s.actual]));
-  assert.deepEqual(by, { saludos: 6, demos: 4, visitadas: 4, interaccion: 2, cuentas: 0, activas: 0, pagos: 0 });
+  assert.deepEqual(by, { saludos: 6, demos: 4, visitadas: 4, interaccion: 2, llamadas: 0, fundadores: 0 });
   for (let i = 1; i < 4; i++) assert.ok(tf.steps[i].actual <= tf.steps[i - 1].actual, tf.steps[i].key);
 });
 
-test('Turnia: cuentas creadas y activas son por persona (no cuenta clínicas de otras fuentes)', () => {
+test('Turnia: el embudo termina en clientes fundadores (setup cobrado), con la llamada antes', () => {
   const { turnia } = require('../prospecting/units').UNITS;
+  assert.deepEqual(turnia.targets.map((s) => [s.key, s.rate || s.perWeek]), [['saludos', 250], ['demos', 0.15], ['visitadas', 0.65], ['interaccion', 0.5], ['llamadas', 0.45], ['fundadores', 0.5]]);
   const a = (o) => ({ firstContact: '2026-11-02 10:00', touches: 1, stage: 'contactado', phoneKind: 'celular', ...o });
-  const accounts = [a({ demoOpened: 'sí', demoChat: 'sí', accountAt: '2026-11-03 10:00', accountActive: '2026-11-03 12:00' }), a({ demoOpened: 'sí' }), a({})];
-  // La app dice 1 clínica activa (por ejemplo, una de otra fuente): no se usa.
-  const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03', metrics: { uso: { clinicas: 5, clinicas_activas: 5 } } });
-  const by = Object.fromEntries(tf.steps.map((s) => [s.key, [s.actual, s.source]]));
-  assert.deepEqual(by.cuentas, [1, 'sheet']);
-  assert.deepEqual(by.activas, [1, 'sheet']);
-  assert.deepEqual(C.toAccounts([['Código', 'Nombre', 'Cuenta creada', 'Clínica de la cuenta', 'Cuenta activa'], ['x', 'X', '2026-11-03 10:00', 'Clínica X', '']], turnia).accounts[0].accountClinic, 'Clínica X');
+  const accounts = [a({ demoOpened: 'sí', demoChat: 'sí', stage: 'reunion' }), a({ demoOpened: 'sí', demoChat: 'sí', stage: 'cliente' }), a({ demoOpened: 'sí' }), a({})];
+  const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03' });
+  const by = Object.fromEntries(tf.steps.map((s) => [s.key, s.actual]));
+  assert.deepEqual(by, { saludos: 4, demos: 4, visitadas: 3, interaccion: 2, llamadas: 2, fundadores: 1 });
+  const row = C.toAccounts([['Código', 'Nombre', 'Cliente desde', 'Operativa desde', 'Interacciones del primer mes'], ['x', 'X', '2026-11-01 10:00', '2026-11-05 09:00', '37']], turnia).accounts[0];
+  assert.equal(row.clientAt, '2026-11-01 10:00');
+  assert.equal(row.operationalAt, '2026-11-05 09:00');
+  assert.equal(row.firstMonth, 37);
+  assert.equal(C.toAccounts([['Código', 'Nombre', 'Cuenta creada', 'Clínica de la cuenta', 'Cuenta activa'], ['x', 'X', '2026-11-03 10:00', 'Clínica X', '']], turnia).accounts[0].accountClinic, 'Clínica X');
 });
 
 test('modo Enviar: WhatsApp Web directo, franjas horarias y un reintento no se registra dos veces', () => {

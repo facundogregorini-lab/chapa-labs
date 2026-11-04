@@ -113,7 +113,7 @@
     const m = location.pathname.match(/^\/prospecting\/?(turnia|habita|todas)?/);
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
-    state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'enviar', 'embudo', 'cuentas', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
+    state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'enviar', 'embudo', 'cuentas', 'onboarding', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
   }
   function go(unit, view, { replace } = {}) {
     state.unit = unit;
@@ -167,7 +167,7 @@
     $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
     const tabs = state.unit === 'todas'
       ? [['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
+      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
     $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
     document.body.dataset.unit = state.unit;
     const userBtn = $('#user');
@@ -205,7 +205,7 @@
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, enviar: renderSend, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
@@ -655,6 +655,66 @@
       <section class="card glass"><div class="card-head"><div><h2>Después</h2><p class="sub">El orden de la cola: seguimientos, saludos por revisar y nuevos hasta la meta. Los saltados van al final.</p></div></div>
         <div class="rows">${items.slice(cur && items[0] && items[0].a.id === (a && a.id) ? 1 : 0, 9).map((x) => `<div class="arow" data-open-account="${esc(x.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(x.a.name)}</strong><div class="meta"><span>${esc(x.step)}</span>·<span>${esc(x.a.zone || '')}</span>${signals(x.a)}</div></div></div>`).join('') || '<p class="empty">Nadie más por ahora.</p>'}</div>
       </section>`;
+  }
+
+  // ─── Onboarding (posventa: garantías del Programa Fundadores) ─
+  // Cada cliente: desde que se cobró el setup, operativo en 14 días (si no, se devuelve el setup) y
+  // al menos 50 interacciones en su primer mes operativo (si no, el mes 2 es gratis).
+  function onboardingRows(id) {
+    const u = unitOf(id);
+    const g = u.onboarding;
+    const t = C.today();
+    const d = state.data[id];
+    if (!g || !d || !d.accounts) return [];
+    return d.accounts.filter((a) => a.stage === 'cliente' || a.customer || a.clientAt || a.accountAt).map((a) => {
+      const start = C.dayOf(a.clientAt || a.customer || a.accountAt);
+      const op = C.dayOf(a.operationalAt);
+      let g1;
+      if (!start) g1 = { state: 'info', text: 'Falta la fecha de cobro (marcalo «Cliente»)' };
+      else if (op) {
+        const days = C.daysBetween(start, op);
+        g1 = days <= g.setupDays ? { state: 'ok', text: `Operativa en ${days} días` } : { state: 'bad', text: `Operativa en ${days} días: corresponde devolver el setup` };
+      } else {
+        const left = g.setupDays - C.daysBetween(start, t);
+        g1 = left < 0 ? { state: 'bad', text: `Vencida hace ${-left} días: corresponde devolver el setup` } : { state: left <= 3 ? 'risk' : 'wait', text: `Faltan ${left} días para que opere` };
+      }
+      let g2;
+      const n = a.firstMonth || 0;
+      if (!op) g2 = { state: 'info', text: 'Empieza cuando opere' };
+      else {
+        const elapsed = C.daysBetween(op, t);
+        if (n >= g.firstMonthInteractions) g2 = { state: 'ok', text: `${int(n)} interacciones en el primer mes` };
+        else if (elapsed >= 30) g2 = { state: 'bad', text: `${int(n)} de ${g.firstMonthInteractions}: el mes 2 es gratis` };
+        else {
+          const pace = (n / Math.max(1, elapsed)) * 30;
+          g2 = { state: pace < g.firstMonthInteractions ? 'risk' : 'wait', text: `${int(n)} de ${g.firstMonthInteractions} · quedan ${30 - elapsed} días${pace < g.firstMonthInteractions ? ' · a este ritmo no llega' : ''}` };
+        }
+      }
+      return { a, start, op, g1, g2 };
+    }).sort((x, y) => ['bad', 'risk', 'wait', 'info', 'ok'].indexOf(x.g1.state) - ['bad', 'risk', 'wait', 'info', 'ok'].indexOf(y.g1.state) || String(y.start).localeCompare(String(x.start)));
+  }
+  function onboardingAlerts() {
+    if (!state.data[state.unit] || !state.data[state.unit].accounts) return 0;
+    return onboardingRows(state.unit).filter((r) => [r.g1.state, r.g2.state].some((x) => x === 'bad' || x === 'risk')).length;
+  }
+  function renderOnboarding(id) {
+    const u = unitOf(id);
+    const g = u.onboarding;
+    const rows = onboardingRows(id);
+    const chip = (x) => `<span class="gstate ${x.state}">${{ ok: '✓', bad: '✗', risk: '!', wait: '…', info: '·' }[x.state]} ${esc(x.text)}</span>`;
+    const count = (f) => rows.filter(f).length;
+    return `
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Onboarding</span><h1>Que cada fundador quede andando</h1><p>Posventa, fuera del embudo comercial: desde que se cobra el setup, la clínica tiene que operar en ${g.setupDays} días (si no, se devuelve el setup) y tener al menos ${g.firstMonthInteractions} interacciones en su primer mes (si no, el mes 2 es gratis).</p></div></section>
+      <section class="card glass"><div class="kpis">
+        ${kpi('Clientes', int(rows.length), 'Setup cobrado o cuenta vinculada')}
+        ${kpi('Operativas', int(count((r) => r.op)), `Primera conversación de Sofi`)}
+        ${kpi('En riesgo', int(count((r) => r.g1.state === 'risk' || r.g2.state === 'risk')), 'Garantía por vencer')}
+        ${kpi('Garantías incumplidas', int(count((r) => r.g1.state === 'bad' || r.g2.state === 'bad')), 'Devolución o mes gratis')}
+      </div></section>
+      <section class="card glass"><div class="card-head"><div><h2>Clientes</h2><p class="sub">«Cliente desde» es cuando se marcó «Cliente» (setup cobrado); «operativa», la primera conversación de Sofi en su clínica. Vinculá la clínica real en la ficha (sección Cuenta).</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Clínica</th><th>Cliente desde</th><th>Garantía 1 · operativa en ${g.setupDays} días</th><th>Garantía 2 · ${g.firstMonthInteractions} interacciones el primer mes</th></tr></thead><tbody>
+          ${rows.map((r) => `<tr class="click" data-open-account="${esc(r.a.id)}" tabindex="0"><td><strong>${esc(r.a.name)}</strong></td><td>${r.a.accountClinic ? esc(r.a.accountClinic) : '<span class="sub">Sin vincular</span>'}${r.a.accountActive ? ' <span class="badge live">Activa</span>' : ''}</td><td>${esc(when(r.start) || '—')}</td><td>${chip(r.g1)}</td><td>${chip(r.g2)}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Todavía no hay clientes. Cuando cobres el setup, marcalo «Cliente» en su ficha y vinculá su clínica.</td></tr>`}
+        </tbody></table></div></section>`;
   }
 
   // ─── Cuentas ────────────────────────────────────────────────
