@@ -16,7 +16,10 @@
     ...(p.ads ? p.ads.daily.map((d) => d.date.slice(0, 7)) : []),
     ...(p.posthog ? (p.posthog.data.daily || []).map((d) => d.date.slice(0, 7)) : []),
   ];
-  let allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
+  // El mes en curso siempre está (aunque la foto de data.js sea del mes anterior): los datos en vivo lo llenan.
+  const thisMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+  const monthsOf = () => [...new Set([...PROJECTS.flatMap(projectMonths), thisMonth()])].sort();
+  let allMonths = monthsOf();
   const state = {
     month: allMonths[allMonths.length - 1],
     view: 'resumen',
@@ -597,6 +600,23 @@
           <span class="f-num">${fmt(v, 'int')}</span>
         </div>`;
     }).join('');
+  }
+
+  // ─── Resumen: del primer contacto al uso real (desde /api/metricas) ──
+  // Para los proyectos que venden por prospección: el embudo comercial completo y lo que ya pasa
+  // en el producto, con los datos en vivo de la app. El detalle y la meta, en /prospecting.
+  function summaryFunnelHtml(p, color) {
+    const sf = p.summaryFunnel;
+    if (!sf || !mReal(p)) return '';
+    const row = Object.fromEntries(sf.steps.map((st) => [st.key, mNum(p, st.metrics)]));
+    const ctx = (sf.context || []).map((c) => tile({ label: c.label, hint: c.hint, value: mNum(p, c.metrics), format: c.format || 'int' })).join('');
+    return `
+      <h2 class="section">${esc(sf.title)} ${mBadge(p)}</h2>
+      <div class="grid g-2">
+        <div class="card"><h3>${esc(sf.funnelTitle)}</h3>${sf.note ? `<p class="sub">${esc(sf.note)}</p>` : ''}<div class="funnel">${funnelHtml(sf.steps, row, color)}</div>
+          ${sf.link ? `<p class="sub" style="margin-top:12px"><a href="${esc(sf.link)}">${esc(sf.linkLabel)} →</a></p>` : ''}</div>
+        <div><h3 style="margin:0 0 4px">${esc(sf.contextTitle)}</h3>${sf.contextNote ? `<p class="sub" style="margin:0 0 10px">${esc(sf.contextNote)}</p>` : ''}<div class="tiles summary-tiles">${ctx}</div></div>
+      </div>`;
   }
 
   // ─── Embudo real por canal (PostHog + inversión de Meta) ──
@@ -1440,10 +1460,11 @@
         </div>
         ${chart(lineChart({ points: list, format: ns.format, color, height: 240 }))}
       </div>
+      ${summaryFunnelHtml(p, color)}
 
       ${p.revenue ? `
       <h2 class="section">Suscriptores e ingresos ${p.revenue.noData ? badge(p.revenue) : p.revenue.metrics ? mBadge(p) : phBadge(p)}</h2>
-      ${renderRevenue(p, color)}` : ''}
+      ${p.revenue.noData && p.revenue.note ? `<div class="card"><p class="sub" style="margin:0">${esc(p.revenue.note)}</p></div>` : renderRevenue(p, color)}` : ''}
       </section>
 
       <section class="pillar" id="producto-sec" aria-labelledby="producto">
@@ -1600,7 +1621,7 @@
   const noData = PROJECTS.some((p) => [p.northStar, p.revenue, p.acquisition, p.usability].some((b) => noSource(p, b)));
   if (noData) $('#sample').hidden = false;
   if (DATA.team && DATA.team.length) $('#team').textContent = `Seguimiento de proyectos · ${DATA.team.join(' y ')}`;
-  $('#foot').textContent = `Datos actualizados al ${new Date(`${DATA.updatedAt}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}.`;
+  $('#foot').textContent = `Datos actualizados al ${new Date(`${DATA.updatedAt}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })}. Lo marcado «en vivo» se lee al abrir.`;
 
   // Datos en vivo de Meta Ads (función /api/meta en Vercel). Si no está
   // configurada o falla, queda la foto guardada en data.js.
@@ -1635,7 +1656,7 @@
       });
       if (!changed) return;
       const last = allMonths[allMonths.length - 1];
-      allMonths = [...new Set(PROJECTS.flatMap(projectMonths))].sort();
+      allMonths = monthsOf();
       if (state.month === last) state.month = allMonths[allMonths.length - 1];
       fillMonths();
       render();

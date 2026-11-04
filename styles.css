@@ -409,3 +409,5 @@ input { font: inherit; color: inherit; }
   .period-now { margin-left: 0; width: 100%; }
   .seg button { padding: 6px 10px; font-size: 12px; }
 }
+
+.summary-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
