@@ -1456,6 +1456,7 @@
           <p class="hero">${fmt(value, ns.format)}</p>
           ${delta(value, prev && prev.value, { format: ns.format, suffix: f.suffix })}
           ${f.period ? `<p class="period">${f.period}</p>` : ''}
+          ${ns.split && ns.metrics && mReal(p) ? `<p class="period">${ns.split.map((x) => `<strong>${fmt(mNum(p, x.metrics), 'int')}</strong> ${esc(x.label)}`).join(' · ')}</p>` : ''}
           <p class="nsm-def">${esc(ns.definition)}</p>
         </div>
         ${chart(lineChart({ points: list, format: ns.format, color, height: 240 }))}

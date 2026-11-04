@@ -521,11 +521,18 @@ window.CHAPA_DATA = {
       currency: 'ARS',
       posthog: { org: 'Turnia Salud', projectId: 518346, snapshotAt: null, data: {} },
       metrics: { source: 'panel de Turnia', snapshotAt: null, data: null },
+      // North Star de la etapa actual (validación, antes de cobrar): cuánta gente habla con Sofi.
+      // Suma los pacientes en clínicas reales y los odontólogos que la prueban en su demo; cuando haya
+      // clínicas pagas, la que importa es la de clínicas reales (y después, turnos).
       northStar: {
-        name: 'Turnos agendados por Turnia',
-        definition: 'Turnos que tomó Turnia (WhatsApp, teléfono, web o campañas; no los cargados en el panel) en los últimos 7 días, en clínicas reales (sin las de las demos).',
+        name: 'Conversaciones con Sofi',
+        definition: 'Conversaciones con Sofi en los últimos 7 días: pacientes en clínicas reales y odontólogos que la prueban en su demo (WhatsApp, voz o web).',
         format: 'int',
-        metrics: { value: 'uso.ultimos7', prev: 'uso.previos7', daily: 'uso.diario', dailyKey: 'turnos' },
+        metrics: { value: 'sofi.ultimos7', prev: 'sofi.previos7', daily: 'sofi.diario', dailyKey: 'conversaciones' },
+        split: [
+          { label: 'en clínicas reales', metrics: 'sofi.clinicas7' },
+          { label: 'en demos', metrics: 'sofi.demos7' },
+        ],
       },
       // Resumen: del primer contacto al uso real, en vivo desde /api/metricas (histórico).
       summaryFunnel: {
