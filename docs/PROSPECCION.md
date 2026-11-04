@@ -151,7 +151,7 @@ En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (s
 | Cuentas activas | 50% | App: primera ambientación propia |
 | Clientes pagos | 25% | App: primer pago aprobado |
 
-**Metas ajustables:** en el Embudo, «Editar metas» cambia los saludos por semana y el % de cada paso. Son del equipo (las ve todo el que abre el panel): se guardan en el almacén privado de Vercel Blob del proyecto (`prospecting/metas-<unidad>.json`, el mismo almacén que usa `/api/ediciones`). «Volver a las de fábrica» vuelve a las de `units.js`.
+**Metas ajustables:** en el Embudo, «Editar metas» cambia los saludos por semana y el % de cada paso. Son del equipo (las ve todo el que abre el panel) y se guardan donde vive cada unidad: **Turnia**, en su configuración por su API (los saludos por semana son la misma meta semanal de su panel, `outreach_weekly_goal`; los % en `outreach_funnel_rates`); **habita.**, en la pestaña «Metas» de su planilla (se puede editar ahí también: el % como «45» o «45%»). «Volver a las de fábrica» vuelve a las de `units.js`.
 
 ### Onboarding de Turnia (`?vista=onboarding`)
 

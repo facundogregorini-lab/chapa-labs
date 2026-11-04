@@ -393,7 +393,7 @@
         <label class="field">${esc(u.targets[0].label)} por semana<input type="number" name="perWeek" min="1" max="5000" step="1" required value="${u.targets[0].perWeek}" data-testid="target-perWeek"></label>
         ${u.targets.slice(1).map((t, i) => `<label class="field">${esc(t.label)} <span class="sub" style="font-weight:500">(% sobre «${esc(u.targets[i].label)}»${pctv(base[i + 1].rate) !== pctv(t.rate) ? ` · de fábrica ${pctv(base[i + 1].rate)}%` : ''})</span><span class="pct-input"><input type="number" name="rate-${esc(t.key)}" min="1" max="100" step="0.5" required value="${pctv(t.rate)}" data-testid="target-${esc(t.key)}"><span>%</span></span></label>`).join('')}
       </div>
-      <p class="sub" style="margin:0">Las metas son del equipo: las ve todo el que abre el panel.${state.data[id].targetsShared === false && !state.demo ? ' Para guardarlas hace falta conectar Vercel Blob al proyecto.' : ''}</p>
+      <p class="sub" style="margin:0">Las metas son del equipo: las ve todo el que abre el panel. ${unitOf(id).api ? `Se guardan en ${esc(unitOf(id).appName)}: los saludos por semana son su misma meta semanal.` : 'Se guardan en la pestaña «Metas» de la planilla.'}</p>
       <div class="btns"><button class="btn primary" type="submit" data-testid="save-targets">Guardar metas</button><button class="btn ghost" type="button" data-action="cancel-targets">Cancelar</button><button class="btn ghost" type="button" data-action="reset-targets" data-arm="Confirmar: volver a las de fábrica">Volver a las de fábrica</button></div>
     </form>`;
   }

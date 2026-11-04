@@ -13,8 +13,6 @@
 // Nunca devuelve nada sin sesión: las planillas tienen nombres y teléfonos.
 
 const google = require('./_google');
-// Se carga solo al usar las metas compartidas.
-const blobLib = () => require('@vercel/blob');
 const session = require('./_session');
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
@@ -37,7 +35,7 @@ function fail(res, status, error, extra = {}) {
 
 async function readUnit(unit, sheet) {
   const meta = await google.tabs(sheet.id);
-  const want = [sheet.tab, core.ACTIVITY_TAB, TEMPLATES_TAB].filter((t) => meta.tabs.includes(t));
+  const want = [sheet.tab, core.ACTIVITY_TAB, TEMPLATES_TAB, TARGETS_TAB].filter((t) => meta.tabs.includes(t));
   if (!meta.tabs.includes(sheet.tab)) {
     return { meta, missingTab: true, accounts: [], events: [], map: {}, head: [], templates: {} };
   }
@@ -49,7 +47,7 @@ async function readUnit(unit, sheet) {
   for (const r of trows) {
     if (r[0] && r[4]) templates[String(r[0]).trim()] = { title: r[1] || '', channel: r[2] || '', subject: r[3] || '', text: String(r[4]) };
   }
-  return { meta, accounts, events, map, head, templates };
+  return { meta, accounts, events, map, head, templates, targets: targetsFromRows(values[TARGETS_TAB]) };
 }
 
 // Señales de solo lectura desde otra planilla (por ejemplo, la que Turnia escribe sola).
@@ -96,23 +94,31 @@ async function appendEvents(sheet, tabs, events) {
 }
 
 // ─── Metas del embudo, compartidas por todo el equipo ───────────
-// Se guardan en el almacén privado de Vercel Blob del proyecto (el mismo de /api/ediciones):
-// { perWeek, rates: { paso: 0.45 } }. Sin almacén, se usan las de units.js.
-const targetsPath = (unit) => `prospecting/metas-${unit.id}.json`;
-async function readTargets(unit) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
-  try {
-    const res = await blobLib().get(targetsPath(unit), { access: 'private', useCache: false });
-    if (!res) return null;
-    return JSON.parse(await new Response(res.stream).text());
-  } catch {
-    return null;
+// Se guardan donde vive cada unidad: con API (Turnia), en su configuración (la meta semanal de
+// saludos es la misma de su panel); con planilla (habita.), en la pestaña «Metas».
+// Forma: { perWeek, rates: { paso: 0.45 } }. Sin nada guardado, valen las de units.js.
+const TARGETS_TAB = 'Metas';
+const TARGETS_HEAD = ['Paso', 'Meta', 'Unidad', 'Actualizado', 'Por'];
+const PER_WEEK_KEY = 'saludos_por_semana';
+
+function targetsFromRows(rows) {
+  const out = { rates: {} };
+  for (const r of (rows || []).slice(1)) {
+    const key = String(r[0] || '').trim();
+    const v = Number(String(r[1] || '').replace('%', '').replace(',', '.'));
+    if (!key || !Number.isFinite(v)) continue;
+    if (key === PER_WEEK_KEY) out.perWeek = Math.round(v);
+    else out.rates[key] = v > 1 ? v / 100 : v; // «45», «45%» o «0,45»
+    if (r[3]) out.at = String(r[3]);
+    if (r[4]) out.by = String(r[4]);
   }
+  return out.perWeek ? out : null;
 }
+
 function cleanTargets(unit, body) {
   const out = { rates: {} };
   const perWeek = Number(body && body.perWeek);
-  if (!Number.isInteger(perWeek) || perWeek < 1 || perWeek > 5000) throw new Error('La meta de saludos por semana va de 1 a 5000.');
+  if (!Number.isInteger(perWeek) || perWeek < 1 || perWeek > 2000) throw new Error('La meta de saludos por semana va de 1 a 2000.');
   out.perWeek = perWeek;
   for (const step of unit.targets.slice(1)) {
     const r = Number(body.rates && body.rates[step.key]);
@@ -121,22 +127,34 @@ function cleanTargets(unit, body) {
   }
   return out;
 }
+
 async function doTargets(req, res, user) {
   const unit = UNITS[(req.body || {}).unit];
-  if (!unit || !unit.targets) return fail(res, 400, 'Unidad sin embudo.');
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(res, 503, 'Para guardar las metas falta conectar el almacén de Vercel Blob al proyecto chapa-labs.');
+  const sheet = unit && sheetOf(unit);
+  if (!unit || !unit.targets || !sheet) return fail(res, 400, 'Unidad sin embudo o sin planilla.');
   let targets;
   try {
-    targets = req.body.reset ? null : cleanTargets(unit, req.body);
+    targets = req.body.reset
+      ? { perWeek: unit.targets[0].perWeek, rates: Object.fromEntries(unit.targets.slice(1).map((t) => [t.key, t.rate])) }
+      : cleanTargets(unit, req.body);
   } catch (err) {
     return fail(res, 400, err.message);
   }
-  if (targets) {
-    targets.by = user.name;
-    targets.at = new Date().toISOString();
+  if (unit.api) {
+    if (!apiOf(unit)) return fail(res, 403, `Para guardar las metas de ${unit.name} falta la clave de su API.`);
+    try {
+      const out = await callApi(unit, { method: 'POST', body: { funnel: targets } });
+      return res.status(200).json({ targets: out.funnel });
+    } catch (err) {
+      return fail(res, err.status || 502, err.message);
+    }
   }
-  await blobLib().put(targetsPath(unit), JSON.stringify(targets || {}), { access: 'private', allowOverwrite: true, addRandomSuffix: false, contentType: 'application/json' });
-  return res.status(200).json({ targets });
+  const meta = await google.tabs(sheet.id);
+  if (!meta.tabs.includes(TARGETS_TAB)) await google.addTabs(sheet.id, [TARGETS_TAB]);
+  const at = core.nowLocal();
+  const rows = [TARGETS_HEAD, [PER_WEEK_KEY, targets.perWeek, 'por semana', at, user.name], ...Object.entries(targets.rates).map(([k, r]) => [k, Math.round(r * 1000) / 10, '%', at, user.name])];
+  await google.writeRange(sheet.id, TARGETS_TAB, 1, rows);
+  return res.status(200).json({ targets: { ...targets, at, by: user.name } });
 }
 
 // Unidades cuya planilla la escribe su app (Turnia): las acciones van a la API de la app.
@@ -354,21 +372,24 @@ module.exports = async (req, res) => {
       let templates = data.templates;
       let clinics = null;
       let apiError = null;
+      let apiTargets = null;
       if (unit.api && apiOf(unit)) {
         try {
           const out = await callApi(unit);
           templates = appTemplates(out.templates);
           clinics = out.clinics || [];
+          // La meta semanal es la del panel de la app; sin % guardados, valen los de fábrica.
+          if (out.weeklyGoal) apiTargets = { perWeek: out.weeklyGoal, rates: out.funnelRates || {} };
         } catch (err) {
           apiError = err.message;
         }
       }
-      const targets = await readTargets(unit);
+      let targets = data.targets;
+      if (unit.api && apiOf(unit) && !apiError && apiTargets) targets = apiTargets;
       return res.status(200).json({
         unit: unit.id,
         readAt: new Date().toISOString(),
         targets: targets && targets.perWeek ? targets : null,
-        targetsShared: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
         readOnly: readOnlyOf(unit),
         viaApi: Boolean(unit.api && apiOf(unit)),
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },

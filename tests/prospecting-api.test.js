@@ -224,27 +224,38 @@ test('el mismo envío confirmado dos veces seguidas se registra una sola vez', a
   assert.equal(book.tabs.Actividad.length, before + 1);
 });
 
-test('metas del embudo: sin almacén no se guardan; con valores fuera de rango, error', async () => {
-  delete process.env.BLOB_READ_WRITE_TOKEN;
-  const r = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates: {} } });
-  assert.equal(r.statusCode, 503);
-  process.env.BLOB_READ_WRITE_TOKEN = 'x';
-  const path = require('node:path');
-  const saved = {};
-  require.cache[require.resolve('@vercel/blob')] = { id: 'b', filename: 'b', loaded: true, exports: {
-    put: async (p, body) => { saved[p] = body; },
-    get: async (p) => (saved[p] ? { stream: new Response(saved[p]).body } : null),
-  } };
+test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por su API', async () => {
+  process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
+  const rates = { demos: 0.2, visitadas: 0.6, interaccion: 0.4, cuentas: 0.5, activas: 0.5, pagos: 0.3 };
+  const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates: { ...rates, demos: 2 } } });
+  assert.equal(bad.statusCode, 400);
+  const ok = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates } });
+  assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
+  assert.equal(book.tabs.Metas[1][0], 'saludos_por_semana');
+  assert.equal(book.tabs.Metas[1][1], 300);
+  assert.deepEqual(book.tabs.Metas.find((r) => r[0] === 'demos').slice(0, 2), ['demos', 20]);
+  const data = await call('data', { query: { unit: 'habita' }, cookie });
+  assert.equal(data.body.targets.perWeek, 300);
+  assert.equal(data.body.targets.rates.demos, 0.2);
+
+  process.env.TURNIA_PROSPECTING_SHEET_ID = 'sheet-turnia';
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  book.tabs['Prospección'] = [['Código', 'Nombre', 'Estado'], ['ana-111', 'Ana', 'Contactado']];
+  const realFetch = global.fetch;
+  let sent = null;
+  global.fetch = async (url, opts = {}) => {
+    if (opts.method === 'POST') { sent = JSON.parse(opts.body); return { ok: true, status: 200, json: async () => ({ funnel: sent.funnel }) }; }
+    return { ok: true, status: 200, json: async () => ({ templates: [], clinics: [], weeklyGoal: 320, funnelRates: { llamadas: 0.6 } }) };
+  };
   try {
-    const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates: { demos: 2 } } });
-    assert.equal(bad.statusCode, 400);
-    const rates = { demos: 0.2, visitadas: 0.6, interaccion: 0.4, llamadas: 0.5, fundadores: 0.5 };
-    const ok = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates } });
-    assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
-    assert.equal(ok.body.targets.perWeek, 300);
-    assert.equal(ok.body.targets.by, 'Axel');
-    assert.ok(saved['prospecting/metas-turnia.json']);
+    const t = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 320, rates: { demos: 0.15, visitadas: 0.65, interaccion: 0.5, llamadas: 0.6, fundadores: 0.5 } } });
+    assert.equal(t.statusCode, 200, JSON.stringify(t.body));
+    assert.equal(sent.funnel.perWeek, 320);
+    assert.equal(sent.funnel.rates.llamadas, 0.6);
+    const d = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.deepEqual(d.body.targets, { perWeek: 320, rates: { llamadas: 0.6 } });
   } finally {
-    delete process.env.BLOB_READ_WRITE_TOKEN;
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
   }
 });
