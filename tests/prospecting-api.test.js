@@ -223,3 +223,28 @@ test('el mismo envío confirmado dos veces seguidas se registra una sola vez', a
   assert.equal(second.body.replayed, true);
   assert.equal(book.tabs.Actividad.length, before + 1);
 });
+
+test('metas del embudo: sin almacén no se guardan; con valores fuera de rango, error', async () => {
+  delete process.env.BLOB_READ_WRITE_TOKEN;
+  const r = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates: {} } });
+  assert.equal(r.statusCode, 503);
+  process.env.BLOB_READ_WRITE_TOKEN = 'x';
+  const path = require('node:path');
+  const saved = {};
+  require.cache[require.resolve('@vercel/blob')] = { id: 'b', filename: 'b', loaded: true, exports: {
+    put: async (p, body) => { saved[p] = body; },
+    get: async (p) => (saved[p] ? { stream: new Response(saved[p]).body } : null),
+  } };
+  try {
+    const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates: { demos: 2 } } });
+    assert.equal(bad.statusCode, 400);
+    const rates = { demos: 0.2, visitadas: 0.6, interaccion: 0.4, llamadas: 0.5, fundadores: 0.5 };
+    const ok = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 300, rates } });
+    assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.targets.perWeek, 300);
+    assert.equal(ok.body.targets.by, 'Axel');
+    assert.ok(saved['prospecting/metas-turnia.json']);
+  } finally {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+  }
+});

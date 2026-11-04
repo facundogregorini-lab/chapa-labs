@@ -26,6 +26,7 @@
     more: {},        // bloques de Hoy desplegados completos
     editing: null,   // mensaje en edición: { unit, key, text, subject }
     agent: { replied: null, fails: 0, override: false }, // modo Enviar
+    editingTargets: null, // unidad cuyas metas del embudo se están editando
     busy: false,     // una acción en curso: un doble clic no la repite
   };
 
@@ -350,7 +351,15 @@
   }
 
   // Embudo con metas: barra = real, marca = meta. Al lado, la conversión real contra la esperada.
-  function targetHtml(u, accounts, { compact } = {}) {
+  // Las metas de la unidad con las que el equipo ajustó (compartidas, guardadas en el servidor).
+  function withTargets(u) {
+    const o = state.data[u.id] && state.data[u.id].targets;
+    if (!u.targets || !o) return u;
+    return { ...u, targets: u.targets.map((t, i) => (i === 0 ? { ...t, perWeek: o.perWeek || t.perWeek } : { ...t, rate: (o.rates && o.rates[t.key]) || t.rate })) };
+  }
+
+  function targetHtml(u0, accounts, { compact } = {}) {
+    const u = withTargets(u0);
     const metrics = state.metrics && state.metrics.projects ? state.metrics.projects[u.metricsKey] : null;
     const tf = C.targetFunnel(accounts, u, { range: periodRange(), metrics });
     if (!tf) return '';
@@ -373,6 +382,20 @@
     }).join('');
     return `<div class="tfunnel${compact ? ' compact' : ''}" role="list">${compact ? '' : '<div class="trow thead" aria-hidden="true"><span>Paso</span><span>Real (barra) contra meta (marca), cada paso en su escala</span><span>Real / meta</span><span>Conversión / meta</span><span>Fuente</span></div>'}${rows}</div>
       <div class="legend"><span><i style="background:${color(u)}"></i>Real</span><span><i class="mark"></i>Meta del período (${state.period === 'all' ? 'desde el primer contacto' : 'período elegido'}: ${int(u.targets[0].perWeek)} saludos por semana)</span></div>`;
+  }
+
+  function targetsForm(id) {
+    const u = withTargets(unitOf(id));
+    const base = unitOf(id).targets;
+    const pctv = (r) => Math.round(r * 1000) / 10;
+    return `<form class="grid" data-targets-form style="gap:10px">
+      <div class="tform">
+        <label class="field">${esc(u.targets[0].label)} por semana<input type="number" name="perWeek" min="1" max="5000" step="1" required value="${u.targets[0].perWeek}" data-testid="target-perWeek"></label>
+        ${u.targets.slice(1).map((t, i) => `<label class="field">${esc(t.label)} <span class="sub" style="font-weight:500">(% sobre «${esc(u.targets[i].label)}»${pctv(base[i + 1].rate) !== pctv(t.rate) ? ` · de fábrica ${pctv(base[i + 1].rate)}%` : ''})</span><span class="pct-input"><input type="number" name="rate-${esc(t.key)}" min="1" max="100" step="0.5" required value="${pctv(t.rate)}" data-testid="target-${esc(t.key)}"><span>%</span></span></label>`).join('')}
+      </div>
+      <p class="sub" style="margin:0">Las metas son del equipo: las ve todo el que abre el panel.${state.data[id].targetsShared === false && !state.demo ? ' Para guardarlas hace falta conectar Vercel Blob al proyecto.' : ''}</p>
+      <div class="btns"><button class="btn primary" type="submit" data-testid="save-targets">Guardar metas</button><button class="btn ghost" type="button" data-action="cancel-targets">Cancelar</button><button class="btn ghost" type="button" data-action="reset-targets" data-arm="Confirmar: volver a las de fábrica">Volver a las de fábrica</button></div>
+    </form>`;
   }
 
   const kpi = (label, value, foot) => `<div class="kpi"><div class="label">${label}</div><div class="value num">${value}</div>${foot ? `<div class="foot">${foot}</div>` : ''}</div>`;
@@ -404,7 +427,7 @@
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Embudo</span><h1>${int(f.contactados)} contactados, ${int(f.respondieron)} respondieron</h1><p>${esc(u.icp)}</p></div>${periodSeg()}</section>
       ${crumbs(id)}
-      <section class="card glass"><div class="card-head"><div><h2>Embudo contra la meta</h2><p class="sub">Saludos: ${int(u.targets[0].perWeek)} por semana. Cada paso, la conversión esperada sobre el anterior. Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su <code>/api/metricas</code>.</p></div></div>${targetHtml(u, list)}</section>
+      <section class="card glass" data-testid="target-card"><div class="card-head"><div><h2>Embudo contra la meta</h2><p class="sub">Saludos: ${int(withTargets(u).targets[0].perWeek)} por semana. Cada paso, la conversión esperada sobre el anterior. Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su <code>/api/metricas</code>.${d.targets && d.targets.by ? ` Metas ajustadas por ${esc(d.targets.by)}.` : ''}</p></div>${state.editingTargets === id ? '' : '<button class="btn small" type="button" data-action="edit-targets" data-testid="edit-targets">Editar metas</button>'}</div>${state.editingTargets === id ? targetsForm(id) : targetHtml(u, list)}</section>
       <section class="card glass"><div class="kpis">
         ${kpi('Prospectados', int(f.prospectados), `${int(f.porContactar)} por contactar con canal`)}
         ${kpi('Contactados', int(f.contactados), state.period === 'all' ? 'Histórico' : 'Primer contacto en el período')}
@@ -1114,6 +1137,19 @@
     }
   }
 
+  async function saveTargets(body) {
+    const id = state.unit;
+    try {
+      const r = state.demo ? { targets: body.reset ? null : body } : await api('targets', { method: 'POST', body: { unit: id, ...body } });
+      state.data[id].targets = r.targets && r.targets.perWeek ? r.targets : null;
+      state.editingTargets = null;
+      toast(body.reset ? 'Metas de fábrica' : 'Metas guardadas');
+      render();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
   async function copy(text) {
     try { await navigator.clipboard.writeText(text); toast('Copiado'); } catch { toast('No se pudo copiar: seleccioná el texto.', true); }
   }
@@ -1257,6 +1293,9 @@
       }
       case 'more': state.shown += 100; render(); break;
       case 'cancel-tpl': state.editing = null; render(); break;
+      case 'edit-targets': state.editingTargets = state.unit; render(); break;
+      case 'cancel-targets': state.editingTargets = null; render(); break;
+      case 'reset-targets': await saveTargets({ reset: true }); break;
       case 'copy-instructions': copy(agentInstructions(unitOf(state.unit))); break;
       case 'factory-tpl': {
         const t = templatesOf(state.unit)[state.editing.key];
@@ -1338,6 +1377,13 @@
     if (form.matches('[data-edit]')) {
       const fields = Object.fromEntries(new FormData(form).entries());
       await act(state.drawer, { type: 'edit', fields }, { label: 'Datos guardados' });
+    }
+    if (form.matches('[data-targets-form]')) {
+      const fd = new FormData(form);
+      const rates = {};
+      for (const t of unitOf(state.unit).targets.slice(1)) rates[t.key] = Number(fd.get(`rate-${t.key}`)) / 100;
+      await saveTargets({ perWeek: Number(fd.get('perWeek')), rates });
+      return;
     }
     if (form.matches('[data-tpl-form]')) {
       const ed = state.editing;

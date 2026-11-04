@@ -13,6 +13,8 @@
 // Nunca devuelve nada sin sesión: las planillas tienen nombres y teléfonos.
 
 const google = require('./_google');
+// Se carga solo al usar las metas compartidas.
+const blobLib = () => require('@vercel/blob');
 const session = require('./_session');
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
@@ -91,6 +93,50 @@ async function appendEvents(sheet, tabs, events) {
     await google.writeRange(sheet.id, core.ACTIVITY_TAB, 1, [core.ACTIVITY_HEAD]);
   }
   await google.appendRows(sheet.id, core.ACTIVITY_TAB, events.map(core.eventRow));
+}
+
+// ─── Metas del embudo, compartidas por todo el equipo ───────────
+// Se guardan en el almacén privado de Vercel Blob del proyecto (el mismo de /api/ediciones):
+// { perWeek, rates: { paso: 0.45 } }. Sin almacén, se usan las de units.js.
+const targetsPath = (unit) => `prospecting/metas-${unit.id}.json`;
+async function readTargets(unit) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  try {
+    const res = await blobLib().get(targetsPath(unit), { access: 'private', useCache: false });
+    if (!res) return null;
+    return JSON.parse(await new Response(res.stream).text());
+  } catch {
+    return null;
+  }
+}
+function cleanTargets(unit, body) {
+  const out = { rates: {} };
+  const perWeek = Number(body && body.perWeek);
+  if (!Number.isInteger(perWeek) || perWeek < 1 || perWeek > 5000) throw new Error('La meta de saludos por semana va de 1 a 5000.');
+  out.perWeek = perWeek;
+  for (const step of unit.targets.slice(1)) {
+    const r = Number(body.rates && body.rates[step.key]);
+    if (!Number.isFinite(r) || r <= 0 || r > 1) throw new Error(`La meta de «${step.label}» tiene que estar entre 1% y 100%.`);
+    out.rates[step.key] = Math.round(r * 1000) / 1000;
+  }
+  return out;
+}
+async function doTargets(req, res, user) {
+  const unit = UNITS[(req.body || {}).unit];
+  if (!unit || !unit.targets) return fail(res, 400, 'Unidad sin embudo.');
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return fail(res, 503, 'Para guardar las metas falta conectar el almacén de Vercel Blob al proyecto chapa-labs.');
+  let targets;
+  try {
+    targets = req.body.reset ? null : cleanTargets(unit, req.body);
+  } catch (err) {
+    return fail(res, 400, err.message);
+  }
+  if (targets) {
+    targets.by = user.name;
+    targets.at = new Date().toISOString();
+  }
+  await blobLib().put(targetsPath(unit), JSON.stringify(targets || {}), { access: 'private', allowOverwrite: true, addRandomSuffix: false, contentType: 'application/json' });
+  return res.status(200).json({ targets });
 }
 
 // Unidades cuya planilla la escribe su app (Turnia): las acciones van a la API de la app.
@@ -317,9 +363,12 @@ module.exports = async (req, res) => {
           apiError = err.message;
         }
       }
+      const targets = await readTargets(unit);
       return res.status(200).json({
         unit: unit.id,
         readAt: new Date().toISOString(),
+        targets: targets && targets.perWeek ? targets : null,
+        targetsShared: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
         readOnly: readOnlyOf(unit),
         viaApi: Boolean(unit.api && apiOf(unit)),
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
@@ -334,6 +383,7 @@ module.exports = async (req, res) => {
     if (op === 'action' && req.method === 'POST') return await doAction(req, res, user);
     if (op === 'setup' && req.method === 'POST') return await doSetup(req, res, user);
     if (op === 'template' && req.method === 'POST') return await doTemplate(req, res);
+    if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {
     console.error('prospecting_error', op, err.message);

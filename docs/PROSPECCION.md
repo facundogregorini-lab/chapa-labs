@@ -151,6 +151,8 @@ En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (s
 | Cuentas activas | 50% | App: primera ambientación propia |
 | Clientes pagos | 25% | App: primer pago aprobado |
 
+**Metas ajustables:** en el Embudo, «Editar metas» cambia los saludos por semana y el % de cada paso. Son del equipo (las ve todo el que abre el panel): se guardan en el almacén privado de Vercel Blob del proyecto (`prospecting/metas-<unidad>.json`, el mismo almacén que usa `/api/ediciones`). «Volver a las de fábrica» vuelve a las de `units.js`.
+
 ### Onboarding de Turnia (`?vista=onboarding`)
 
 Posventa, fuera del embudo: por cada cliente (marcado «Cliente» o con cuenta vinculada), las dos garantías del Programa Fundadores. **Operativa en 14 días** desde «Cliente desde» (si no, se devuelve el setup) y **50 interacciones en su primer mes** desde «Operativa desde» (si no, el mes 2 es gratis). «Operativa» es la primera conversación de Sofi en su clínica real (la que se vincula en la ficha, sección Cuenta). Marca en riesgo lo que está por vencer o no llega al ritmo. Los datos salen de las columnas «Cliente desde», «Operativa desde» e «Interacciones del primer mes» de la planilla de Turnia. La garantía de Revenue Growth (100 pacientes dormidos en 30 días) todavía no está.

@@ -449,3 +449,9 @@ button.chip:hover { background: var(--glass-strong); }
 .gstate.bad { color: var(--bad-text); }
 .gstate.risk { color: var(--ink); box-shadow: inset 0 0 0 1px var(--warning); }
 .gstate.info, .gstate.wait { color: var(--ink-2); }
+
+.tform { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); align-items: end; }
+.tform .field input { height: 40px; }
+.pct-input { display: flex; align-items: center; gap: 6px; }
+.pct-input input { flex: 1; }
+.pct-input span { color: var(--muted); font-weight: 700; }
