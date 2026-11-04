@@ -115,8 +115,9 @@
       { key: 'demos', label: 'Demos enviadas', rate: 0.15, sheet: (a) => a.touches >= 1 },
       { key: 'visitadas', label: 'Visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
       { key: 'interaccion', label: 'Con interacción', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
-      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Clínicas con acceso real (no demo), total de Turnia', rate: 0.5, metrics: 'uso.clinicas' },
-      { key: 'activas', label: 'Cuentas activas', hint: 'Con turnos en 30 días, total de Turnia', rate: 0.5, metrics: 'uso.clinicas_activas' },
+      // Por persona: la cuenta real que se le dio (se vincula en la ficha) y si su clínica tuvo turnos en 30 días.
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Le dimos acceso a una clínica real', rate: 0.5, sheet: (a) => Boolean(a.accountAt) },
+      { key: 'activas', label: 'Cuentas activas', hint: 'Su clínica tuvo turnos en 30 días', rate: 0.5, sheet: (a) => Boolean(a.accountActive) },
       { key: 'pagos', label: 'Clientes pagos', hint: 'Marcados «Cliente»', rate: 0.25, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
     ],
     // Lo que sigue al embudo comercial, desde /api/metricas de Turnia (totales, sin datos personales).

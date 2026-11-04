@@ -102,6 +102,14 @@
       if (r() < 0.55) { a.meeting = a.replied; a.stage = 'reunion'; ev('reunion'); a.nextAt = C.addBusinessDays(t, 1); a.nextStep = 'Reunión de 15 minutos'; }
       if (a.stage === 'reunion' && r() < 0.35) { a.customer = a.replied; a.stage = 'cliente'; a.nextAt = ''; a.nextStep = 'Onboarding'; ev('cliente'); }
     }
+    // Turnia: algunas cuentas reales vinculadas (las que llegaron a reunión o cliente).
+    if (unit.id === 'turnia') {
+      accounts.filter((a) => a.stage === 'reunion' || a.stage === 'cliente').slice(0, 3).forEach((a, i) => {
+        a.accountAt = a.meeting || a.replied;
+        a.accountClinic = `Clínica de ejemplo ${i + 1}`;
+        if (i < 2) a.accountActive = C.nowLocal();
+      });
+    }
     for (const a of accounts) a.updated = C.nowLocal();
     events.sort((x, y) => x.at.localeCompare(y.at));
     return {
@@ -109,6 +117,7 @@
       sheet: { title: 'Datos de ejemplo', tab: unit.tab, url: '', missingColumns: [] },
       readAt: new Date().toISOString(),
       signals: unit.id === 'turnia' ? { matched: accounts.filter((a) => a.demoOpened).length, total: accounts.length } : null,
+      clinics: unit.id === 'turnia' ? [1, 2, 3, 4].map((i) => ({ id: `00000000-0000-4000-8000-00000000000${i}`, name: `Clínica de ejemplo ${i}` })) : null,
     };
   }
 

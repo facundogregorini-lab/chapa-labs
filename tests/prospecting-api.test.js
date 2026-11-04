@@ -174,3 +174,38 @@ test('Turnia con la clave: las acciones van a su API y vuelve la fila nueva', as
     delete process.env.TURNIA_METRICS_SECRET;
   }
 });
+
+test('mensajes: en la planilla se guardan en la pestaña Mensajes; en Turnia, por su API', async () => {
+  process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
+  delete book.tabs.Mensajes;
+  let r = await call('template', { method: 'POST', cookie, body: { unit: 'habita', key: 'whatsapp_1', text: 'Hola {saludo}, nuevo texto' } });
+  assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+  const row = book.tabs.Mensajes.find((x) => x[0] === 'whatsapp_1');
+  assert.equal(row[4], 'Hola {saludo}, nuevo texto');
+  r = await call('template', { method: 'POST', cookie, body: { unit: 'habita', key: 'whatsapp_1', text: 'Otra versión' } });
+  assert.equal(book.tabs.Mensajes.filter((x) => x[0] === 'whatsapp_1').length, 1, 'se reemplaza, no se duplica');
+  assert.equal(book.tabs.Mensajes.find((x) => x[0] === 'whatsapp_1')[4], 'Otra versión');
+  assert.equal((await call('template', { method: 'POST', cookie, body: { unit: 'habita', key: 'whatsapp_1', text: '  ' } })).statusCode, 400);
+
+  process.env.TURNIA_PROSPECTING_SHEET_ID = 'sheet-turnia';
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  const realFetch = global.fetch;
+  let sent = null;
+  global.fetch = async (url, opts = {}) => {
+    sent = { method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null };
+    return { ok: true, status: 200, json: async () => ({ templates: [{ key: 'whatsapp_saludo', title: 'Saludo', text: '¡Hola {saludo}!' }], clinics: [{ id: 'c1', name: 'Clínica' }] }) };
+  };
+  try {
+    r = await call('template', { method: 'POST', cookie, body: { unit: 'turnia', key: 'whatsapp_saludo', text: '¡Hola {saludo}!' } });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.deepEqual(sent, { method: 'POST', body: { templates: { whatsapp_saludo: '¡Hola {saludo}!' } } });
+    assert.equal(r.body.templates.whatsapp_saludo.text, '¡Hola {saludo}!');
+    book.tabs['Prospección'] = [['Código', 'Nombre', 'Estado'], ['ana-111', 'Ana', 'Contactado']];
+    const data = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.equal(data.body.templates.whatsapp_saludo.text, '¡Hola {saludo}!');
+    assert.deepEqual(data.body.clinics, [{ id: 'c1', name: 'Clínica' }]);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});

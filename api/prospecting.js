@@ -101,6 +101,69 @@ function apiOf(unit) {
 }
 const readOnlyOf = (unit) => Boolean(unit.readOnly || (unit.api && !apiOf(unit)));
 
+// Llamada a la API de la app de la unidad (GET o POST con JSON).
+async function callApi(unit, { method = 'GET', body } = {}) {
+  const api = apiOf(unit);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(api.url, {
+      method,
+      headers: { Authorization: `Bearer ${api.secret}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = r.status === 401 ? `${unit.name} rechazó la clave: revisá que sea la misma en los dos proyectos.` : json.error || `${unit.name} respondió ${r.status}.`;
+      throw Object.assign(new Error(msg), { status: r.status === 401 ? 502 : r.status });
+    }
+    return json;
+  } catch (err) {
+    if (err.name === 'AbortError') throw Object.assign(new Error(`${unit.name} no respondió a tiempo.`), { status: 504 });
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Los mensajes de la app ({ key, title, hint, text }) con la forma de la pestaña Mensajes.
+const appTemplates = (list) => Object.fromEntries((list || []).map((t) => [t.key, { title: t.title || '', text: t.text || '', hint: t.hint || '' }]));
+
+async function doTemplate(req, res) {
+  const { unit: unitId, key, text, subject, title } = req.body || {};
+  const unit = UNITS[unitId];
+  const sheet = unit && sheetOf(unit);
+  if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
+  const clean = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!key || !/^[a-z0-9_]{2,40}$/.test(key)) return fail(res, 400, 'Clave de mensaje inválida.');
+  if (!clean) return fail(res, 400, 'El mensaje no puede quedar vacío.');
+  if (clean.length > 1500) return fail(res, 400, 'El mensaje tiene que tener menos de 1500 caracteres.');
+  if (unit.api) {
+    if (!apiOf(unit)) return fail(res, 403, `Para editar los mensajes de ${unit.name} falta la clave de su API.`);
+    try {
+      const out = await callApi(unit, { method: 'POST', body: { templates: { [key]: clean } } });
+      return res.status(200).json({ templates: appTemplates(out.templates) });
+    } catch (err) {
+      return fail(res, err.status || 502, err.message);
+    }
+  }
+  // En la planilla: la fila de esa clave en la pestaña Mensajes (se crea si no está).
+  const meta = await google.tabs(sheet.id);
+  if (!meta.tabs.includes(TEMPLATES_TAB)) {
+    await google.addTabs(sheet.id, [TEMPLATES_TAB]);
+    const rows = Object.entries(unit.templates).map(([k, t]) => [k, t.title, t.channel, t.subject || '', t.text, t.hint || '']);
+    await google.writeRange(sheet.id, TEMPLATES_TAB, 1, [TEMPLATES_HEAD, ...rows]);
+  }
+  const rows = (await google.readTabs(sheet.id, [TEMPLATES_TAB]))[TEMPLATES_TAB] || [];
+  const base = unit.templates[key] || {};
+  const i = rows.findIndex((r, n) => n > 0 && String(r[0] || '').trim() === key);
+  const row = [key, title || (i > 0 && rows[i][1]) || base.title || key, (i > 0 && rows[i][2]) || base.channel || '', subject ?? ((i > 0 && rows[i][3]) || base.subject || ''), clean, (i > 0 && rows[i][5]) || base.hint || ''];
+  if (i > 0) await google.writeRange(sheet.id, TEMPLATES_TAB, i + 1, [row]);
+  else await google.appendRows(sheet.id, TEMPLATES_TAB, [row]);
+  return res.status(200).json({ ok: true, template: { title: row[1], channel: row[2], subject: row[3], text: row[4] } });
+}
+
 async function actionViaApi(res, unit, user, id, action) {
   const api = apiOf(unit);
   const ctrl = new AbortController();
@@ -236,6 +299,19 @@ module.exports = async (req, res) => {
       const data = await readUnit(unit, sheet);
       const signals = data.missingTab ? null : await mergeSignals(unit, data.accounts);
       const missing = core.WRITABLE.filter((k) => data.map[k] === undefined);
+      // Unidades con API: los mensajes y las clínicas salen de la app (los mismos de su panel).
+      let templates = data.templates;
+      let clinics = null;
+      let apiError = null;
+      if (unit.api && apiOf(unit)) {
+        try {
+          const out = await callApi(unit);
+          templates = appTemplates(out.templates);
+          clinics = out.clinics || [];
+        } catch (err) {
+          apiError = err.message;
+        }
+      }
       return res.status(200).json({
         unit: unit.id,
         readAt: new Date().toISOString(),
@@ -244,12 +320,15 @@ module.exports = async (req, res) => {
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts: data.accounts,
         events: data.events.slice(-8000),
-        templates: data.templates,
+        templates,
+        clinics,
+        apiError,
         signals,
       });
     }
     if (op === 'action' && req.method === 'POST') return await doAction(req, res, user);
     if (op === 'setup' && req.method === 'POST') return await doSetup(req, res, user);
+    if (op === 'template' && req.method === 'POST') return await doTemplate(req, res);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {
     console.error('prospecting_error', op, err.message);

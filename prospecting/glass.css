@@ -429,3 +429,5 @@ tr.click:hover td { background: var(--glass-soft); }
   .trow.thead { display: none; }
   .tfunnel.compact .trow { grid-template-columns: 1fr 80px; }
 }
+button.chip { border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; }
+button.chip:hover { background: var(--glass-strong); }

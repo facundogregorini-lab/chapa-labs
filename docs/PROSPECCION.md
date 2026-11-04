@@ -93,6 +93,8 @@ El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel
 - Sin clave, Turnia queda en solo lectura y la ficha lleva al panel de Turnia.
 - «Contactado» sin mensajes y con «Saludo enviado» se lee como «Saludado» (esperan la demo); «Sin WhatsApp» como número inválido. «Interesado» se guarda en Turnia como «Respondió» con el detalle. Abrir o probar la demo lo registra Turnia sola.
 - La historia completa de cada persona queda en el panel de Turnia (acá no hay pestaña Actividad).
+- **Mensajes:** los de Turnia son los mismos de su panel (Prospección → Mensajes): se leen y se guardan por su API, así que editarlos acá los cambia allá. Los de habita. se guardan en la pestaña «Mensajes» de su planilla.
+- **Cuenta:** cuando se le da acceso a una clínica real, se vincula en la ficha (sección Cuenta). Así «cuentas creadas» y «activas» cuentan solo lo que viene de la prospección: las clínicas de otras fuentes (como Guerra–Mininni) no entran.
 
 ### Embudo contra la meta
 
@@ -104,8 +106,8 @@ En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (s
 | Demos enviadas | 15% | Planilla: al menos un mensaje con la demo | App: demos publicadas de las cuentas prospectadas |
 | Visitadas | 65% | Planilla: abrieron su demo (`/p/…`) | App: entraron a su demo |
 | Con interacción | 50% | Planilla: conversó con Sofi en la demo | App: interactuaron con su demo |
-| Cuentas creadas | 50% | App: clínicas con acceso real (no demo), total de Turnia | App: crearon o reclamaron su cuenta |
-| Cuentas activas | 50% | App: clínicas con turnos en 30 días, total de Turnia | App: primera ambientación propia |
+| Cuentas creadas | 50% | Planilla: le dimos acceso a una clínica real (se vincula en la ficha → Cuenta) | App: crearon o reclamaron su cuenta |
+| Cuentas activas | 50% | Planilla: su clínica tuvo turnos en 30 días | App: primera ambientación propia |
 | Clientes pagos | 25% | Planilla: «Cliente» | App: primer pago aprobado |
 
 Cada paso de la planilla incluye a los siguientes (quien conversó en la demo también cuenta como visita). Las metas están en `targets` de cada unidad (`prospecting/units.js`). Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su `/api/metricas`. Sin dato, el paso dice «Sin datos».

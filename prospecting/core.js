@@ -47,6 +47,9 @@
     ['demoTried', 'Probó la demo', /^prob[oó] (su |la )?demo/i],
     ['demoClinic', 'Clínica de la demo', /^cl[ií]nica de (su |la )?demo/i],
     ['demoChat', 'Conversó en la demo', /^convers[oó] en (su |la )?demo/i],
+    ['accountAt', 'Cuenta creada', /^cuenta creada$/i],
+    ['accountClinic', 'Clínica de la cuenta', /^cl[ií]nica de la cuenta$/i],
+    ['accountActive', 'Cuenta activa', /^cuenta activa$/i],
     ['replied', 'Respondió', /^respondi[oó]$/i],
     ['interested', 'Interesado', /^interesad[oa]$/i],
     ['meeting', 'Reunión', /^reuni[oó]n$/i],
@@ -176,7 +179,7 @@
       a.stageRaw = a.stage;
       a.stage = stageFromText(a.stage);
       // Fechas o «Sí»; cualquier otro texto en Baja también cuenta como baja.
-      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
+      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'accountAt', 'accountActive', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
       a.optOut = parseDate(a.optOut) || (a.optOut && !/^(no|false|falso|-)$/i.test(a.optOut) ? 'sí' : '');
       a.touches = Number(String(a.touches).replace(',', '.')) || 0;
       a.score = a.score === '' ? null : Number(String(a.score).replace(',', '.'));
@@ -600,6 +603,14 @@
         // Vuelve los campos a como estaban antes del último contacto (los manda el navegador).
         for (const [k, v] of Object.entries(action.previous || {})) if (WRITABLE.includes(k) && k !== 'updated' && k !== 'id') patch[k] = v;
         ev('deshacer', { detail: action.detail || 'Deshacer el último contacto' });
+        break;
+      }
+      case 'account': {
+        // La API de la app devuelve la fila real; esto solo sirve para el modo de ejemplo.
+        patch.accountAt = action.clinicId ? a.accountAt || at : '';
+        patch.accountClinic = action.clinicId ? action.clinicName || '' : '';
+        if (!action.clinicId) patch.accountActive = '';
+        ev('cuenta', { detail: action.clinicName ? `Cuenta: ${action.clinicName}` : 'Cuenta desvinculada' });
         break;
       }
       case 'reopen': {

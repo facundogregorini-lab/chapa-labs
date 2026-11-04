@@ -24,6 +24,7 @@
     undo: {},        // id → { previous, version, label }
     shown: 100,
     more: {},        // bloques de Hoy desplegados completos
+    editing: null,   // mensaje en edición: { unit, key, text, subject }
   };
 
   // ─── Utilidades ─────────────────────────────────────────────
@@ -584,7 +585,7 @@
     const u = unitOf(id);
     const custom = (state.data[id] && state.data[id].templates) || {};
     const out = {};
-    for (const [k, t] of Object.entries(u.templates)) out[k] = { ...t, ...(custom[k] ? { text: custom[k].text, title: custom[k].title || t.title, subject: custom[k].subject || t.subject } : {}), custom: Boolean(custom[k]) };
+    for (const [k, t] of Object.entries(u.templates)) out[k] = { ...t, ...(custom[k] ? { text: custom[k].text, title: custom[k].title || t.title, subject: custom[k].subject || t.subject } : {}), custom: Boolean(custom[k] && custom[k].text.trim() !== t.text.trim()), factory: t.text, factorySubject: t.subject || '' };
     for (const [k, t] of Object.entries(custom)) if (!out[k]) out[k] = { ...t, hint: 'Agregada en la planilla', custom: true };
     out.libre = { title: 'Mensaje libre', channel: 'whatsapp', text: '', hint: 'Para una conversación en curso: escribí lo que corresponda.', builtin: true };
     return out;
@@ -596,13 +597,38 @@
     const stats = C.templateStats(d.events, u);
     const tpls = templatesOf(id);
     return `
-      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Mensajes</span><h1>Qué decimos y qué responde</h1><p>Las plantillas salen de la pestaña «Mensajes» de la planilla (si no está, se usan estas de fábrica). Editalas ahí: el cambio llega a todo el equipo.</p></div></section>
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Mensajes</span><h1>Qué decimos y qué responde</h1><p>${u.api ? `Son los mismos mensajes de ${esc(u.appName)}: lo que edites acá cambia allá también.` : 'Se guardan en la pestaña «Mensajes» de la planilla: el cambio llega a todo el equipo.'} Tocá «Editar» en cualquiera.</p></div></section>
       <section class="card glass"><div class="card-head"><div><h2>Respuesta por plantilla</h2><p class="sub">Cada respuesta va al último mensaje enviado antes, dentro de ${u.window} días. Un envío cuenta en la tasa cuando pasó esa ventana o ya respondió. Sin ganadora automática: con menos de 30, es muestra chica.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Plantilla</th><th class="n">Enviados</th><th class="n">Maduros</th><th class="n">Respuestas</th><th>Tasa</th></tr></thead><tbody>
         ${stats.map((s) => `<tr><td><strong>${esc((tpls[s.template] && tpls[s.template].title) || s.template)}</strong></td><td class="n">${int(s.enviados)}</td><td class="n">${int(s.maduros)}</td><td class="n">${int(s.respuestas)}</td><td class="num"><span class="minibar" style="width:${Math.round((s.tasa || 0) * 120)}px;--accent:${color(u)}"></span> ${pct(s.tasa)} ${s.muestraChica ? '<span class="chip warn">Muestra chica</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Todavía no hay envíos registrados desde el panel.</td></tr>'}
         </tbody></table></div></section>
-      <div class="grid cols-2">${Object.entries(tpls).filter(([, t]) => !t.builtin).map(([k, t]) => `<section class="card glass"><div class="card-head" style="margin-bottom:8px"><div><h3>${esc(t.title)}</h3><p class="sub">${esc(t.hint || '')}</p></div><span class="badge plain">${esc(t.channel || '')}${t.custom ? ' · planilla' : ''}</span></div>
-        ${t.subject ? `<p class="sub"><strong>Asunto:</strong> ${esc(C.renderTemplate(t.subject, sample, u))}</p>` : ''}<pre class="tpl">${esc(C.renderTemplate(t.text, sample, u))}</pre></section>`).join('')}</div>`;
+      <div class="grid cols-2">${Object.entries(tpls).filter(([, t]) => !t.builtin).map(([k, t]) => templateCard(id, k, t, sample)).join('')}</div>`;
+  }
+
+  const VARS = [['{saludo}', 'nombre de pila'], ['{nombre}', 'nombre completo'], ['{destinatario}', '«la Dra. Pérez»'], ['{organizacion}', 'consultorio o inmobiliaria'], ['{zona}', 'ciudad o zona'], ['{link}', 'su demo']];
+  function templateCard(id, k, t, sample) {
+    const u = unitOf(id);
+    const editing = state.editing && state.editing.unit === id && state.editing.key === k;
+    const locked = isReadOnly(id) || (u.api && state.data[id] && state.data[id].apiError);
+    const head = `<div class="card-head" style="margin-bottom:8px"><div><h3>${esc(t.title)}</h3><p class="sub">${esc(t.hint || '')}</p></div>
+      <div class="btns" style="align-items:center"><span class="badge plain">${esc(t.channel || '')}${t.custom ? ' · editado' : ''}</span>${editing || locked ? '' : `<button class="btn small" type="button" data-edit-tpl="${esc(k)}">Editar</button>`}</div></div>`;
+    if (!editing) {
+      return `<section class="card glass" data-tpl-card="${esc(k)}">${head}
+        ${t.subject ? `<p class="sub"><strong>Asunto:</strong> ${esc(C.renderTemplate(t.subject, sample, u))}</p>` : ''}<pre class="tpl">${esc(C.renderTemplate(t.text, sample, u))}</pre></section>`;
+    }
+    const draft = state.editing.text;
+    return `<section class="card glass strong" data-tpl-card="${esc(k)}">${head}
+      <form class="grid" data-tpl-form="${esc(k)}" style="gap:10px">
+        ${t.channel === 'email' ? `<label class="field">Asunto<input name="subject" value="${esc(state.editing.subject)}"></label>` : ''}
+        <label class="field">Texto<textarea name="text" rows="7" data-tpl-text>${esc(draft)}</textarea></label>
+        <p class="sub" style="margin:0">Variables: ${VARS.map(([v, l]) => `<button type="button" class="chip" data-insert-var="${esc(v)}" title="${esc(l)}">${esc(v)}</button>`).join(' ')}</p>
+        <div><span class="eyebrow">Así lo recibe ${esc(sample.name || '')}</span><pre class="tpl" data-tpl-preview>${esc(C.renderTemplate(draft, sample, u))}</pre></div>
+        <div class="btns">
+          <button class="btn primary" type="submit">Guardar</button>
+          <button class="btn ghost" type="button" data-action="cancel-tpl">Cancelar</button>
+          ${t.factory ? '<button class="btn ghost" type="button" data-action="factory-tpl">Volver al de fábrica</button>' : ''}
+        </div>
+      </form></section>`;
   }
 
   // ─── Playbook ───────────────────────────────────────────────
@@ -716,6 +742,7 @@
         <div class="section"><h3>Agendar</h3>
           <div class="btns" style="align-items:flex-end"><label class="field" style="flex:1 1 140px">Fecha<input type="date" data-next-at value="${esc(C.dayOf(a.nextAt))}"></label><label class="field" style="flex:2 1 180px">Qué hacer<input data-next-step value="${esc(a.nextStep)}"></label><button class="btn small" type="button" data-action="schedule">Guardar</button></div>
         </div>`}
+        ${u.api && !isReadOnly(state.unit) ? accountSection(a, u) : ''}
         <div class="section"><h3>Datos</h3>
           <dl class="facts">
             ${a.org && a.org !== a.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(a.org)}</dd>` : ''}
@@ -754,9 +781,24 @@
     window.LiquidGlass && window.LiquidGlass.scan();
   }
 
+  // La cuenta real que se le dio (Turnia): mide «cuentas creadas» y «activas» de la prospección.
+  function accountSection(a, u) {
+    const clinics = (state.data[state.unit] && state.data[state.unit].clinics) || [];
+    if (a.accountAt || a.accountClinic) {
+      return `<div class="section"><h3>Cuenta</h3>
+        <p style="margin:0"><strong>${esc(a.accountClinic || 'Cuenta creada')}</strong> · desde ${esc(when(a.accountAt))}
+          ${a.accountActive ? '<span class="badge live" style="margin-left:6px">Activa</span>' : '<span class="badge off" style="margin-left:6px">Sin turnos en 30 días</span>'}</p>
+        <div class="btns"><button class="btn small ghost" type="button" data-account="">Desvincular</button></div></div>`;
+    }
+    return `<div class="section"><h3>Cuenta</h3>
+      <p class="sub" style="margin:0">Cuando le des acceso a una clínica real, vinculala acá: así cuenta en «cuentas creadas» y, si tiene turnos, en «activas».</p>
+      ${clinics.length ? `<div class="btns" style="align-items:flex-end"><label class="field" style="flex:1 1 200px">Clínica<select data-account-select><option value="">Elegí la clínica</option>${clinics.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select></label><button class="btn small" type="button" data-account-link>Vincular cuenta</button></div>` : `<p class="sub" style="margin:0">${state.demo ? 'En el ejemplo no hay clínicas.' : 'No hay clínicas reales para elegir.'}</p>`}
+    </div>`;
+  }
+
   function eventLabel(e, u) {
     const tpls = templatesOf(u.id);
-    const labels = { saludo: 'Saludo enviado', mensaje: 'Mensaje enviado', llamada: 'Llamada', visita: 'Visita', respondio: 'Respondió', interesado: 'Interesado', reunion: 'Reunión', cliente: 'Cliente', perdido: u.stageLabel('perdido'), invalido: u.stageLabel('invalido'), baja: 'Pidió no recibir más', abrio_demo: 'Abrió la demo', probo_demo: 'Probó la demo', proximo: 'Agendado', nota: 'Nota', edicion: 'Datos editados', deshacer: 'Deshecho', reabrir: 'Reabierta' };
+    const labels = { cuenta: 'Cuenta', saludo: 'Saludo enviado', mensaje: 'Mensaje enviado', llamada: 'Llamada', visita: 'Visita', respondio: 'Respondió', interesado: 'Interesado', reunion: 'Reunión', cliente: 'Cliente', perdido: u.stageLabel('perdido'), invalido: u.stageLabel('invalido'), baja: 'Pidió no recibir más', abrio_demo: 'Abrió la demo', probo_demo: 'Probó la demo', proximo: 'Agendado', nota: 'Nota', edicion: 'Datos editados', deshacer: 'Deshecho', reabrir: 'Reabierta' };
     const base = labels[e.type] || e.type;
     return e.template && tpls[e.template] ? `${base} (${tpls[e.template].title})` : base;
   }
@@ -891,6 +933,24 @@
       render();
       return;
     }
+    if (ds.editTpl) {
+      const t = templatesOf(state.unit)[ds.editTpl];
+      state.editing = { unit: state.unit, key: ds.editTpl, text: t.text, subject: t.subject || '' };
+      render();
+      const ta = main.querySelector('[data-tpl-text]');
+      if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+      return;
+    }
+    if (ds.insertVar) {
+      const ta = main.querySelector('[data-tpl-text]');
+      if (ta) {
+        const [a0, b0] = [ta.selectionStart, ta.selectionEnd];
+        ta.setRangeText(ds.insertVar, a0, b0, 'end');
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        ta.focus();
+      }
+      return;
+    }
     if (ds.moreBlock) { state.more[ds.moreBlock] = true; render(); return; }
     if (ds.stageFilter) { filt(state.unit).stage = ds.stageFilter; state.shown = 100; render(); return; }
     if (ds.send) { e.stopPropagation(); const a = findAccount(ds.send); const next = a && C.nextTemplate(a, unitOf(state.unit)); startSend(ds.send, next ? next.channel : 'whatsapp', ds.key); return; }
@@ -910,6 +970,18 @@
       await act(state.drawer, { type: 'outcome', outcome: ds.outcome, detail: detail() }, { label: `Marcado: ${u.stageLabel(ds.outcome)}`, undoable: true });
       return;
     }
+    if (ds.accountLink !== undefined) {
+      const sel = $('#drawer [data-account-select]');
+      if (!sel || !sel.value) { toast('Elegí la clínica.', true); return; }
+      const name = sel.options[sel.selectedIndex].textContent;
+      await act(state.drawer, { type: 'account', clinicId: sel.value, clinicName: name }, { label: `Cuenta vinculada: ${name}` });
+      return;
+    }
+    if (ds.account !== undefined && t.closest('#drawer')) {
+      if (!confirm('¿Desvincular la cuenta de esta persona?')) return;
+      await act(state.drawer, { type: 'account', clinicId: null }, { label: 'Cuenta desvinculada' });
+      return;
+    }
     if (ds.demo) { await act(state.drawer, { type: 'demo', tried: ds.demo === 'tried' }, { label: ds.demo === 'tried' ? 'Probó la demo' : 'Abrió la demo', undoable: true }); return; }
     switch (ds.action) {
       case 'close': closeDrawer(); break;
@@ -926,6 +998,14 @@
         break;
       }
       case 'more': state.shown += 100; render(); break;
+      case 'cancel-tpl': state.editing = null; render(); break;
+      case 'factory-tpl': {
+        const t = templatesOf(state.unit)[state.editing.key];
+        state.editing.text = t.factory;
+        state.editing.subject = t.factorySubject || state.editing.subject;
+        render();
+        break;
+      }
       case 'demo': await startDemo(); break;
       case 'exit-demo': state.demo = false; state.data = {}; go(state.unit, state.view, { replace: true }); boot(); break;
       case 'reload': state.data[state.unit] = null; ensureLoaded(true); break;
@@ -958,6 +1038,15 @@
   $('#scrim').addEventListener('click', closeDrawer);
 
   document.addEventListener('input', (e) => {
+    if (e.target.matches('[data-tpl-text]') && state.editing) {
+      state.editing.text = e.target.value;
+      const d = state.data[state.unit];
+      const sample = d.accounts.find((a) => a.stage === 'por_contactar' && a.name) || d.accounts[0] || { name: 'Ana Ejemplo', greeting: 'Ana' };
+      const pv = main.querySelector('[data-tpl-preview]');
+      if (pv) pv.textContent = C.renderTemplate(state.editing.text, sample, unitOf(state.unit));
+      return;
+    }
+    if (e.target.matches('[data-tpl-form] input[name="subject"]') && state.editing) { state.editing.subject = e.target.value; return; }
     if (e.target.matches('[data-search]')) {
       filt(state.unit).q = e.target.value;
       clearTimeout(e.target._t);
@@ -990,6 +1079,26 @@
     if (form.matches('[data-edit]')) {
       const fields = Object.fromEntries(new FormData(form).entries());
       await act(state.drawer, { type: 'edit', fields }, { label: 'Datos guardados' });
+    }
+    if (form.matches('[data-tpl-form]')) {
+      const ed = state.editing;
+      const btn = form.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const r = state.demo
+          ? { template: { title: templatesOf(ed.unit)[ed.key].title, text: ed.text, subject: ed.subject } }
+          : await api('template', { method: 'POST', body: { unit: ed.unit, key: ed.key, text: ed.text, subject: ed.subject } });
+        const d = state.data[ed.unit];
+        if (r.templates) d.templates = r.templates;
+        else d.templates = { ...(d.templates || {}), [ed.key]: r.template };
+        state.editing = null;
+        toast('Mensaje guardado');
+        render();
+      } catch (err) {
+        btn.disabled = false;
+        toast(err.message, true);
+      }
+      return;
     }
     if (form.matches('[data-note]')) {
       const text = new FormData(form).get('note');
