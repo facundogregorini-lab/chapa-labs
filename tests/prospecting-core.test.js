@@ -284,3 +284,22 @@ test('modo Enviar: WhatsApp Web directo, franjas horarias y un reintento no se r
   assert.equal(C.isReplay(ev, 'a', 'mensaje', 'whatsapp_1', '2026-11-04 08:41'), false, 'otro paso no es reintento');
   assert.equal(C.isReplay([...ev, { id: 'a', type: 'deshacer', at: '2026-11-04 08:41' }], 'a', 'saludo', 'whatsapp_saludo', '2026-11-04 08:41'), false);
 });
+
+test('nuevos como en Turnia: un número ya usado no es nuevo y un número compartido sale una sola vez', () => {
+  const { turnia } = require('../prospecting/units').UNITS;
+  const { accounts } = C.toAccounts([
+    ['Código', 'Nombre', 'Teléfono', 'De quién es el teléfono', 'Prioridad', 'Estado', 'Mensajes'],
+    ['a', 'Padre', '+54 9 223 500-0001', 'Celular del consultorio', '1', 'Contactado', '1'],
+    ['b', 'Hija', '+54 9 223 500-0001', 'Celular del consultorio', '1', 'Por contactar', '0'], // mismo número: ya se le escribió
+    ['c', 'Socia 1', '+54 9 223 500-0002', 'Celular del consultorio', '2', 'Por contactar', '0'],
+    ['d', 'Socia 2', '2235000002', 'Celular del consultorio', '1', 'Por contactar', '0'], // mismo número sin contactar: sale una vez, por la de mejor prioridad
+    ['e', 'Baja', '+54 9 223 500-0003', 'Celular', '1', 'Pidió no recibir más', '0'],
+    ['f', 'Otro de la baja', '+54 9 223 500-0003', 'Celular', '1', 'Por contactar', '0'],
+    ['g', 'Fijo', '+54 223 400-0000', 'Fijo', '1', 'Por contactar', '0'],
+    ['h', 'Libre', '+54 9 223 500-0009', 'Celular', '3', 'Por contactar', '0'],
+  ], turnia);
+  const q = C.queue(accounts, turnia, { todayDay: '2026-11-04' });
+  assert.deepEqual(q.fresh.map((a) => a.id), ['d', 'h']);
+  assert.equal(q.freshTotal, 2);
+  assert.equal(C.funnel(accounts, turnia).porContactar, 2);
+});

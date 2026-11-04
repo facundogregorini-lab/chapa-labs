@@ -232,6 +232,34 @@
   const isContacted = (a) => Boolean(a.firstContact) || level(a) >= 1;
   const closed = (a) => Boolean(STAGES[a.stage] && STAGES[a.stage].closed);
 
+  // Números ya usados: alguien con ese número fue contactado, respondió, se cerró o pidió la baja.
+  // Como en Turnia, un número compartido (consultorio con varios profesionales, padres e hijos) se
+  // escribe una sola vez: los demás con ese número no son «nuevos».
+  const phoneKey = (p) => String(p || '').replace(/\D+/g, '').slice(-10);
+  function usedPhones(accounts) {
+    const out = new Set();
+    for (const a of accounts) {
+      const k = phoneKey(a.phone);
+      if (k && (isContacted(a) || a.stage !== 'por_contactar' || a.touches > 0 || a.optOut)) out.add(k);
+    }
+    return out;
+  }
+  // Los nuevos que de verdad se pueden contactar: con canal, sin número usado y un número una sola vez
+  // (por la persona de mejor prioridad), en el orden en que se reciben.
+  function freshContacts(accounts, unit) {
+    const used = usedPhones(accounts);
+    const sorted = accounts.filter((a) => !isContacted(a) && !closed(a) && !a.optOut && counted(a, unit) && canMessage(a, unit) && !used.has(phoneKey(a.phone)))
+      .sort((x, y) => (x.priority || 9) - (y.priority || 9) || (y.score ?? -1) - (x.score ?? -1) || x.row - y.row);
+    const seen = new Set();
+    return sorted.filter((a) => {
+      const k = phoneKey(a.phone);
+      if (!k) return true;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+
   function canMessage(a, unit) {
     if (a.optOut || a.stage === 'baja' || a.stage === 'invalido') return false;
     if (unit && unit.canMessage) return unit.canMessage(a);
@@ -280,7 +308,7 @@
       mensajes: cohort.reduce((s, a) => s + (a.touches || 0), 0),
       // Contactados hace menos de la ventana que todavía no respondieron: pueden responder.
       enObservacion: cohort.filter((a) => level(a) < 2 && a.firstContact && daysBetween(dayOf(a.firstContact), t) < ((unit && unit.window) || 7)).length,
-      porContactar: base.filter((a) => !isContacted(a) && canMessage(a, unit)).length,
+      porContactar: freshContacts(base, unit).length,
     };
     out.maduros = out.contactados - out.enObservacion;
     return out;
@@ -449,8 +477,7 @@
     const contactedToday = new Set(accounts.filter((a) => dayOf(a.firstContact) === t).map((a) => a.id));
     for (const e of events) if (dayOf(e.at) === t && (e.type === 'saludo' || e.type === 'mensaje')) contactedToday.add(e.id);
     const goal = (unit && unit.dailyGoal) || 40;
-    const fresh = live.filter((a) => !isContacted(a) && canMessage(a, unit))
-      .sort((x, y) => (x.priority || 9) - (y.priority || 9) || (y.score ?? -1) - (x.score ?? -1) || x.row - y.row);
+    const fresh = freshContacts(accounts, unit);
     return {
       conversations, greeted, followUps,
       fresh: fresh.slice(0, Math.max(0, goal - contactedToday.size)),
@@ -680,6 +707,6 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, freshContacts, usedPhones, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

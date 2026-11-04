@@ -511,7 +511,7 @@
       const isOpen = folds[key] === undefined ? open : folds[key];
       return `<section class="card glass block" data-open="${isOpen}" aria-label="${esc(title)}">
         <button type="button" class="block-head" data-fold="${key}" aria-expanded="${isOpen}"><div><h3>${esc(title)} <span class="count num" style="vertical-align:1px">${list.length}</span></h3><p class="sub">${sub}</p></div><span class="chev">${icon.chev}</span></button>
-        <div class="rows">${list.length ? list.slice(0, state.more[key] ? list.length : 15).map((a) => accountRow(a, u, key)).join('') + (list.length > 15 && !state.more[key] ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? `No quedan ${esc(u.entity.many)} con canal para contactar: sumá una lista a la planilla.` : 'Nada por acá.'}</p>`}</div></section>`;
+        <div class="rows">${list.length ? list.slice(0, state.more[key] ? list.length : 15).map((a) => accountRow(a, u, key)).join('') + (list.length > 15 && !state.more[key] ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? (u.api ? `No quedan ${esc(u.entity.many)} nuevos con WhatsApp (los que faltan son fijos o comparten un número que ya usaste). Importá la próxima lista en <a href="${esc(u.appUrl)}/importar" target="_blank" rel="noopener">${esc(u.appName)} → Importar lista</a>.` : `No quedan ${esc(u.entity.many)} nuevos con canal (los que faltan no tienen WhatsApp verificado o comparten un número ya usado): sumá una lista a la planilla.`) : 'Nada por acá.'}</p>`}</div></section>`;
     };
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Hoy</span><h1>${q.doneToday >= q.goal ? '¡Meta del día cumplida!' : `Te faltan ${int(q.goal - q.doneToday)} contactos nuevos`}</h1><p>${esc(u.hours)}</p></div>
@@ -601,7 +601,7 @@
     let status;
     if (ro) { phase = 'paused'; status = `Solo lectura: falta la clave de la API de ${u.name}.`; }
     else if (pending && cur && cur.a) { phase = 'opened'; status = '¿Salió el mensaje? Confirmá antes de seguir.'; }
-    else if (!cur || !cur.a) { phase = 'done'; status = 'No queda nadie para hoy. Pará.'; }
+    else if (!cur || !cur.a) { phase = 'done'; status = q.freshTotal ? 'No queda nadie para hoy. Pará.' : `No queda nadie para hoy y no hay ${esc(u.entity.many)} nuevos con WhatsApp: hay que sumar otra lista. Pará.`; }
     else if (state.agent.fails >= 3) { phase = 'stopped'; status = 'Pará: tres envíos seguidos no salieron. Revisá WhatsApp (¿restricción, sesión cerrada?).'; }
     else if (cur.fresh && q.doneToday >= q.goal) { phase = 'done'; status = `Meta del día cumplida (${int(q.doneToday)} de ${int(q.goal)}). Pará.`; }
     else if (!C.inSendWindow(u) && store(`override-${id}`) !== C.today()) { phase = 'paused'; status = `Fuera del horario de envío (${esc(u.hours)}). Próxima franja: ${esc(C.nextSendWindow(u))}.`; }
