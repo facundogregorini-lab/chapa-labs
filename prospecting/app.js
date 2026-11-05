@@ -220,7 +220,43 @@
     }
   }, 1000);
 
+  // Entrada de cada vista: las tarjetas suben en cascada, las barras crecen y los números cuentan.
+  // Solo al cambiar de unidad o de vista: un dato que se actualiza no repite la animación.
+  let shownKey = null;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function enter() {
+    const loaded = !main.querySelector(':scope > .skeleton');
+    const key = `${state.unit}/${state.view}/${state.demo}`;
+    const entering = loaded && key !== shownKey;
+    if (loaded) shownKey = key;
+    if (!entering || calm) return;
+    // La clase queda lo que dura la entrada: si llegan datos en ese momento, la animación sigue.
+    main.classList.add('entering');
+    clearTimeout(enter.t);
+    enter.t = setTimeout(() => main.classList.remove('entering'), 1600);
+    main.querySelectorAll(':scope > .card, :scope > section, :scope > .notice').forEach((c, i) => c.style.setProperty('--n', Math.min(i, 12)));
+    main.querySelectorAll('.kpi .value, .hero h1').forEach(countUp);
+  }
+  // Enteros con separador de miles (es-AR) y, opcionalmente, un prefijo o sufijo: «1.234», «45%».
+  function countUp(el) {
+    if (el.children.length) return;
+    const m = /^([^\d-]*)(\d{1,3}(?:\.\d{3})*|\d+)([^\d,]*)$/.exec(el.textContent.trim());
+    if (!m) return;
+    const target = Number(m[2].replace(/\./g, ''));
+    if (!Number.isFinite(target) || target < 2) return;
+    const t0 = performance.now();
+    const dur = Math.min(1400, 600 + Math.log10(target + 1) * 220);
+    const step = (now) => {
+      if (!el.isConnected) return;
+      const k = Math.min(1, (now - t0) / dur);
+      el.textContent = `${m[1]}${Math.round(target * (1 - (1 - k) ** 4)).toLocaleString('es-AR')}${m[3]}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
   function after() {
+    enter();
     const p = storedPending();
     if (p && !state.pending && state.view !== 'enviar' && !$('#confirm').classList.contains('on')) { state.pending = p; showConfirmBar(p, { again: true }); }
     window.LiquidGlass && window.LiquidGlass.scan();
@@ -481,7 +517,7 @@
       const h = Math.max(p.contactos ? 2 : 0, (H - T - B) * (p.contactos / top));
       const x = L + i * bw + Math.min(2, bw * 0.15);
       const wpx = Math.max(1, bw - Math.min(4, bw * 0.3));
-      return `<rect x="${x}" y="${H - B - h}" width="${wpx}" height="${h}" rx="${Math.min(4, wpx / 2)}" fill="${color(u)}"/><rect class="hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" fill="transparent" data-tip="${esc(JSON.stringify({ t: shortDay(p.date), v: `${int(p.contactos)} contactos`, e: `${int(p.nuevos || 0)} nuevos · ${int(p.respuestas || 0)} respuestas` }))}"/>`;
+      return `<rect class="col" style="--i:${i}" x="${x}" y="${H - B - h}" width="${wpx}" height="${h}" rx="${Math.min(4, wpx / 2)}" fill="${color(u)}"/><rect class="hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}" fill="transparent" data-tip="${esc(JSON.stringify({ t: shortDay(p.date), v: `${int(p.contactos)} contactos`, e: `${int(p.nuevos || 0)} nuevos · ${int(p.respuestas || 0)} respuestas` }))}"/>`;
     }).join('');
     const every = Math.ceil(pts.length / 8);
     const labels = pts.map((p, i) => (i % every === 0 ? `<text class="axis" x="${L + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${shortDay(p.date)}</text>` : '')).join('');
@@ -541,7 +577,7 @@
     };
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Hoy</span><h1>${q.doneToday >= q.goal ? '¡Meta del día cumplida!' : `Te faltan ${int(q.goal - q.doneToday)} contactos nuevos`}</h1><p>${esc(u.hours)}</p></div>
-        <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">contactos nuevos hoy</div></div></div></section>
+        <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" style="--c0:${circ}" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">contactos nuevos hoy</div></div></div></section>
       ${crumbs(id)}
       ${block('conversations', 'Conversaciones abiertas', 'Respondieron o están interesados: contestá primero.', q.conversations)}
       ${u.greetingFirst ? block('greeted', 'Esperan la demo', 'Los saludaste. Si te respondieron, mandales la demo.', q.greeted, { open: false }) : ''}
@@ -649,7 +685,7 @@
     const R = 27; const circ = 2 * Math.PI * R; const ratio = Math.min(1, q.doneToday / q.goal);
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Enviar</span><h1>Uno por vez</h1><p>Una tarjeta, un mensaje, una confirmación. Sirve igual para una persona o para un agente de IA que alterna con la pestaña de WhatsApp. ${esc(u.hours)}</p></div>
-        <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos nuevos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">nuevos hoy · ${int(items.length)} en la cola</div></div></div></section>
+        <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos nuevos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" style="--c0:${circ}" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">nuevos hoy · ${int(items.length)} en la cola</div></div></div></section>
       <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, text) : '')}" aria-labelledby="agent-name">
         <p class="agent-status ${phase}" role="status" aria-live="polite" data-testid="agent-status">${status}${phase === 'paused' && !ro && a ? ` <button type="button" class="btn small ghost" data-testid="agent-override-hours" data-agent="override" data-arm="Confirmar: mandar fuera de horario">Mandar igual</button>` : ''}</p>
         ${a ? `

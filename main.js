@@ -318,7 +318,16 @@
         out += `<line class="target" x1="${f.pad.l}" x2="${w - f.pad.r}" y1="${f.y(target)}" y2="${f.y(target)}"/>`;
         out += `<text class="target-label" x="${f.pad.l + 4}" y="${f.y(target) - 6}">Meta ${fmt(target, format, currency)}</text>`;
       }
-      out += `<path class="line" d="${d}" style="stroke:${color}"/>`;
+      // Área con degradé bajo la línea (una sola serie: no compite con otras) y el largo para dibujarla.
+      const gid = `g${++gradSeq}`;
+      const y0 = f.y(0);
+      if (valid.length > 1) {
+        out += `<defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity="0.28"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`;
+        out += `<path class="area" d="${d}L${x(valid[valid.length - 1].i)},${y0}L${x(valid[0].i)},${y0}Z" fill="url(#${gid})"/>`;
+      }
+      let len = 0;
+      valid.forEach((p, k) => { if (k) len += Math.hypot(x(p.i) - x(valid[k - 1].i), f.y(p.value) - f.y(valid[k - 1].value)); });
+      out += `<path class="line" d="${d}" style="stroke:${color};--len:${Math.ceil(len) + 2}"/>`;
       const colW = n > 1 ? f.iw / (n - 1) : f.iw;
       points.forEach((p, i) => {
         if (showTick(i, n, Math.floor(f.iw / 46))) out += `<text x="${x(i)}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
@@ -327,7 +336,7 @@
         const extra = prev && Number.isFinite(prev.value) ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
         out += `<g class="hitg">
           <line class="cross" x1="${x(i)}" x2="${x(i)}" y1="${f.pad.t}" y2="${f.pad.t + f.ih}" opacity="0"/>
-          <circle class="pt" cx="${x(i)}" cy="${f.y(p.value)}" r="4.5" style="fill:${color}"/>
+          <circle class="pt" cx="${x(i)}" cy="${f.y(p.value)}" r="4.5" style="fill:${color};--i:${i}"/>
           <rect class="hit" x="${x(i) - colW / 2}" y="0" width="${colW}" height="${h}" data-tip="${tipHtml(tipLabel(p), fmt(p.value, format, currency), extra)}"/>
         </g>`;
       });
@@ -360,7 +369,7 @@
         const d = `M${x0},${y0}V${y1 + r}Q${x0},${y1} ${x0 + r},${y1}H${x0 + bw - r}Q${x0 + bw},${y1} ${x0 + bw},${y1 + r}V${y0}Z`;
         const prev = points[i - 1];
         const extra = prev ? delta(p.value, prev.value, { format }).replace(/<[^>]+>/g, '') : '';
-        out += `<path class="bar" d="${d}" style="fill:${color}"/>`;
+        out += `<path class="bar" d="${d}" style="fill:${color};--i:${i}"/>`;
         out += `<rect class="hit" x="${cx - band / 2}" y="0" width="${band}" height="${h}" data-tip="${tipHtml(tipLabel(p), fmt(p.value, format, currency), extra)}"/>`;
         if (showTick(i, n, Math.floor(f.iw / 46))) out += `<text x="${cx}" y="${h - 6}" text-anchor="middle">${axisLabel(p)}</text>`;
         if (i === n - 1) out += `<text class="val" x="${cx}" y="${y1 - 7}" text-anchor="middle">${fmt(p.value, format, currency)}</text>`;
@@ -370,6 +379,7 @@
   }
 
   let chartSeq = 0;
+  let gradSeq = 0;
   function chart(render) {
     const id = `c${++chartSeq}`;
     charts[id] = render;
@@ -380,6 +390,8 @@
       const render = charts[el.dataset.chart];
       const w = Math.max(240, Math.floor(el.clientWidth));
       if (render && el.dataset.w !== String(w)) {
+        // La animación de entrada va solo la primera vez (no al redibujar por un cambio de tamaño).
+        el.classList.toggle('anim', entering && !el.dataset.w);
         el.innerHTML = render(w);
         el.dataset.w = w;
       }
@@ -1492,10 +1504,35 @@
       const i = PROJECTS.indexOf(p);
       const dot = i >= 0 ? `<span class="dot" style="background:${ACCENTS[i % ACCENTS.length]}"></span>` : '';
       return `<a href="#${esc(p.id)}"${state.view === p.id ? ' aria-current="page"' : ''}>${dot}${esc(p.name)}</a>`;
-    }).join('');
+    }).join('') + '<span class="tabs-thumb" aria-hidden="true"></span>';
+    moveThumb(!entering);
+  }
+  // La píldora de vidrio de las pestañas se desliza hasta la elegida.
+  let thumbAt = null;
+  function moveThumb(instant) {
+    const nav = $('#tabs');
+    const thumb = nav.querySelector('.tabs-thumb');
+    const cur = nav.querySelector('[aria-current="page"]');
+    if (!thumb || !cur) return;
+    const from = thumbAt;
+    const to = { x: cur.offsetLeft, w: cur.offsetWidth };
+    if (from && !instant) {
+      thumb.style.transition = 'none';
+      thumb.style.transform = `translateX(${from.x}px)`;
+      thumb.style.width = `${from.w}px`;
+      thumb.getBoundingClientRect();
+      thumb.style.transition = '';
+    }
+    thumb.style.transform = `translateX(${to.x}px)`;
+    thumb.style.width = `${to.w}px`;
+    thumbAt = to;
   }
 
+  // Solo al cambiar de vista hay animación de entrada; los datos en vivo que llegan después redibujan quietos.
+  let shownView = null;
+  let entering = true;
   function render() {
+    entering = state.view !== shownView;
     charts = {};
     tip.hidden = true;
     const project = PROJECTS.find((p) => p.id === state.view);
@@ -1504,8 +1541,37 @@
     if (project) renderProject(project); else renderSummary();
     document.title = project ? `${project.name} · Chapa Labs` : 'Chapa Labs · Seguimiento';
     drawCharts();
+    enter();
+    shownView = state.view;
     // Los botones de sección quedan pegados justo debajo del encabezado.
     document.documentElement.style.setProperty('--top-h', `${$('.top').offsetHeight}px`);
+  }
+
+  // Entrada de la vista: las tarjetas suben en cascada y los números cuentan hasta su valor.
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function enter() {
+    main.classList.toggle('settled', !entering);
+    main.querySelectorAll('.card, .period-bar').forEach((c, i) => c.style.setProperty('--n', Math.min(i, 14)));
+    if (calm || !entering) return;
+    main.querySelectorAll('.hero, .tile .value, .stat .v, .proj-rev-head strong, .funnel-total strong, .proj-hero-value').forEach(countUp);
+  }
+  // Solo números enteros con separador de miles (es-AR): «1.234», «$ 5.600», «45%». Los decimales quedan como están.
+  function countUp(el) {
+    if (el.children.length) return;
+    const m = /^([^\d-]*)(\d{1,3}(?:\.\d{3})*|\d+)([^\d,]*)$/.exec(el.textContent.trim());
+    if (!m) return;
+    const target = Number(m[2].replace(/\./g, ''));
+    if (!Number.isFinite(target) || target < 2) return;
+    const t0 = performance.now();
+    const dur = Math.min(1400, 600 + Math.log10(target + 1) * 220);
+    const step = (now) => {
+      if (!el.isConnected) return;
+      const k = Math.min(1, (now - t0) / dur);
+      const e = 1 - (1 - k) ** 4;
+      el.textContent = `${m[1]}${Math.round(target * e).toLocaleString('es-AR')}${m[3]}`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   function fromHash() {
@@ -1748,6 +1814,16 @@
       } catch (e) { /* sin servidor: solo la planilla */ }
     }));
   }
+
+  // Foto de fondo, la misma de Prospección; si no carga, queda la luz de color.
+  const photo = new Image();
+  photo.onload = () => {
+    const el = document.querySelector('.ambient .photo');
+    if (el) el.style.backgroundImage = `url(${photo.src})`;
+    document.documentElement.classList.add('has-photo');
+  };
+  photo.src = '/prospecting/fondo.jpg';
+  if (window.LiquidGlass) window.LiquidGlass.scan();
 
   fromHash();
   render();
