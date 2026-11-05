@@ -140,7 +140,7 @@ async function doTargets(req, res, user) {
   } catch (err) {
     return fail(res, 400, err.message);
   }
-  if (unit.api) {
+  if (unit.api && unit.api.targets !== false) {
     if (!apiOf(unit)) return fail(res, 403, `Para guardar las metas de ${unit.name} falta la clave de su API.`);
     try {
       const out = await callApi(unit, { method: 'POST', body: { funnel: targets } });
@@ -163,7 +163,10 @@ function apiOf(unit) {
   const secret = unit.api.secretEnvs.map((k) => (process.env[k] || '').trim()).find((v) => v.length >= 32);
   return secret ? { url: (process.env[unit.api.urlEnv] || '').trim() || unit.api.url, secret } : null;
 }
-const readOnlyOf = (unit) => Boolean(unit.readOnly || (unit.api && !apiOf(unit)));
+// Sin la clave: Turnia queda de solo lectura (su planilla la escribe la app); habita. vuelve a operar
+// sobre su planilla, como antes de su API.
+const sheetFallback = (unit) => Boolean(unit.api && unit.api.fallback === 'sheet' && !apiOf(unit));
+const readOnlyOf = (unit) => Boolean(unit.readOnly || (unit.api && !apiOf(unit) && !sheetFallback(unit)));
 
 // Llamada a la API de la app de la unidad (GET o POST con JSON).
 async function callApi(unit, { method = 'GET', body } = {}) {
@@ -203,7 +206,7 @@ async function doTemplate(req, res) {
   if (!key || !/^[a-z0-9_]{2,40}$/.test(key)) return fail(res, 400, 'Clave de mensaje inválida.');
   if (!clean) return fail(res, 400, 'El mensaje no puede quedar vacío.');
   if (clean.length > 1500) return fail(res, 400, 'El mensaje tiene que tener menos de 1500 caracteres.');
-  if (unit.api) {
+  if (unit.api && unit.api.templates !== false) {
     if (!apiOf(unit)) return fail(res, 403, `Para editar los mensajes de ${unit.name} falta la clave de su API.`);
     try {
       const out = await callApi(unit, { method: 'POST', body: { templates: { [key]: clean } } });
@@ -262,7 +265,7 @@ async function actionViaApi(res, unit, user, id, action) {
 async function doBulk(req, res, user) {
   const { unit: unitId, items } = req.body || {};
   const unit = UNITS[unitId];
-  if (!unit || !unit.api) return fail(res, 400, 'El registro en lote es para unidades que se operan por API (Turnia). En habita. se edita la planilla.');
+  if (!unit || !unit.api) return fail(res, 400, 'El registro en lote es para unidades que se operan por la API de su app.');
   if (!apiOf(unit)) return fail(res, 403, `Falta la clave de la API de ${unit.name}.`);
   if (!Array.isArray(items) || !items.length || items.length > 20) return fail(res, 400, 'Mandá entre 1 y 20 personas por vez.');
   const results = [];
@@ -329,7 +332,7 @@ async function doSetup(req, res, user) {
   const unit = UNITS[(req.body || {}).unit];
   const sheet = unit && sheetOf(unit);
   if (!sheet) return fail(res, 400, 'Unidad sin planilla configurada.');
-  if (unit.readOnly || unit.api) return fail(res, 403, `La planilla de ${unit.name} la escribe su app: no se prepara desde acá.`);
+  if (unit.readOnly || (unit.api && !sheetFallback(unit))) return fail(res, 403, `La planilla de ${unit.name} la escribe su app: no se prepara desde acá.`);
   const meta = await google.tabs(sheet.id);
   const add = [sheet.tab, core.ACTIVITY_TAB, TEMPLATES_TAB].filter((t) => !meta.tabs.includes(t));
   await google.addTabs(sheet.id, add);
@@ -402,11 +405,18 @@ module.exports = async (req, res) => {
       let clinics = null;
       let apiError = null;
       let apiTargets = null;
+      let accounts = data.accounts;
+      let events = data.events;
       if (unit.api && apiOf(unit)) {
         try {
           const out = await callApi(unit);
-          templates = appTemplates(out.templates);
-          clinics = out.clinics || [];
+          if (unit.api.templates !== false) templates = appTemplates(out.templates);
+          clinics = out.clinics || null;
+          // habita.: las cuentas y su historia salen de la app, no de la planilla (que es solo de entrada).
+          if (unit.api.rows) {
+            accounts = core.toAccounts([out.header, ...(out.rows || [])], unit).accounts;
+            events = Array.isArray(out.events) ? out.events : [];
+          }
           // La meta semanal es la del panel de la app; sin % guardados, valen los de fábrica.
           if (out.weeklyGoal) apiTargets = { perWeek: out.weeklyGoal, rates: out.funnelRates || {} };
         } catch (err) {
@@ -421,9 +431,9 @@ module.exports = async (req, res) => {
         targets: targets && targets.perWeek ? targets : null,
         readOnly: readOnlyOf(unit),
         viaApi: Boolean(unit.api && apiOf(unit)),
-        sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
-        accounts: data.accounts,
-        events: data.events.slice(-8000),
+        sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: unit.api && unit.api.rows && apiOf(unit) ? [] : missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
+        accounts,
+        events: events.slice(-8000),
         templates,
         clinics,
         apiError,

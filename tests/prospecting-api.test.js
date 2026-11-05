@@ -283,9 +283,41 @@ test('Turnia: registrar en lote manda cada paso con «step» y devuelve cada fil
     const bad = await call('bulk', { method: 'POST', cookie, body: { unit: 'turnia', items: [{ id: 'x', actions: [{ type: 'outcome', step: 1 }] }] } });
     assert.equal(bad.body.results[0].error, 'Acción inválida.');
     const habita = await call('bulk', { method: 'POST', cookie, body: { unit: 'habita', items: [{ id: 'abc', actions: [] }] } });
-    assert.equal(habita.statusCode, 400);
+    assert.equal(habita.statusCode, 403); // sin la clave de habita.
   } finally {
     global.fetch = realFetch;
     delete process.env.TURNIA_METRICS_SECRET;
+  }
+});
+
+test('habita. con la clave: las cuentas salen de su API y las acciones van allá; la planilla no se toca', async () => {
+  process.env.HABITA_METRICS_SECRET = 'h'.repeat(40);
+  const realFetch = global.fetch;
+  const calls = [];
+  const header = ['ID', 'Inmobiliaria', 'Teléfono', 'Confianza del número', 'Estado', 'Mensajes', 'Primer contacto'];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method, auth: opts.headers.Authorization, body: opts.body ? JSON.parse(opts.body) : null });
+    if (opts.method === 'POST') return { ok: true, status: 200, json: async () => ({ header, row: ['u-1', 'Inmo Uno', '+5492235111111', 'verificado', 'Enviado', 1, '2026-11-05 10:00'] }) };
+    return { ok: true, status: 200, json: async () => ({ header, rows: [['u-1', 'Inmo Uno', '+5492235111111', 'verificado', 'Pendiente', 0, ''], ['u-2', 'Inmo Dos', '', '', 'Respondió', 1, '2026-11-01 09:00']], events: [{ at: '2026-11-01 09:00', id: 'u-2', account: 'Inmo Dos', type: 'mensaje', channel: 'whatsapp' }] }) };
+  };
+  const before = JSON.stringify(book.tabs.Prospectos);
+  try {
+    const data = await call('data', { query: { unit: 'habita' }, cookie });
+    assert.equal(data.statusCode, 200, JSON.stringify(data.body));
+    assert.equal(data.body.viaApi, true);
+    assert.equal(data.body.readOnly, false);
+    assert.deepEqual(data.body.accounts.map((a) => [a.id, a.stage]), [['u-1', 'por_contactar'], ['u-2', 'respondio']]);
+    assert.equal(data.body.events.length, 1);
+    assert.deepEqual(data.body.sheet.missingColumns, []);
+    assert.equal(calls[0].url, 'https://habitaia.vercel.app/api/prospeccion');
+    assert.equal(calls[0].auth, `Bearer ${'h'.repeat(40)}`);
+    const r = await call('action', { method: 'POST', cookie, body: { unit: 'habita', id: 'u-1', action: { type: 'sent', channel: 'whatsapp', template: 'whatsapp_1', text: 'Hola' } } });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.deepEqual(calls[1].body.action, { type: 'sent', channel: 'whatsapp', template: 'whatsapp_1', text: 'Hola' });
+    assert.equal(r.body.account.stage, 'contactado');
+    assert.equal(JSON.stringify(book.tabs.Prospectos), before);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.HABITA_METRICS_SECRET;
   }
 });

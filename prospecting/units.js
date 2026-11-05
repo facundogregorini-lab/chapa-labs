@@ -143,6 +143,13 @@
     sheetEnv: 'HABITA_PROSPECTING_SHEET_ID',
     tabEnv: 'HABITA_PROSPECTING_TAB',
     tab: 'Prospectos',
+    // La base es la de la app (/admin/prospeccion): la planilla solo la alimenta (cada hora, con
+    // scripts/prospeccion-sync.gs). Con la clave, las cuentas y cada acción van por la API de habita.
+    // (las mismas reglas que su panel); los mensajes y las metas siguen en la planilla. Sin la clave,
+    // el panel opera sobre la planilla como antes.
+    api: { urlEnv: 'HABITA_PROSPECTING_API_URL', url: 'https://habitaia.vercel.app/api/prospeccion', secretEnvs: ['HABITA_PROSPECTING_SECRET', 'HABITA_METRICS_SECRET'], rows: true, templates: false, targets: false, fallback: 'sheet' },
+    appUrl: 'https://habitaia.vercel.app/admin/prospeccion',
+    appName: 'el panel de habita.',
     // La sincronización de la planilla con habita. (scripts/prospeccion-sync.gs) lee «Fecha envío» solo como día.
     dayColumns: ['firstContact'],
     metricsKey: 'amobla-ia',

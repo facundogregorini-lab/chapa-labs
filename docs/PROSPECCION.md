@@ -108,12 +108,14 @@ Es un «usuario robot» de Google: un email del tipo `chapa-labs@proyecto.iam.gs
 
 | Unidad | Variable | Planilla | Pestaña | Modo |
 | --- | --- | --- | --- | --- |
-| habita. | `HABITA_PROSPECTING_SHEET_ID` | «Prospecting Habita» | `Prospectos` | Lee y escribe |
+| habita. | `HABITA_PROSPECTING_SHEET_ID` | «Prospecting Habita» | `Prospectos` | Respaldo: con la clave de su API, las cuentas y las acciones van por habita. |
 | Turnia | `TURNIA_PROSPECTING_SHEET_ID` | «Turnia · Prospección y pedidos de demo» | `Prospección` | Lee la planilla; escribe por la API de Turnia |
 
 El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel y no acá porque el repo es público. Cada planilla se comparte con el email de la cuenta de servicio (`...@...iam.gserviceaccount.com`): **Editor** la de habita., **Lector** alcanza para la de Turnia. Después, **Redeploy**.
 
-**habita.** El panel reconoce sus columnas (Inmobiliaria, SDR, Número, Confianza del número, Estado, Fecha envío, Grupo Habita…), escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando. «Motivo / próximo paso» (la nota de la investigación) se muestra como señal y no se pisa: el próximo paso del panel va en una columna propia que se agrega al primer cambio. En la vista de la unidad, «Preparar la planilla» agrega las pestañas Actividad y Mensajes.
+**habita. (con su API).** La base es la del panel de habita. (`/admin/prospeccion`); la planilla solo lo alimenta (cada hora, `scripts/prospeccion-sync.gs`). Con `HABITA_METRICS_SECRET` (o `HABITA_PROSPECTING_SECRET`), el mismo valor que `METRICS_SECRET` en habita., las cuentas y su historia se leen de `GET https://habitaia.vercel.app/api/prospeccion` y cada acción va por `POST` a la misma ruta, con las reglas de ese panel (solo números revisados, bajas, tres pasos, evidencia; «Mandé el mensaje» prepara, abre y confirma de una). Los mensajes y las metas siguen en la planilla. Sin la clave, el panel avisa y opera sobre la planilla como antes.
+
+**habita. (sin su API).** El panel reconoce sus columnas (Inmobiliaria, SDR, Número, Confianza del número, Estado, Fecha envío, Grupo Habita…), escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando. «Motivo / próximo paso» (la nota de la investigación) se muestra como señal y no se pisa: el próximo paso del panel va en una columna propia que se agrega al primer cambio. En la vista de la unidad, «Preparar la planilla» agrega las pestañas Actividad y Mensajes.
 
 **Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel reescribe la pestaña «Prospección» entera. Por eso el panel la **lee** (siempre al día) pero **no la escribe**: cada acción de `/prospecting/turnia` va a la API de Turnia (`POST https://turniasalud.vercel.app/api/prospeccion`), que aplica las mismas reglas que su panel (saludo primero, tres mensajes, la baja para siempre, PostHog) y vuelve a copiar la planilla.
 

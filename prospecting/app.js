@@ -231,9 +231,12 @@
   // Unidades cuya planilla escribe su propia app (Turnia): acá se mira y se mide; se opera allá.
   const isReadOnly = (id) => { const d = state.data[id]; return Boolean(d && d.readOnly && !state.demo); };
   function readOnlyBanner(id) {
-    if (!isReadOnly(id)) return '';
     const u = unitOf(id);
     const d = state.data[id];
+    // habita.: sin respuesta de su API se ve la planilla, que no tiene lo que se hizo en su panel.
+    if (!state.demo && u.api && u.api.rows && d && d.apiError) return `<div class="notice glass"><span class="badge off">Sin conexión</span><span>No pudimos leer ${esc(u.appName)} (${esc(d.apiError)}). Lo que ves es la planilla, que no tiene lo que se hizo en ese panel.</span><a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a></div>`;
+    if (!state.demo && u.api && u.api.rows && d && !d.error && !d.loading && !d.viaApi) return `<div class="notice glass"><span class="badge off">Planilla</span><span>Falta la clave de la API de ${esc(u.name)} en Vercel (${esc(u.api.secretEnvs.join(' o '))}): lo que ves es la planilla, que no tiene lo que se hizo en ${esc(u.appName)}.</span></div>`;
+    if (!isReadOnly(id)) return '';
     return `<div class="notice glass"><span class="badge off">Solo lectura</span><span>La planilla de ${esc(u.name)} la escribe ${esc(u.appName)}. Para operar desde acá falta la clave de su API en Vercel (${esc((u.api && u.api.secretEnvs.join(' o ')) || '')}); mientras tanto, para contactar, abrí el panel.</span><a class="btn small primary" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a></div>`;
   }
 
@@ -393,7 +396,7 @@
         <label class="field">${esc(u.targets[0].label)} por semana<input type="number" name="perWeek" min="1" max="5000" step="1" required value="${u.targets[0].perWeek}" data-testid="target-perWeek"></label>
         ${u.targets.slice(1).map((t, i) => `<label class="field">${esc(t.label)} <span class="sub" style="font-weight:500">(% sobre «${esc(u.targets[i].label)}»${pctv(base[i + 1].rate) !== pctv(t.rate) ? ` · de fábrica ${pctv(base[i + 1].rate)}%` : ''})</span><span class="pct-input"><input type="number" name="rate-${esc(t.key)}" min="1" max="100" step="0.5" required value="${pctv(t.rate)}" data-testid="target-${esc(t.key)}"><span>%</span></span></label>`).join('')}
       </div>
-      <p class="sub" style="margin:0">Las metas son del equipo: las ve todo el que abre el panel. ${unitOf(id).api ? `Se guardan en ${esc(unitOf(id).appName)}: los saludos por semana son su misma meta semanal.` : 'Se guardan en la pestaña «Metas» de la planilla.'}</p>
+      <p class="sub" style="margin:0">Las metas son del equipo: las ve todo el que abre el panel. ${unitOf(id).api && unitOf(id).api.targets !== false ? `Se guardan en ${esc(unitOf(id).appName)}: los saludos por semana son su misma meta semanal.` : 'Se guardan en la pestaña «Metas» de la planilla.'}</p>
       <div class="btns"><button class="btn primary" type="submit" data-testid="save-targets">Guardar metas</button><button class="btn ghost" type="button" data-action="cancel-targets">Cancelar</button><button class="btn ghost" type="button" data-action="reset-targets" data-arm="Confirmar: volver a las de fábrica">Volver a las de fábrica</button></div>
     </form>`;
   }
@@ -534,7 +537,7 @@
       const isOpen = folds[key] === undefined ? open : folds[key];
       return `<section class="card glass block" data-open="${isOpen}" aria-label="${esc(title)}">
         <button type="button" class="block-head" data-fold="${key}" aria-expanded="${isOpen}"><div><h3>${esc(title)} <span class="count num" style="vertical-align:1px">${list.length}</span></h3><p class="sub">${sub}</p></div><span class="chev">${icon.chev}</span></button>
-        <div class="rows">${list.length ? list.slice(0, state.more[key] ? list.length : 15).map((a) => accountRow(a, u, key)).join('') + (list.length > 15 && !state.more[key] ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? (u.api ? `No quedan ${esc(u.entity.many)} nuevos con WhatsApp (los que faltan son fijos o comparten un número que ya usaste). Importá la próxima lista en <a href="${esc(u.appUrl)}/importar" target="_blank" rel="noopener">${esc(u.appName)} → Importar lista</a>.` : `No quedan ${esc(u.entity.many)} nuevos con canal (los que faltan no tienen WhatsApp verificado o comparten un número ya usado): sumá una lista a la planilla.`) : 'Nada por acá.'}</p>`}</div></section>`;
+        <div class="rows">${list.length ? list.slice(0, state.more[key] ? list.length : 15).map((a) => accountRow(a, u, key)).join('') + (list.length > 15 && !state.more[key] ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? (u.api && !u.api.rows ? `No quedan ${esc(u.entity.many)} nuevos con WhatsApp (los que faltan son fijos o comparten un número que ya usaste). Importá la próxima lista en <a href="${esc(u.appUrl)}/importar" target="_blank" rel="noopener">${esc(u.appName)} → Importar lista</a>.` : `No quedan ${esc(u.entity.many)} nuevos con canal (los que faltan no tienen WhatsApp verificado o comparten un número ya usado): sumá una lista a la planilla.`) : 'Nada por acá.'}</p>`}</div></section>`;
     };
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Hoy</span><h1>${q.doneToday >= q.goal ? '¡Meta del día cumplida!' : `Te faltan ${int(q.goal - q.doneToday)} contactos nuevos`}</h1><p>${esc(u.hours)}</p></div>
@@ -759,10 +762,10 @@
     const list = scoped(id).filter(test).filter((a) => !q || C.norm([a.name, a.org, a.zone, a.phone, a.email, a.sdr, a.campaign].join(' ')).includes(q));
     const shown = list.slice(0, state.shown);
     return `
-      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Cuentas</span><h1>${int(list.length)} ${esc(u.entity.many)}</h1><p>La base completa de la planilla. Los cambios se guardan en la misma fila.</p></div>
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Cuentas</span><h1>${int(list.length)} ${esc(u.entity.many)}</h1><p>${state.data[id].viaApi && u.api.rows ? `La base de ${esc(u.appName)}: cada cambio se guarda allá, con sus reglas.` : 'La base completa de la planilla. Los cambios se guardan en la misma fila.'}</p></div>
         ${state.data[id].sheet && state.data[id].sheet.url ? `<a class="btn" href="${esc(state.data[id].sheet.url)}" target="_blank" rel="noopener">${icon.ext} Abrir la planilla</a>` : ''}</section>
       ${sheetWarnings(id)}
-      ${u.api && !isReadOnly(id) ? bulkCard(id) : ''}
+      ${state.data[id].viaApi && !isReadOnly(id) ? bulkCard(id) : ''}
       ${crumbs(id)}
       <section class="card glass">
         <div class="toolbar"><input class="input search" type="search" placeholder="Buscar por nombre, zona, teléfono…" aria-label="Buscar" value="${esc(f.q)}" data-search>
@@ -878,7 +881,7 @@
     const stats = C.templateStats(d.events, u);
     const tpls = templatesOf(id);
     return `
-      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Mensajes</span><h1>Qué decimos y qué responde</h1><p>${u.api ? `Son los mismos mensajes de ${esc(u.appName)}: lo que edites acá cambia allá también.` : 'Se guardan en la pestaña «Mensajes» de la planilla: el cambio llega a todo el equipo.'} Tocá «Editar» en cualquiera.</p></div></section>
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Mensajes</span><h1>Qué decimos y qué responde</h1><p>${u.api && u.api.templates !== false ? `Son los mismos mensajes de ${esc(u.appName)}: lo que edites acá cambia allá también.` : 'Se guardan en la pestaña «Mensajes» de la planilla: el cambio llega a todo el equipo.'} Tocá «Editar» en cualquiera.</p></div></section>
       <section class="card glass"><div class="card-head"><div><h2>Respuesta por plantilla</h2><p class="sub">Cada respuesta va al último mensaje enviado antes, dentro de ${u.window} días. Un envío cuenta en la tasa cuando pasó esa ventana o ya respondió. Sin ganadora automática: con menos de 30, es muestra chica.</p></div></div>
         <div class="table-wrap"><table><thead><tr><th>Plantilla</th><th class="n">Enviados</th><th class="n">Maduros</th><th class="n">Respuestas</th><th>Tasa</th></tr></thead><tbody>
         ${stats.map((s) => `<tr><td><strong>${esc((tpls[s.template] && tpls[s.template].title) || s.template)}</strong></td><td class="n">${int(s.enviados)}</td><td class="n">${int(s.maduros)}</td><td class="n">${int(s.respuestas)}</td><td class="num"><span class="minibar" style="width:${Math.round((s.tasa || 0) * 120)}px;--accent:${color(u)}"></span> ${pct(s.tasa)} ${s.muestraChica ? '<span class="chip warn">Muestra chica</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Todavía no hay envíos registrados desde el panel.</td></tr>'}
@@ -890,7 +893,7 @@
   function templateCard(id, k, t, sample) {
     const u = unitOf(id);
     const editing = state.editing && state.editing.unit === id && state.editing.key === k;
-    const locked = isReadOnly(id) || (u.api && state.data[id] && state.data[id].apiError);
+    const locked = isReadOnly(id) || (u.api && u.api.templates !== false && state.data[id] && state.data[id].apiError);
     const head = `<div class="card-head" style="margin-bottom:8px"><div><h3>${esc(t.title)}</h3><p class="sub">${esc(t.hint || '')}</p></div>
       <div class="btns" style="align-items:center"><span class="badge plain">${esc(t.channel || '')}${t.custom ? ' · editado' : ''}</span>${editing || locked ? '' : `<button class="btn small" type="button" data-edit-tpl="${esc(k)}">Editar</button>`}</div></div>`;
     if (!editing) {
@@ -1009,7 +1012,7 @@
             <button class="btn small" type="button" data-outcome="interesado" data-testid="outcome-interesado">Interesado</button>
             <button class="btn small" type="button" data-outcome="reunion" data-testid="outcome-reunion">Reunión</button>
             <button class="btn small" type="button" data-outcome="cliente" data-testid="outcome-cliente">Cliente</button>
-            ${link && !u.api ? `<button class="btn small" type="button" data-demo="opened">Abrió la demo</button><button class="btn small" type="button" data-demo="tried">Probó la demo</button>` : ''}
+            ${link && !(state.data[state.unit] || {}).viaApi ? `<button class="btn small" type="button" data-demo="opened">Abrió la demo</button><button class="btn small" type="button" data-demo="tried">Probó la demo</button>` : ''}
           </div>
           <div class="btns">
             <button class="btn small ghost" type="button" data-outcome="perdido">${esc(u.stageLabel('perdido'))}</button>
@@ -1023,7 +1026,7 @@
         <div class="section"><h3>Agendar</h3>
           <div class="btns" style="align-items:flex-end"><label class="field" style="flex:1 1 140px">Fecha<input type="date" data-next-at value="${esc(C.dayOf(a.nextAt))}"></label><label class="field" style="flex:2 1 180px">Qué hacer<input data-next-step value="${esc(a.nextStep)}"></label><button class="btn small" type="button" data-action="schedule">Guardar</button></div>
         </div>`}
-        ${u.api && !isReadOnly(state.unit) ? accountSection(a, u) : ''}
+        ${u.api && !u.api.rows && !isReadOnly(state.unit) ? accountSection(a, u) : ''}
         <div class="section"><h3>Datos</h3>
           <dl class="facts">
             ${a.org && a.org !== a.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(a.org)}</dd>` : ''}
@@ -1175,7 +1178,7 @@
     if (!url) { toast('Esta cuenta no tiene ese canal.', true); return; }
     if (channel === 'whatsapp') openWhatsApp(a.phone, body);
     else window.open(url, '_blank', 'noopener');
-    state.pending = { id, channel, key, kind, name: a.name, inline: Boolean(inline) };
+    state.pending = { id, channel, key, kind, name: a.name, text: body, subject: channel === 'email' ? C.renderTemplate(t.subject || '', a, u) : '', inline: Boolean(inline) };
     savePending(state.pending);
     if (inline) { render(); return; }
     showConfirmBar(state.pending);
@@ -1191,7 +1194,7 @@
       if (p.inline) { state.agent.fails++; skipAgent(p.id); render(); }
       return;
     }
-    const ok = await act(p.id, { type: 'sent', channel: p.channel, template: p.key, kind: p.kind }, { label: `${p.kind === 'saludo' ? 'Saludo' : 'Mensaje'} a ${p.name} registrado`, undoable: true });
+    const ok = await act(p.id, { type: 'sent', channel: p.channel, template: p.key, kind: p.kind, ...(p.text ? { text: String(p.text).slice(0, 4000) } : {}), ...(p.subject ? { subject: p.subject } : {}) }, { label: `${p.kind === 'saludo' ? 'Saludo' : 'Mensaje'} a ${p.name} registrado`, undoable: true });
     // El mensaje ya salió: si no se pudo registrar, se reintenta sin volver a abrir WhatsApp.
     if (!ok) {
       state.pending = p;
