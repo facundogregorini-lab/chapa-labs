@@ -61,3 +61,31 @@ test('totales por etapa y cuenta', () => {
   assert.equal(A.accountState({ hasOwner: true, subscribed: false }), 'registered');
   assert.equal(A.agoText('2026-11-04T15:00:00Z', NOW), 'Ayer');
 });
+
+test('Turnia: las filas desde sus cuentas, con el paso de su demo y la etapa', () => {
+  const C = require('../prospecting/core');
+  const accounts = [
+    { id: 'a', name: 'Ana', stage: 'por_contactar', touches: 0, demoUrl: 'https://t/p/a' },
+    { id: 'b', name: 'Beto', stage: 'saludado', touches: 0, greetingSent: '2026-11-03 09:00', firstContact: '2026-11-03 09:00', demoUrl: 'https://t/p/b' },
+    { id: 'c', name: 'Caro', stage: 'contactado', touches: 1, firstContact: '2026-11-03 09:00', lastContact: '2026-11-04 10:00', demoUrl: 'https://t/p/c' },
+    { id: 'd', name: 'Dani', stage: 'contactado', touches: 1, firstContact: '2026-11-02 09:00', demoOpened: '2026-11-02 12:00', demoChat: '2026-11-02 12:05', demoUrl: 'https://t/p/d' },
+    { id: 'e', name: 'Eli', stage: 'reunion', touches: 2, firstContact: '2026-10-20 09:00', meeting: '2026-11-01 10:00', demoUrl: 'https://t/p/e' },
+    { id: 'f', name: 'Fede', stage: 'perdido', touches: 3, firstContact: '2026-10-10 09:00', demoUrl: 'https://t/p/f' },
+    { id: 'g', name: 'Gabi', stage: 'cliente', touches: 2, firstContact: '2026-10-01 09:00', customer: '2026-10-30 10:00', accountAt: '2026-10-25 10:00', accountActive: '2026-10-28 10:00', demoUrl: 'https://t/p/g' },
+  ];
+  const rows = A.fromAccounts(accounts, { closed: C.closed });
+  assert.deepEqual(rows.map((r) => [r.id, r.stage, r.step]), [
+    ['a', 'prospect', 0], ['b', 'contacted', 0], ['c', 'demo_sent', 1], ['d', 'interacted', 3], ['e', 'call', 4], ['f', 'closed', 1], ['g', 'client', 5],
+  ]);
+  assert.equal(rows[3].lastActivity.text, 'Habló con Sofi');
+  assert.equal(A.accountState(rows[6]), 'active');
+  const v = A.view(rows, A.filtersFrom(new URLSearchParams('etapa=cerrados'), A.TURNIA), A.TURNIA);
+  assert.deepEqual(v.funnel.map((x) => x.count), [7, 5, 3, 3, 2, 1]);
+  assert.deepEqual(v.items.map((r) => r.id), ['f']);
+  // «Se quedaron» en Enviadas: les mandamos la demo y no la abrieron.
+  const stayed = A.view(rows, A.filtersFrom(new URLSearchParams('paso=1&quedo=1'), A.TURNIA), A.TURNIA);
+  assert.deepEqual(stayed.items.map((r) => r.id).sort(), ['c', 'f']);
+  // Sin enviar, la demo cuenta solo en «Todo».
+  const week = A.view(rows, { ...A.filtersFrom(new URLSearchParams(''), A.TURNIA), period: { key: '7', from: '2026-10-30', to: '2026-11-05' } }, A.TURNIA);
+  assert.deepEqual(week.funnel.map((x) => x.count), [2, 2, 1, 1, 0, 0]);
+});

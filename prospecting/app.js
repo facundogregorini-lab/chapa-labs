@@ -137,9 +137,12 @@
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
     state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
-    if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search));
+    if (v === 'odontologos' && state.unit === 'turnia') state.view = 'inmobiliarias';
+    if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
   function go(unit, view, { replace } = {}) {
+    // Los filtros de la lista son de cada unidad: al cambiar de unidad, vuelven a cero.
+    if (unit !== state.unit && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
     state.unit = unit;
     state.view = unit === 'todas' ? 'resumen' : view || 'hoy';
     state.shown = 100;
@@ -191,7 +194,7 @@
     $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
     const tabs = state.unit === 'todas'
       ? [['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', 'Inmobiliarias']] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
+      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
     $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
     document.body.dataset.unit = state.unit;
     const userBtn = $('#user');
@@ -923,42 +926,58 @@
     return '';
   }
 
-  // ─── habita. · Inmobiliarias (la lista de /admin/inmobiliarias de su equipo, tal cual) ───────────
-  // Las filas las calcula habita. (etapa comercial, demos y su paso, cuenta, lead score, actividad);
-  // acá se filtran, se ordenan y se cuentan con las mismas reglas (agencies.js). Las acciones van por su API.
+  // ─── La lista con el embudo de demos (la de /admin/inmobiliarias de habita., tal cual) ─────────────
+  // habita. · Inmobiliarias: las filas las calcula habita. y las acciones van por su API.
+  // Turnia · Odontólogos: la misma vista armada con sus cuentas; las acciones son las del panel (registrar
+  // el envío, la ficha, su demo /p/…). Las reglas de filtros, orden y embudo son las mismas (agencies.js).
   const AG = window.ProspectingAgencies;
   const WA_LOGO = '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.4.8 3.2.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.2Z"/></svg>';
-  const STAGE_ICON = { prospect: '◎', contacted: '✉', demo_sent: '➤', interacted: '↗', panel: '▦', client: '✓' };
+  const STAGE_ICON = { prospect: '◎', contacted: '✉', demo_sent: '➤', interacted: '↗', panel: '▦', call: '☎', client: '✓', closed: '✕' };
+  const cfgOf = (id) => (id === 'turnia' ? AG.TURNIA : AG.HABITA);
+  const lc = (t) => (t ? t[0].toLowerCase() + t.slice(1) : t);
+  const fromApi = (id) => unitOf(id).agencies === true;
   state.ag = {};
-  state.agf = AG.filtersFrom(new URLSearchParams(location.search));
+  state.agf = AG.filtersFrom(new URLSearchParams(location.search), cfgOf((location.pathname.match(/\/prospecting\/(turnia|habita)/) || [])[1]));
   function agUrl() {
-    const p = new URLSearchParams({ vista: 'inmobiliarias' });
-    for (const [k, v] of Object.entries(AG.filtersParams(state.agf))) if (v) p.set(k, v);
+    const cfg = cfgOf(state.unit);
+    const p = new URLSearchParams({ vista: cfg.slug });
+    for (const [k, v] of Object.entries(AG.filtersParams(state.agf, cfg))) if (v) p.set(k, v);
     if (state.demo) p.set('ejemplo', '1');
     return `/prospecting/${state.unit}?${p}`;
   }
   /** Cambia filtros como los links de la lista original: un valor vacío lo quita y la página vuelve a 1. */
   function agSet(change, { push = true } = {}) {
-    const cur = AG.filtersParams(state.agf);
+    const cfg = cfgOf(state.unit);
+    const cur = AG.filtersParams(state.agf, cfg);
     const next = new URLSearchParams();
     for (const [k, v] of Object.entries({ ...cur, pagina: '', ...change })) if (v) next.set(k, v);
-    state.agf = AG.filtersFrom(next);
+    state.agf = AG.filtersFrom(next, cfg);
     state.agMenu = null;
     history[push ? 'pushState' : 'replaceState']({}, '', agUrl());
     render();
   }
   async function loadAgencies(id, { quiet } = {}) {
+    if (!fromApi(id)) return;
     if (state.demo) { state.ag[id] = window.ProspectingFixture.agencies(); return; }
     if (!quiet) state.ag[id] = { loading: true };
     try { state.ag[id] = await api('agencies', { query: { unit: id } }); } catch (err) { state.ag[id] = { error: err.message }; }
   }
-  function agThumb(id, photo) {
+  function agThumb(id, photo, name) {
+    if (!fromApi(id)) return `<span class="ag-thumb is-initials" aria-hidden="true">${esc(String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase())}</span>`;
     if (!photo) return '<span class="ag-thumb" aria-hidden="true">▦</span>';
     if (state.demo) return '<span class="ag-thumb" aria-hidden="true">▦</span>';
     return `<span class="ag-thumb" aria-hidden="true"><img src="/api/prospecting?op=agencyThumb&unit=${esc(id)}&foto=${esc(photo)}&w=120" alt="" loading="lazy"></span>`;
   }
-  const agStagePill = (s) => `<span class="ag-pill ag-stage is-${s}"><i aria-hidden="true">${STAGE_ICON[s]}</i> ${esc(AG.STAGE_STEP[s])}</span>`;
-  const accountPill = (s) => `<span class="ag-pill ag-account is-${s}">${esc(AG.ACCOUNT_LABEL[s])}</span>`;
+  const agStagePill = (s, cfg) => `<span class="ag-pill ag-stage is-${s}"><i aria-hidden="true">${STAGE_ICON[s]}</i> ${esc(cfg.stageStep[s])}</span>`;
+  const accountPill = (s, cfg) => `<span class="ag-pill ag-account is-${s}">${esc(cfg.accountLabel[s])}</span>`;
+  /** Los datos de la lista: los de habita. por su API; los de Turnia, de sus cuentas en el panel. */
+  function agData(id) {
+    if (fromApi(id)) return state.ag[id];
+    const d = state.data[id];
+    if (!d || !d.accounts) return d;
+    const u = unitOf(id);
+    return { rows: AG.fromAccounts(d.accounts, { counted: u.counted, closed: C.closed }), toReview: [], app: u.appUrl ? new URL(u.appUrl).origin : '' };
+  }
   function scorePill(score) {
     if (score === null || score === undefined) return '<span class="ag-pill ag-score is-none" title="Sin visitas externas: las del equipo no cuentan">—</span>';
     return `<span class="ag-pill ag-score ${score >= AG.HOT_SCORE ? 'is-hot' : score >= 40 ? 'is-warm' : 'is-cold'}" title="Lead score: engagement observado, no probabilidad de compra">${int(score)} / 100</span>`;
@@ -966,15 +985,17 @@
 
   function renderAgencies(id) {
     const u = unitOf(id);
-    const d = state.ag[id];
-    if (!d) { loadAgencies(id).then(render); return '<div class="skeleton"></div><div class="skeleton"></div>'; }
-    if (d.loading) return '<div class="skeleton"></div><div class="skeleton"></div>';
+    const cfg = cfgOf(id);
+    const api_ = fromApi(id);
+    const d = agData(id);
+    if (!d && api_) { loadAgencies(id).then(render); return '<div class="skeleton"></div><div class="skeleton"></div>'; }
+    if (!d || d.loading) return '<div class="skeleton"></div><div class="skeleton"></div>';
     const app = d.app || (u.appUrl ? new URL(u.appUrl).origin : '');
-    const head = `<section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Inmobiliarias</span><h1>Inmobiliarias</h1><p>Todas las inmobiliarias, en un solo lugar: prospectos, leads y clientes. La misma lista de ${esc(u.appName)} (Inmobiliarias), con sus datos.</p></div>
-      <div class="btns"><button class="btn" type="button" data-action="ag-reload">Actualizar</button><a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a></div></section>`;
-    if (d.error) return `${head}<section class="card glass"><h2>No pudimos cargar las inmobiliarias</h2><p class="sub">${esc(d.error)}</p><button class="btn" type="button" data-action="ag-reload">Reintentar</button></section>`;
+    const head = `<section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · ${esc(cfg.title)}</span><h1>${esc(cfg.title)}</h1><p>${api_ ? `Todas las inmobiliarias, en un solo lugar: prospectos, leads y clientes. La misma lista de ${esc(u.appName)} (Inmobiliarias), con sus datos.` : `Todos los ${esc(cfg.many)}, en un solo lugar, con el embudo de su demo (/p/…) hasta el Cliente Fundador. La misma vista que armó Facu para habita., con los datos de ${esc(u.name)}.`}</p></div>
+      <div class="btns"><button class="btn" type="button" data-action="ag-reload">Actualizar</button>${api_ ? `<a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a>` : u.appUrl ? `<a class="btn" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>` : ''}</div></section>`;
+    if (d.error) return `${head}<section class="card glass"><h2>No pudimos cargar ${esc(api_ ? 'las inmobiliarias' : `los ${cfg.many}`)}</h2><p class="sub">${esc(d.error)}</p><button class="btn" type="button" data-action="ag-reload">Reintentar</button></section>`;
     const f = state.agf;
-    const v = AG.view(d.rows, f);
+    const v = AG.view(d.rows, f, cfg);
     const filtering = Boolean(f.account || f.minScore !== null || f.days);
     const isOn = (s, st) => f.step === s && f.stayed === st;
     const set = (o) => esc(new URLSearchParams(o).toString());
@@ -986,79 +1007,80 @@
       const minPx = (stay > 0 ? 24 : 0) + (went > 0 ? 24 : 0);
       const wentStep = last ? i : i + 1;
       return `<li style="--i:${i}">
-        <button type="button" class="ag-f-top${isOn(i, false) ? ' is-on' : ''}" data-ag-set="${set({ paso: isOn(i, false) ? '' : String(i), quedo: '' })}" title="Ver las ${int(x.count)} que llegaron a «${esc(x.label)}»"><strong class="num">${int(x.count)}</strong><small>${i === 0 ? 'Base del período' : x.ofPrevious === null ? '—' : `${x.ofPrevious}% ${AG.OF_PREVIOUS[i]}`}</small></button>
+        <button type="button" class="ag-f-top${isOn(i, false) ? ' is-on' : ''}" data-ag-set="${set({ paso: isOn(i, false) ? '' : String(i), quedo: '' })}" title="Ver las ${int(x.count)} que llegaron a «${esc(x.label)}»"><strong class="num">${int(x.count)}</strong><small>${i === 0 ? 'Base del período' : x.ofPrevious === null ? '—' : `${x.ofPrevious}% ${cfg.ofPrevious[i]}`}</small></button>
         <div class="ag-f-plot">${x.count ? `<div class="ag-f-col" style="height:max(${total}%, ${minPx}px)">
-          ${stay > 0 ? `<button type="button" class="ag-f-seg is-stayed${isOn(i, true) ? ' is-on' : ''}" style="flex-grow:${stay}" data-ag-set="${set({ paso: isOn(i, true) ? '' : String(i), quedo: isOn(i, true) ? '' : '1' })}" aria-label="${int(stay)}: ${esc(AG.STAYED[i].toLowerCase())}. Ver sus inmobiliarias">${int(stay)}</button>` : ''}
-          ${went > 0 ? `<button type="button" class="ag-f-seg is-went${last ? ' is-last' : ''}${isOn(wentStep, false) ? ' is-on' : ''}" style="flex-grow:${went}" data-ag-set="${set({ paso: isOn(wentStep, false) ? '' : String(wentStep), quedo: '' })}" aria-label="${last ? `${int(went)} suscriptas` : `${int(went)} pasaron a «${esc(v.funnel[i + 1].label)}»`}. Ver sus inmobiliarias">${int(went)}</button>` : ''}
+          ${stay > 0 ? `<button type="button" class="ag-f-seg is-stayed${isOn(i, true) ? ' is-on' : ''}" style="flex-grow:${stay}" data-ag-set="${set({ paso: isOn(i, true) ? '' : String(i), quedo: isOn(i, true) ? '' : '1' })}" aria-label="${int(stay)}: ${esc(lc(cfg.stayed[i]))}. Ver sus ${esc(cfg.many)}">${int(stay)}</button>` : ''}
+          ${went > 0 ? `<button type="button" class="ag-f-seg is-went${last ? ' is-last' : ''}${isOn(wentStep, false) ? ' is-on' : ''}" style="flex-grow:${went}" data-ag-set="${set({ paso: isOn(wentStep, false) ? '' : String(wentStep), quedo: '' })}" aria-label="${last ? `${int(went)}: ${esc(lc(cfg.lastNote))}` : `${int(went)} pasaron a «${esc(v.funnel[i + 1].label)}»`}. Ver sus ${esc(cfg.many)}">${int(went)}</button>` : ''}
         </div>` : '<span class="ag-f-zero"></span>'}</div>
-        <span class="ag-f-label">${i + 1}. ${esc(x.label)}${last ? '<small class="is-went">Clientes pagos</small>' : stay > 0 ? `<small>${int(stay)} ${esc(AG.STAYED[i].toLowerCase())}</small>` : '<small>&nbsp;</small>'}</span>
+        <span class="ag-f-label">${i + 1}. ${esc(x.label)}${last ? `<small class="is-went">${esc(cfg.lastNote)}</small>` : stay > 0 ? `<small>${int(stay)} ${esc(lc(cfg.stayed[i]))}</small>` : '<small>&nbsp;</small>'}</span>
       </li>`;
     }).join('');
     const funnel = `<section class="card glass ag-funnel"><div class="card-head"><div><h2>Funnel de demos</h2><p class="sub">Cada paso cuenta las demos que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
-        <div class="ag-period"><span class="sub">Demo creada:</span><div class="seg" role="group" aria-label="Período">${AG.PERIODS.map((p) => `<button type="button" aria-pressed="${f.period.key === p.key}" data-ag-set="${set({ periodo: p.key === 'todo' ? '' : p.key, desde: '', hasta: '' })}">${esc(p.label)}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div>
+        <div class="ag-period"><span class="sub">${esc(cfg.periodBy)}:</span><div class="seg" role="group" aria-label="Período">${AG.PERIODS.map((p) => `<button type="button" aria-pressed="${f.period.key === p.key}" data-ag-set="${set({ periodo: p.key === 'todo' ? '' : p.key, desde: '', hasta: '' })}">${esc(p.label)}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div>
         <form class="ag-range" data-ag-range><label>Desde <input class="input" type="date" name="desde" value="${esc(f.period.from && f.period.key === 'rango' ? f.period.from : '')}"></label><label>Hasta <input class="input" type="date" name="hasta" value="${esc(f.period.to && f.period.key === 'rango' ? f.period.to : '')}"></label><button class="btn small" type="submit">Aplicar</button></form></div></div>
       <ul class="ag-f-legend" aria-hidden="true"><li class="is-went">Pasaron al paso siguiente</li><li class="is-stayed">Se quedaron (para hacer seguimiento)</li></ul>
       <ol class="ag-f-chart">${bars}</ol>
-      <p class="sub" style="margin:0">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Las inmobiliarias de prueba (QA) no cuentan.</p></section>`;
+      <p class="sub" style="margin:0">Tocá una parte de una barra para ver sus ${esc(cfg.many)}: lo verde pasó al paso siguiente; lo naranja se quedó ahí. ${esc(cfg.note)}</p></section>`;
     const review = d.toReview && d.toReview.length ? `<section class="card glass"><h2>Cuentas reclamadas para revisar (${int(d.toReview.length)})</h2><ul class="ag-review">${d.toReview.map((a) => `<li><a href="${esc(app)}/admin/inmobiliarias/${esc(a.id)}?pestana=cuenta" target="_blank" rel="noopener">${esc(a.name)}</a> · ${esc(a.claim_email || '')} · <span class="ag-pill ${a.claim_review === 'mismatch' ? 'is-alert' : ''}">${a.claim_review === 'mismatch' ? 'El email no coincide con su web' : 'Email personal'}</span></li>`).join('')}</ul></section>` : '';
     const tabs = [
-      `<button type="button" class="btn small" aria-pressed="${!f.stage && !f.withDemo}" data-ag-set="${set({ etapa: '' })}">Todas (${int(v.totals.total)})</button>`,
-      `<button type="button" class="btn small" aria-pressed="${f.withDemo}" data-ag-set="${set({ etapa: 'con-demo' })}">Con demo creada (${int(v.withDemos)})</button>`,
-      ...AG.COMMERCIAL_STAGES.map((s) => `<button type="button" class="btn small" aria-pressed="${!f.withDemo && f.stage === s}" data-ag-set="${set({ etapa: AG.STAGE_PARAM[s] })}">${esc(AG.STAGE_TAB[s])} (${int(v.totals.byStage[s])})</button>`),
+      `<button type="button" class="btn small" aria-pressed="${!f.stage && !f.withDemo}" data-ag-set="${set({ etapa: '' })}">${esc(cfg.all)} (${int(v.totals.total)})</button>`,
+      `<button type="button" class="btn small" aria-pressed="${f.withDemo}" data-ag-set="${set({ etapa: 'con-demo' })}">${esc(cfg.withDemoTab)} (${int(v.withDemos)})</button>`,
+      ...cfg.stages.map((s) => `<button type="button" class="btn small" aria-pressed="${!f.withDemo && f.stage === s}" data-ag-set="${set({ etapa: cfg.stageParam[s] })}">${esc(cfg.stageTab[s])} (${int(v.totals.byStage[s])})</button>`),
     ].join('');
     const opt = (val, label, cur) => `<option value="${val}" ${String(cur ?? '') === String(val) ? 'selected' : ''}>${label}</option>`;
     const toolbar = `<section class="card glass ag-toolbar"><div class="chips ag-tabs" role="group" aria-label="Etapa comercial">${tabs}</div>
-      <div class="toolbar"><input class="input search" type="search" placeholder="Buscar inmobiliaria…" aria-label="Buscar inmobiliaria" value="${esc(f.q)}" data-ag-search>
+      <div class="toolbar"><input class="input search" type="search" placeholder="Buscar ${esc(cfg.one)}…" aria-label="Buscar ${esc(cfg.one)}" value="${esc(f.q)}" data-ag-search>
         <details class="ag-filter" ${filtering ? 'open' : ''}><summary class="btn small">Filtrar${filtering ? ' ·' : ''}</summary>
           <form class="ag-filter-form" data-ag-filters>
-            <label class="field">Cuenta habita<select class="input" name="cuenta">${opt('', 'Todas', f.account && AG.ACCOUNT_PARAM[f.account])}${opt('sin-cuenta', 'Sin cuenta', f.account && AG.ACCOUNT_PARAM[f.account])}${opt('registrada', 'Registrada', f.account && AG.ACCOUNT_PARAM[f.account])}${opt('activa', 'Activa (suscripción)', f.account && AG.ACCOUNT_PARAM[f.account])}</select></label>
-            <label class="field">Lead score<select class="input" name="score">${opt('', 'Cualquiera', f.minScore)}${opt(20, '20 o más', f.minScore)}${opt(40, '40 o más', f.minScore)}${opt(60, '60 o más (calientes)', f.minScore)}${opt(80, '80 o más', f.minScore)}</select></label>
+            <label class="field">${esc(cfg.accountTitle)}<select class="input" name="cuenta">${opt('', 'Todas', f.account && AG.ACCOUNT_PARAM[f.account])}${opt('sin-cuenta', cfg.accountLabel.none, f.account && AG.ACCOUNT_PARAM[f.account])}${opt('registrada', cfg.accountLabel.registered, f.account && AG.ACCOUNT_PARAM[f.account])}${opt('activa', cfg.accountActive, f.account && AG.ACCOUNT_PARAM[f.account])}</select></label>
+            ${api_ ? '' : '<!--'}<label class="field">Lead score<select class="input" name="score">${opt('', 'Cualquiera', f.minScore)}${opt(20, '20 o más', f.minScore)}${opt(40, '40 o más', f.minScore)}${opt(60, '60 o más (calientes)', f.minScore)}${opt(80, '80 o más', f.minScore)}</select></label>${api_ ? '' : '-->'}
             <label class="field">Última actividad<select class="input" name="actividad">${opt('', 'Cualquier fecha', f.days)}${opt(7, 'Últimos 7 días', f.days)}${opt(30, 'Últimos 30 días', f.days)}${opt(90, 'Últimos 90 días', f.days)}</select></label>
             <div class="btns">${filtering ? `<button class="btn small ghost" type="button" data-ag-set="${set({ cuenta: '', score: '', actividad: '' })}">Quitar filtros</button>` : ''}<button class="btn small primary" type="submit">Aplicar</button></div>
           </form></details></div></section>`;
-    const scope = v.periodOn || f.step !== null ? `<p class="ag-scope">${int(v.shown.length)} ${v.shown.length === 1 ? 'inmobiliaria' : 'inmobiliarias'}${f.step !== null ? (f.stayed ? ` en «${esc(AG.FUNNEL_STEPS[f.step])}» sin pasar a «${esc(AG.FUNNEL_STEPS[f.step + 1])}» (${esc(AG.STAYED[f.step].toLowerCase())})` : ` en «${esc(AG.FUNNEL_STEPS[f.step])}»`) : ' con demos creadas'}${v.periodOn ? ` · ${esc(AG.periodLabel(f.period))} (${int(v.periodDemos)} ${v.periodDemos === 1 ? 'demo' : 'demos'})` : ''} · <button type="button" class="link" data-ag-set="${set({ periodo: '', desde: '', hasta: '', paso: '', quedo: '' })}">Ver todas</button></p>` : '';
+    const scope = v.periodOn || f.step !== null ? `<p class="ag-scope">${int(v.shown.length)} ${v.shown.length === 1 ? esc(cfg.one) : esc(cfg.many)}${f.step !== null ? (f.stayed ? ` en «${esc(cfg.steps[f.step])}» sin pasar a «${esc(cfg.steps[f.step + 1])}» (${esc(lc(cfg.stayed[f.step]))})` : ` en «${esc(cfg.steps[f.step])}»`) : ' con demos en el período'}${v.periodOn ? ` · ${esc(AG.periodLabel(f.period))} (${int(v.periodDemos)} ${v.periodDemos === 1 ? 'demo' : 'demos'})` : ''} · <button type="button" class="link" data-ag-set="${set({ periodo: '', desde: '', hasta: '', paso: '', quedo: '' })}">Ver ${esc(cfg.all.toLowerCase())}</button></p>` : '';
     const sortHead = (by, label, title) => {
       const on = f.sort.by === by;
       const next = { by, dir: on && f.sort.dir === 'desc' ? 'asc' : 'desc' };
       return `<button type="button" class="ag-sort${on ? ' is-on' : ''}" data-ag-set="${set({ orden: AG.sortParam(next) })}" ${title ? `title="${esc(title)}"` : ''}>${label}<span aria-hidden="true">${on ? (f.sort.dir === 'desc' ? ' ↓' : ' ↑') : ' ↕'}</span></button>`;
     };
     const rowsHtml = v.items.map((r) => {
-      const base = `${app}/admin/inmobiliarias/${r.id}`;
+      const base = api_ ? `${app}/admin/inmobiliarias/${r.id}` : '';
       const pv = v.per.get(r.id);
       let demo = '—';
-      if (pv.latest && pv.step !== null) {
-        const editable = pv.step <= 1 && r.demos.every((x) => x.step <= 1 && x.id);
-        const label = AG.STEP_LABEL[pv.step];
+      if ((pv.latest || !api_) && pv.step !== null && pv.count) {
+        const editable = api_ ? pv.step <= 1 && r.demos.every((x) => x.step <= 1 && x.id) : pv.step === 0;
+        const label = cfg.stepLabel[pv.step];
         const stepEl = editable
           ? `<button type="button" class="ag-step is-step-${pv.step} is-button" data-ag-menu="${esc(r.id)}" aria-expanded="${state.agMenu === r.id}" title="Cambiar el estado de la demo">${esc(label)} ▾</button>`
           : `<span class="ag-step is-step-${pv.step}">${esc(label)}</span>`;
-        demo = `<span class="ag-demo">${stepEl}<small>${esc(AG.shortDay(pv.latest))}${pv.count > 1 ? ` · ${int(pv.count)} demos` : ''}${r.test ? ' · prueba' : ''}</small></span>`;
+        demo = `<span class="ag-demo">${stepEl}<small>${pv.latest ? esc(AG.shortDay(pv.latest)) : 'sin enviar'}${pv.count > 1 ? ` · ${int(pv.count)} demos` : ''}${r.test ? ' · prueba' : ''}</small></span>`;
       }
-      const wa = r.wa ? `<button type="button" class="ag-wa" data-ag-wa="${esc(r.wa)}" aria-label="Escribir a ${esc(r.name)} por WhatsApp" title="Escribir por WhatsApp («¡Buenas!»)">${WA_LOGO}</button>` : `<span class="ag-wa is-off" role="img" aria-label="Falta su WhatsApp" title="Falta su WhatsApp: cargalo en «Editar inmobiliaria»">${WA_LOGO}</span>`;
+      const wa = !api_ ? (u.canMessage(r) ? `<button type="button" class="ag-wa" data-ag-wa-account="${esc(r.id)}" aria-label="Escribir a ${esc(r.name)} por WhatsApp" title="Escribir por WhatsApp: abre el mensaje que le toca y después pregunta si salió">${WA_LOGO}</button>` : `<span class="ag-wa is-off" role="img" aria-label="Sin WhatsApp" title="Sin WhatsApp (fijo o por revisar)">${WA_LOGO}</span>`) : r.wa ? `<button type="button" class="ag-wa" data-ag-wa="${esc(r.wa)}" aria-label="Escribir a ${esc(r.name)} por WhatsApp" title="Escribir por WhatsApp («¡Buenas!»)">${WA_LOGO}</button>` : `<span class="ag-wa is-off" role="img" aria-label="Falta su WhatsApp" title="Falta su WhatsApp: cargalo en «Editar inmobiliaria»">${WA_LOGO}</span>`;
       return `<tr>
-        <td class="is-name"><a class="ag-name" href="${esc(base)}" target="_blank" rel="noopener">${agThumb(id, r.coverPhotoId)}<strong>${esc(r.name)}</strong></a></td>
-        <td class="is-stage" data-label="Estado">${agStagePill(r.stage)}</td>
+        <td class="is-name">${api_ ? `<a class="ag-name" href="${esc(base)}" target="_blank" rel="noopener">` : `<a class="ag-name" href="#" data-open-account="${esc(r.id)}">`}${agThumb(id, r.coverPhotoId, r.name)}<span><strong>${esc(r.name)}</strong>${!api_ && r.org && r.org !== r.name ? `<small class="sub" style="display:block">${esc(r.org)}</small>` : ''}</span></a></td>
+        <td class="is-stage" data-label="Estado">${agStagePill(r.stage, cfg)}</td>
         <td class="is-demo" data-label="Demo">${demo}</td>
-        <td class="is-account" data-label="Cuenta">${accountPill(AG.accountState(r))}</td>
-        <td class="n is-props" data-label="Propiedades">${int(r.properties)}</td>
-        <td class="is-score" data-label="Lead score">${scorePill(r.score)}</td>
+        <td class="is-account" data-label="Cuenta">${accountPill(AG.accountState(r), cfg)}</td>
+        ${api_ ? `<td class="n is-props" data-label="Propiedades">${int(r.properties)}</td>` : `<td class="is-props" data-label="Zona">${esc(r.zone || '—')}</td>`}
+        <td class="is-score" data-label="${api_ ? 'Lead score' : 'Mensajes'}">${api_ ? scorePill(r.score) : `<span class="ag-pill">${int(r.touches)} / ${int(u.maxTouches || 3)}</span>`}</td>
         <td class="is-when" data-label="Actividad">${r.lastActivity ? `<span class="ag-when">${esc(AG.agoText(r.lastActivity.at))}<small>${esc(r.lastActivity.text)}</small></span>` : '—'}</td>
         <td class="is-actions">${wa}
-          <button type="button" class="ag-chip" data-ag-link="demo" data-id="${esc(r.id)}" ${r.shareDemo ? '' : 'disabled title="Todavía no tiene una demo publicada"'}>🔗 <span>Demo</span></button>
+          ${api_ ? `<button type="button" class="ag-chip" data-ag-link="demo" data-id="${esc(r.id)}" ${r.shareDemo ? '' : 'disabled title="Todavía no tiene una demo publicada"'}>🔗 <span>Demo</span></button>
           <button type="button" class="ag-chip" data-ag-link="panel" data-id="${esc(r.id)}">🔑 <span>Panel</span></button>
-          <a class="btn small" href="${esc(base)}" target="_blank" rel="noopener">Ver →</a>
+          <a class="btn small" href="${esc(base)}" target="_blank" rel="noopener">Ver →</a>` : `<button type="button" class="ag-chip" data-ag-copy="${esc(r.demoUrl)}" ${r.demoUrl ? '' : 'disabled title="No tiene demo"'}>🔗 <span>Demo</span></button>
+          <button type="button" class="btn small" data-open-account="${esc(r.id)}">Ficha →</button>`}
           <button type="button" class="btn small icon ghost" data-ag-more="${esc(r.id)}" aria-expanded="${state.agMore === r.id}" aria-label="Más acciones de ${esc(r.name)}">⋯</button>
         </td></tr>`;
     }).join('');
     const table = !v.items.length
-      ? (d.rows.length ? '<p class="empty">No hay inmobiliarias con estos filtros.</p>' : `<section class="card glass"><h2>Todavía no hay inmobiliarias</h2><p class="sub">Creá la primera: alcanza con su nombre comercial.</p><a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a></section>`)
+      ? (d.rows.length ? `<p class="empty">No hay ${esc(cfg.many)} con estos filtros.</p>` : `<section class="card glass"><h2>Todavía no hay inmobiliarias</h2><p class="sub">Creá la primera: alcanza con su nombre comercial.</p><a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a></section>`)
       : `<section class="card glass ag-list"><div class="table-wrap"><table class="ag-table"><thead><tr>
-          <th>Inmobiliaria</th><th><span title="Prospecto → Contactada → Demo enviada → Interactuó → Con panel → Cliente. Surge de los hechos registrados.">Estado comercial ⓘ</span></th>
-          <th><span title="La última demo creada en el período y el paso más alto del funnel que alcanzaron sus demos.">Demo ⓘ</span></th><th>Cuenta habita</th><th class="n">Propiedades</th>
-          <th>${sortHead('score', 'Lead score ⓘ', 'Engagement de visitantes externos con sus demos (0 a 100). No es probabilidad de compra. Tocá para ordenar.')}</th><th>${sortHead('actividad', 'Última actividad')}</th><th>Acciones</th>
+          <th>${esc(cfg.one[0].toUpperCase() + cfg.one.slice(1))}</th><th><span title="${esc(cfg.stages.map((k) => cfg.stageStep[k]).join(' → '))}. Surge de los hechos registrados.">Estado comercial ⓘ</span></th>
+          <th><span title="${api_ ? 'La última demo creada en el período y el paso más alto del funnel que alcanzaron sus demos.' : 'Hasta dónde llegó su demo (/p/…) y cuándo se la mandamos.'}">Demo ⓘ</span></th><th>${esc(cfg.accountTitle)}</th>${api_ ? '<th class="n">Propiedades</th>' : '<th>Zona</th>'}
+          <th>${api_ ? sortHead('score', 'Lead score ⓘ', 'Engagement de visitantes externos con sus demos (0 a 100). No es probabilidad de compra. Tocá para ordenar.') : 'Mensajes'}</th><th>${sortHead('actividad', 'Última actividad')}</th><th>Acciones</th>
         </tr></thead><tbody>${rowsHtml}</tbody></table></div>
-        ${v.pages > 1 ? `<nav class="ag-pages" aria-label="Páginas">${v.page > 1 ? `<button type="button" class="btn small" data-ag-set="${set({ pagina: String(v.page - 1) })}">Anterior</button>` : '<span></span>'}<span class="sub">Página ${int(v.page)} de ${int(v.pages)} · ${int(v.shown.length)} inmobiliarias</span>${v.page < v.pages ? `<button type="button" class="btn small" data-ag-set="${set({ pagina: String(v.page + 1) })}">Siguiente</button>` : '<span></span>'}</nav>` : ''}</section>`;
-    const recalc = `<p class="ag-recalc"><button type="button" class="link" data-action="ag-recalc">${state.agRecalc === 'busy' ? 'Recalculando…' : 'Recalcular lead scores'}</button>${state.agRecalc && state.agRecalc !== 'busy' ? ` · <span role="status">${esc(state.agRecalc)}</span>` : ''}</p>`;
+        ${v.pages > 1 ? `<nav class="ag-pages" aria-label="Páginas">${v.page > 1 ? `<button type="button" class="btn small" data-ag-set="${set({ pagina: String(v.page - 1) })}">Anterior</button>` : '<span></span>'}<span class="sub">Página ${int(v.page)} de ${int(v.pages)} · ${int(v.shown.length)} ${esc(cfg.many)}</span>${v.page < v.pages ? `<button type="button" class="btn small" data-ag-set="${set({ pagina: String(v.page + 1) })}">Siguiente</button>` : '<span></span>'}</nav>` : ''}</section>`;
+    const recalc = !api_ ? '' : `<p class="ag-recalc"><button type="button" class="link" data-action="ag-recalc">${state.agRecalc === 'busy' ? 'Recalculando…' : 'Recalcular lead scores'}</button>${state.agRecalc && state.agRecalc !== 'busy' ? ` · <span role="status">${esc(state.agRecalc)}</span>` : ''}</p>`;
     state.agRows = new Map(v.items.map((r) => [r.id, { r, step: v.per.get(r.id).step, app }]));
     queueMicrotask(agPop);
     return head + funnel + review + toolbar + scope + table + recalc;
@@ -1073,6 +1095,15 @@
     el.innerHTML = menuRow ? stepMenu(menuRow.r, menuRow.step) : moreRow ? moreMenu(moreRow.r, moreRow.app) : '';
   }
   function moreMenu(r, app) {
+    if (!fromApi(state.unit)) {
+      const u = unitOf(state.unit);
+      const at = state.agMenuAt || { top: 120, left: 20 };
+      return `<div class="ag-more-list glass strong" style="--at-top:${at.top}px;--at-left:${Math.max(8, at.left - 200)}px" role="menu" aria-label="Más acciones de ${esc(r.name)}">
+        <a role="menuitem" href="#" data-open-account="${esc(r.id)}">Abrir su ficha</a>
+        ${r.demoUrl ? `<a role="menuitem" href="${esc(r.demoUrl)}" target="_blank" rel="noopener">Ver su demo</a>` : ''}
+        ${u.appUrl ? `<a role="menuitem" href="${esc(u.appUrl)}" target="_blank" rel="noopener">Abrir ${esc(u.appName)}</a>` : ''}
+      </div>`;
+    }
     const base = `${app}/admin/inmobiliarias/${r.id}`;
     const at = state.agMenuAt || { top: 120, left: 20 };
     return `<div class="ag-more-list glass strong" style="--at-top:${at.top}px;--at-left:${Math.max(8, at.left - 200)}px" role="menu" aria-label="Más acciones de ${esc(r.name)}">
@@ -1084,6 +1115,13 @@
     </div>`;
   }
   function stepMenu(r, step) {
+    if (!fromApi(state.unit)) {
+      const at = state.agMenuAt || { top: 120, left: 20 };
+      const o = (val, title, help) => `<button type="button" role="radio" aria-checked="${step === val}" class="ag-step-opt${step === val ? ' is-on' : ''}" data-ag-sent="${val}" data-id="${esc(r.id)}"><span class="dot-opt" aria-hidden="true"></span><span><strong>${title}</strong><small>${help}</small></span></button>`;
+      return `<div class="ag-step-pop glass strong" style="--at-top:${at.top}px;--at-left:${at.left}px" role="dialog" aria-label="Estado de la demo de ${esc(r.name)}"><p><strong>Demo de ${esc(r.name)}</strong><span class="sub">¿Ya se la mandaste?</span></p>
+        ${o(0, 'Armada', 'Todavía no se la mandamos')}${o(1, 'Enviada', 'Ya se la mandamos (registra el saludo, si faltaba, y la demo)')}
+        <p class="sub" style="margin:6px 0 0">Abrió, habló con Sofi, llamada y cliente se marcan solos. Para deshacer un envío, usá la ficha.</p><button type="button" class="btn small ghost" data-ag-menu="">Cancelar</button></div>`;
+    }
     const o = (val, title, help) => `<button type="button" role="radio" aria-checked="${step === val}" class="ag-step-opt${step === val ? ' is-on' : ''}" data-ag-sent="${val}" data-id="${esc(r.id)}"><span class="dot-opt" aria-hidden="true"></span><span><strong>${title}</strong><small>${help}</small></span></button>`;
     const at = state.agMenuAt || { top: 120, left: 20 };
     return `<div class="ag-step-pop glass strong" style="--at-top:${at.top}px;--at-left:${at.left}px" role="dialog" aria-label="Estado de la demo de ${esc(r.name)}"><p><strong>Demo de ${esc(r.name)}</strong><span class="sub">¿En qué estado está?</span></p>
@@ -1611,6 +1649,35 @@
       return;
     }
     if (ds.agWa) { openWhatsApp(ds.agWa, '¡Buenas!'); return; }
+    if (ds.agCopy !== undefined) { copy(ds.agCopy); return; }
+    if (ds.agWaAccount) {
+      // Turnia: el mensaje que le toca (saludo, demo o seguimiento) y después la confirmación de que salió.
+      const a = findAccount(ds.agWaAccount);
+      const next = a && C.nextTemplate(a, unitOf(state.unit));
+      if (next && next.channel === 'whatsapp') startSend(a.id, 'whatsapp', next.key);
+      else if (a) openWhatsApp(a.phone, '');
+      return;
+    }
+    if (ds.openAccount && t.matches('a, button')) { e.preventDefault(); state.agMore = null; state.agMenu = null; agPop(); openDrawer(ds.openAccount); return; }
+    if (ds.agSent !== undefined && !fromApi(state.unit)) {
+      // Turnia: «Enviada» registra el saludo (si faltaba) y la demo, como el registro en lote.
+      const a = findAccount(ds.id);
+      if (ds.agSent === '0') { toast('Para deshacer un envío, usá «Deshacer» en la ficha.', true); return; }
+      if (!a) return;
+      if (state.demo) { toast('En el ejemplo no se cambia nada.', true); return; }
+      const steps = [...(!a.greetingSent && !a.touches && unitOf(state.unit).greetingFirst ? [0] : []), 1];
+      t.disabled = true;
+      try {
+        const r = await api('bulk', { method: 'POST', body: { unit: state.unit, items: [{ id: a.id, actions: steps.map((step) => ({ type: 'sent', step, channel: 'whatsapp' })) }] } });
+        const x = r.results && r.results[0];
+        if (!x || !x.ok) throw new Error((x && x.error) || 'No se pudo registrar.');
+        if (x.account) replaceAccount(state.unit, x.account);
+        state.agMenu = null;
+        toast(`Demo de ${a.name} registrada como enviada`);
+        render();
+      } catch (err) { toast(err.message, true); t.disabled = false; }
+      return;
+    }
     if (ds.agSent !== undefined) {
       t.disabled = true;
       try {
@@ -1648,7 +1715,7 @@
         break;
       }
       case 'more': state.shown += 100; render(); break;
-      case 'ag-reload': state.ag[state.unit] = null; render(); break;
+      case 'ag-reload': if (fromApi(state.unit)) { state.ag[state.unit] = null; render(); } else { await loadUnit(state.unit, { quiet: true }); render(); toast('Actualizado'); } break;
       case 'ag-recalc': {
         if (state.agRecalc === 'busy') break;
         state.agRecalc = 'busy'; render();

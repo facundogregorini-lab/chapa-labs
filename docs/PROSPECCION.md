@@ -53,6 +53,16 @@ La lista «Inmobiliarias» que armó Facu en el panel de habita. (`/admin/inmobi
 
 Las reglas son las de su código, copiadas sin cambios en `prospecting/agencies.js` (de `commercial.ts` y `demo-funnel.ts`); las filas las calcula habita. y llegan por `GET /api/prospeccion?vista=inmobiliarias`. Las acciones van por la misma ruta (ver `docs/PROSPECCION.md` de amoblaia). Si Facu cambia una regla allá, hay que copiarla acá.
 
+## Turnia · Odontólogos (`?vista=odontologos`)
+
+La misma vista de Facu, para Turnia, armada con sus cuentas (no hace falta nada nuevo en Turnia):
+
+- **Embudo de su demo** (`/p/<código>`), seis pasos: demos armadas → enviadas → abrieron la demo → hablaron con Sofi → llamada agendada → Clientes Fundadores, en barras partidas que filtran la lista. El período es por la fecha del envío; las que no se enviaron cuentan solo en «Todo». Los fijos sin respuesta no cuentan, como en el panel de Turnia.
+- **Etapas**: por contactar, saludado, demo enviada, interactuó (abrió, probó, habló con Sofi o respondió), llamada agendada, cliente y cerrado.
+- **Cada fila**: estado, demo (Armada → «Enviada» registra el saludo, si faltaba, y la demo, como el registro en lote), cuenta de Turnia (creada / activa), zona, mensajes (de 3) y última actividad. Acciones: WhatsApp (abre el mensaje que le toca y después pregunta si salió, como en Hoy), copiar su demo, su ficha y «⋯».
+
+Las etapas y los pasos están en `prospecting/agencies.js` (`TURNIA`), junto a los de habita. (`HABITA`).
+
 ## Enviar con un agente de IA (`?vista=enviar`)
 
 Una sola tarjeta en un lugar fijo, para una persona o para un agente con computer use (por ejemplo, Claude en Chrome, que alterna entre este panel y la pestaña de WhatsApp Web). En la vista están las **instrucciones para el agente**, listas para copiar.

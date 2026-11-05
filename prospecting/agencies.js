@@ -1,7 +1,8 @@
-// habita. · la lista «Inmobiliarias» del equipo (/admin/inmobiliarias en amoblaia), tal cual, para la
-// vista Inmobiliarias de /prospecting/habita. Las reglas son las de su código y no se cambian acá:
-// src/lib/agency/commercial.ts (etapas, filtros, orden, totales) y src/lib/agency/demo-funnel.ts
-// (embudo de demos, períodos). Las filas llegan ya calculadas por su API (/api/prospeccion?vista=inmobiliarias).
+// La lista con el embudo de demos que armó Facu en habita. (/admin/inmobiliarias en amoblaia), para la
+// vista de cada unidad: «Inmobiliarias» en habita. y «Odontólogos» en Turnia. Las reglas son las de su
+// código (src/lib/agency/commercial.ts y src/lib/agency/demo-funnel.ts) y no se cambian acá; lo que cambia
+// por unidad son las etapas y los pasos del embudo (HABITA y TURNIA, abajo). En habita. las filas llegan
+// calculadas por su API; en Turnia se arman con sus cuentas (fromAccounts), con los datos de su panel.
 (function (root, factory) {
   const api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -14,7 +15,7 @@
   const STAGE_STEP = { prospect: 'Prospecto', contacted: 'Contactada', demo_sent: 'Demo enviada', interacted: 'Interactuó', panel: 'Con panel', client: 'Cliente' };
   const STAGE_TAB = { prospect: 'Prospectos', contacted: 'Contactadas', demo_sent: 'Demo enviada', interacted: 'Interactuaron', panel: 'Con panel', client: 'Clientes' };
   const STAGE_PARAM = { prospect: 'prospectos', contacted: 'contactadas', demo_sent: 'demo-enviada', interacted: 'interactuaron', panel: 'con-panel', client: 'clientes' };
-  const stageFromParam = (v) => COMMERCIAL_STAGES.find((k) => STAGE_PARAM[k] === v) || null;
+  const stageFromParam = (v, cfg = HABITA) => cfg.stages.find((k) => cfg.stageParam[k] === v) || null;
   const HOT_SCORE = 60;
 
   const ACCOUNT_LABEL = { active: 'Activa', registered: 'Registrada', none: 'Sin cuenta' };
@@ -70,8 +71,8 @@
       .sort((a, b) => String((b.lastActivity && b.lastActivity.at) || b.createdAt).localeCompare(String((a.lastActivity && a.lastActivity.at) || a.createdAt)) || a.name.localeCompare(b.name));
   }
 
-  function listTotals(rows) {
-    const byStage = Object.fromEntries(COMMERCIAL_STAGES.map((s) => [s, 0]));
+  function listTotals(rows, cfg = HABITA) {
+    const byStage = Object.fromEntries(cfg.stages.map((s) => [s, 0]));
     for (const r of rows) byStage[r.stage] += 1;
     return {
       total: rows.length,
@@ -89,10 +90,10 @@
   const STAYED = ['No se enviaron', 'No abrieron la demo', 'Visitaron, sin interactuar', 'Interactuaron, sin cuenta', 'Cuenta sin uso', 'Sin suscripción'];
   const OF_PREVIOUS = ['', 'de las creadas', 'de las enviadas', 'de las visitadas', 'de las que interactuaron', 'de las cuentas creadas', 'de las cuentas activas'];
 
-  function funnelCounts(steps) {
-    const counts = FUNNEL_STEPS.map((_, i) => steps.filter((s) => s >= i).length);
+  function funnelCounts(steps, cfg = HABITA) {
+    const counts = cfg.steps.map((_, i) => steps.filter((s) => s >= i).length);
     return counts.map((count, i) => ({
-      label: FUNNEL_STEPS[i],
+      label: cfg.steps[i],
       count,
       ofPrevious: i === 0 ? null : counts[i - 1] ? Math.round((count / counts[i - 1]) * 100) : null,
       ofFirst: counts[0] ? count / counts[0] : 0,
@@ -115,6 +116,7 @@
     return { key: 'todo', from: null, to: null };
   }
   function inPeriod(iso, p) {
+    if (!iso) return !p.from && !p.to; // sin fecha (todavía no se le escribió): solo en «Todo»
     const day = argDay(new Date(iso).getTime());
     return (!p.from || day >= p.from) && (!p.to || day <= p.to);
   }
@@ -138,12 +140,12 @@
 
   // ─── La lista entera, como la arma la página ─────────────────
   /** Filtros desde los parámetros de la URL (los mismos nombres que /admin/inmobiliarias). */
-  function filtersFrom(sp) {
+  function filtersFrom(sp, cfg = HABITA) {
     const g = (k) => (sp.get ? sp.get(k) : sp[k]) || '';
     const stepRaw = Number(g('paso'));
-    const step = g('paso') !== '' && Number.isInteger(stepRaw) && stepRaw >= 0 && stepRaw < FUNNEL_STEPS.length ? stepRaw : null;
+    const step = g('paso') !== '' && Number.isInteger(stepRaw) && stepRaw >= 0 && stepRaw < cfg.steps.length ? stepRaw : null;
     return {
-      stage: stageFromParam(g('etapa')),
+      stage: stageFromParam(g('etapa'), cfg),
       withDemo: g('etapa') === 'con-demo',
       q: g('q').slice(0, 80),
       account: Object.keys(ACCOUNT_PARAM).find((k) => ACCOUNT_PARAM[k] === g('cuenta')) || null,
@@ -151,15 +153,15 @@
       days: [7, 30, 90].includes(Number(g('actividad'))) ? Number(g('actividad')) : null,
       period: parsePeriod({ periodo: g('periodo'), desde: g('desde'), hasta: g('hasta') }),
       step,
-      stayed: step !== null && step < FUNNEL_STEPS.length - 1 && g('quedo') === '1',
+      stayed: step !== null && step < cfg.steps.length - 1 && g('quedo') === '1',
       sort: sortFromParam(g('orden')),
       page: Math.max(1, Number(g('pagina')) || 1),
     };
   }
   /** Los parámetros de la URL de unos filtros (vacíos los que van por defecto). */
-  function filtersParams(f) {
+  function filtersParams(f, cfg = HABITA) {
     return {
-      etapa: f.withDemo ? 'con-demo' : f.stage ? STAGE_PARAM[f.stage] : '',
+      etapa: f.withDemo ? 'con-demo' : f.stage ? cfg.stageParam[f.stage] : '',
       paso: f.step !== null ? String(f.step) : '',
       quedo: f.stayed ? '1' : '',
       periodo: f.period.key === 'todo' || f.period.key === 'rango' ? '' : f.period.key,
@@ -180,12 +182,12 @@
    * pestañas, las filas filtradas y ordenadas y la página. Un período distinto de «Todo» acota la lista
    * a las inmobiliarias con demos creadas en él, para que coincida con el embudo de arriba.
    */
-  function view(rows, f) {
-    const funnel = funnelCounts(rows.filter((r) => !r.test).flatMap((r) => r.demos.filter((d) => inPeriod(d.createdAt, f.period)).map((d) => d.step)));
+  function view(rows, f, cfg = HABITA) {
+    const funnel = funnelCounts(rows.filter((r) => !r.test).flatMap((r) => r.demos.filter((d) => inPeriod(d.createdAt, f.period)).map((d) => d.step)), cfg);
     const per = new Map(rows.map((r) => [r.id, demosInPeriod(r.demos, f.period)]));
     const periodOn = f.period.key !== 'todo';
     const scoped = periodOn ? rows.filter((r) => per.get(r.id).count > 0) : rows;
-    const totals = listTotals(scoped);
+    const totals = listTotals(scoped, cfg);
     const withDemos = rows.filter((r) => per.get(r.id).count > 0).length;
     const periodDemos = scoped.reduce((n, r) => n + per.get(r.id).count, 0);
     const filtered = filterRows(scoped, f).filter((r) => {
@@ -199,7 +201,67 @@
     return { funnel, per, periodOn, totals, withDemos, periodDemos, shown, pages, page, items: shown.slice((page - 1) * PER_PAGE, page * PER_PAGE) };
   }
 
+  // ─── Lo que cambia por unidad ────────────────────────────────
+  const HABITA = {
+    id: 'habita', slug: 'inmobiliarias', many: 'inmobiliarias', one: 'inmobiliaria', title: 'Inmobiliarias', all: 'Todas',
+    stages: COMMERCIAL_STAGES, stageStep: STAGE_STEP, stageTab: STAGE_TAB, stageParam: STAGE_PARAM,
+    steps: FUNNEL_STEPS, stepLabel: STEP_LABEL, stayed: STAYED, ofPrevious: OF_PREVIOUS,
+    lastNote: 'Clientes pagos', periodBy: 'Demo creada', withDemoTab: 'Con demo creada', accountLabel: ACCOUNT_LABEL, accountTitle: 'Cuenta habita', accountActive: 'Activa (suscripción)',
+    note: '«Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Las inmobiliarias de prueba (QA) no cuentan.',
+  };
+
+  // Turnia: cada odontólogo tiene su demo (/p/<código>) desde que entra a la base. El embudo sigue esa
+  // demo hasta el Cliente Fundador, con los mismos datos que el panel de Turnia (su planilla espejo).
+  const TURNIA = {
+    id: 'turnia', slug: 'odontologos', many: 'odontólogos', one: 'odontólogo', title: 'Odontólogos', all: 'Todos',
+    stages: ['prospect', 'contacted', 'demo_sent', 'interacted', 'call', 'client', 'closed'],
+    stageStep: { prospect: 'Por contactar', contacted: 'Saludado', demo_sent: 'Demo enviada', interacted: 'Interactuó', call: 'Llamada agendada', client: 'Cliente Fundador', closed: 'Cerrado' },
+    stageTab: { prospect: 'Por contactar', contacted: 'Saludados', demo_sent: 'Demo enviada', interacted: 'Interactuaron', call: 'Llamada agendada', client: 'Clientes', closed: 'Cerrados' },
+    stageParam: { prospect: 'por-contactar', contacted: 'saludados', demo_sent: 'demo-enviada', interacted: 'interactuaron', call: 'llamada', client: 'clientes', closed: 'cerrados' },
+    steps: ['Demos armadas', 'Enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
+    stepLabel: ['Armada', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
+    stayed: ['No se enviaron', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
+    ofPrevious: ['', 'de las armadas', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
+    lastNote: 'Setup y mes 1 cobrados', periodBy: 'Demo enviada', withDemoTab: 'Con demo', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
+    note: '«Abrieron la demo»: entraron a su /p/…; «Hablaron con Sofi»: conversaron con Sofi en la demo (o la probaron). Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
+  };
+
+  /** «AAAA-MM-DD HH:mm» (hora de Buenos Aires, como las guarda el panel) a ISO. */
+  const iso = (v) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? new Date(`${v.slice(0, 10)}T${(v.slice(11, 16) || '12:00')}:00-03:00`).toISOString() : null);
+  const isDate = (v) => Boolean(v && v !== 'sí');
+
+  /**
+   * Turnia: las filas desde sus cuentas. El paso de su demo (0 armada … 5 cliente) y la etapa sale de los
+   * hechos que ya registra su panel: envío, apertura, conversación con Sofi, llamada, cuenta y cobro.
+   */
+  function fromAccounts(accounts, { counted, closed } = {}) {
+    return accounts.filter((a) => !counted || counted(a)).map((a) => {
+      const sent = (a.touches || 0) >= 1;
+      const opened = Boolean(a.demoOpened || a.demoTried || a.demoChat || a.demoClinic);
+      const chat = Boolean(a.demoChat || a.demoTried);
+      const call = Boolean(a.meeting) || a.stage === 'reunion';
+      const client = Boolean(a.customer || a.clientAt) || a.stage === 'cliente';
+      const step = client ? 5 : call ? 4 : chat ? 3 : opened ? 2 : sent ? 1 : 0;
+      const isClosed = closed ? closed(a) : false;
+      const stage = client ? 'client' : isClosed ? 'closed' : call ? 'call' : chat || opened || a.replied ? 'interacted' : sent ? 'demo_sent' : a.greetingSent || a.firstContact ? 'contacted' : 'prospect';
+      const facts = [
+        [a.clientAt || a.customer, 'Cliente Fundador'], [a.meeting, 'Llamada agendada'], [a.accountAt, 'Creó su cuenta'], [a.demoChat, 'Habló con Sofi'],
+        [a.demoTried, 'Probó la demo'], [a.demoOpened, 'Abrió la demo'], [a.replied, 'Respondió'], [a.lastContact, 'Le escribimos'], [a.greetingSent, 'Saludo enviado'],
+      ].filter(([d]) => isDate(d)).map(([d, text]) => ({ at: iso(d), text })).filter((x) => x.at).sort((x, y) => y.at.localeCompare(x.at));
+      return {
+        id: a.id, name: a.name, org: a.org, zone: a.zone, coverPhotoId: null, stage, step,
+        hasOwner: isDate(a.accountAt), subscribed: isDate(a.accountActive), client,
+        score: null, touches: a.touches || 0, lastActivity: facts[0] || null,
+        createdAt: iso(a.firstContact) || iso(a.greetingSent) || '2000-01-01T00:00:00.000Z',
+        test: false, phone: a.phone, phoneKind: a.phoneKind, demoUrl: a.demoUrl || '',
+        // La fecha de la demo es la del envío: sin enviar, cuenta solo en «Todo».
+        demos: a.demoUrl || sent ? [{ id: a.id, sent, createdAt: sent ? iso(a.firstContact) || iso(a.lastContact) : null, step }] : [],
+      };
+    });
+  }
+
   return {
+    HABITA, TURNIA, fromAccounts,
     COMMERCIAL_STAGES, STAGE_STEP, STAGE_TAB, STAGE_PARAM, stageFromParam, HOT_SCORE, ACCOUNT_LABEL, ACCOUNT_PARAM, accountState, agoText,
     DEFAULT_SORT, sortFromParam, sortParam, sortRows, filterRows, listTotals,
     FUNNEL_STEPS, STEP_LABEL, STAYED, OF_PREVIOUS, funnelCounts, PERIODS, argDay, parsePeriod, inPeriod, shortDay, demosInPeriod, periodLabel,

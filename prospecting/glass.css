@@ -582,3 +582,9 @@ button.chip:hover { background: var(--glass-strong); }
   .ag-chip { height: 44px; padding: 0 14px; }
   .ag-step-pop { position: fixed; left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; }
 }
+
+/* Turnia · Odontólogos: las etapas propias y las iniciales en lugar de la portada. */
+.ag-stage.is-call { background: rgba(22, 112, 106, 0.15); color: #16706a; }
+.ag-stage.is-closed { background: rgba(120, 120, 120, 0.14); color: var(--muted); }
+.ag-thumb.is-initials { font-size: 13px; font-weight: 800; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 16%, var(--glass-soft)); }
+.ag-name > span { min-width: 0; }

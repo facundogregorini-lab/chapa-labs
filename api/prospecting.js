@@ -316,7 +316,7 @@ async function doSync(req, res) {
 // portada de cada demo y las acciones de la lista (Creada/Enviada, links de Demo y Panel, scores).
 function agenciesUnit(req, res, id) {
   const unit = UNITS[id];
-  if (!unit || !unit.agencies) { fail(res, 400, 'Esa unidad no tiene la lista de inmobiliarias.'); return null; }
+  if (!unit || unit.agencies !== true) { fail(res, 400, 'Esa unidad no tiene la lista de inmobiliarias por API.'); return null; }
   if (!apiOf(unit)) { fail(res, 403, `Falta la clave de la API de ${unit.name} (${unit.api.secretEnvs.join(' o ')}).`); return null; }
   return unit;
 }

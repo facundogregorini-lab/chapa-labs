@@ -28,6 +28,8 @@
     api: { urlEnv: 'TURNIA_PROSPECTING_API_URL', url: 'https://turniasalud.vercel.app/api/prospeccion', secretEnvs: ['TURNIA_PROSPECTING_SECRET', 'TURNIA_METRICS_SECRET'] },
     appUrl: 'https://turniasalud.vercel.app/panel/prospeccion',
     appName: 'el panel de Turnia',
+    // La vista «Odontólogos»: la lista con el embudo de demos de habita. (de Facu), armada con estas cuentas.
+    agencies: 'accounts',
     // Para cuando el panel escriba en una planilla propia: trae las señales de la app.
     signals: { env: 'TURNIA_SIGNALS_SHEET_ID', tab: 'Prospección', fields: ['demoOpened', 'demoTried', 'demoUrl'] },
     // En la planilla de Turnia, «Contactado» sin mensajes y con el saludo enviado es «saludado».
