@@ -976,7 +976,7 @@
     const d = state.data[id];
     if (!d || !d.accounts) return d;
     const u = unitOf(id);
-    return { rows: AG.fromAccounts(d.accounts, { counted: u.counted, closed: C.closed }), toReview: [], app: u.appUrl ? new URL(u.appUrl).origin : '' };
+    return { rows: AG.fromAccounts(d.accounts, { counted: u.counted, closed: C.closed, targets: u.targets }), toReview: [], app: u.appUrl ? new URL(u.appUrl).origin : '' };
   }
   function scorePill(score) {
     if (score === null || score === undefined) return '<span class="ag-pill ag-score is-none" title="Sin visitas externas: las del equipo no cuentan">—</span>';
@@ -1119,7 +1119,7 @@
       const at = state.agMenuAt || { top: 120, left: 20 };
       const o = (val, title, help) => `<button type="button" role="radio" aria-checked="${step === val}" class="ag-step-opt${step === val ? ' is-on' : ''}" data-ag-sent="${val}" data-id="${esc(r.id)}"><span class="dot-opt" aria-hidden="true"></span><span><strong>${title}</strong><small>${help}</small></span></button>`;
       return `<div class="ag-step-pop glass strong" style="--at-top:${at.top}px;--at-left:${at.left}px" role="dialog" aria-label="Estado de la demo de ${esc(r.name)}"><p><strong>Demo de ${esc(r.name)}</strong><span class="sub">¿Ya se la mandaste?</span></p>
-        ${o(0, 'Armada', 'Todavía no se la mandamos')}${o(1, 'Enviada', 'Ya se la mandamos (registra el saludo, si faltaba, y la demo)')}
+        ${o(0, 'Saludado', 'Todavía no le mandamos la demo')}${o(1, 'Enviada', 'Ya se la mandamos (registra la demo)')}
         <p class="sub" style="margin:6px 0 0">Abrió, habló con Sofi, llamada y cliente se marcan solos. Para deshacer un envío, usá la ficha.</p><button type="button" class="btn small ghost" data-ag-menu="">Cancelar</button></div>`;
     }
     const o = (val, title, help) => `<button type="button" role="radio" aria-checked="${step === val}" class="ag-step-opt${step === val ? ' is-on' : ''}" data-ag-sent="${val}" data-id="${esc(r.id)}"><span class="dot-opt" aria-hidden="true"></span><span><strong>${title}</strong><small>${help}</small></span></button>`;

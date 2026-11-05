@@ -80,12 +80,32 @@ test('Turnia: las filas desde sus cuentas, con el paso de su demo y la etapa', (
   assert.equal(rows[3].lastActivity.text, 'Habló con Sofi');
   assert.equal(A.accountState(rows[6]), 'active');
   const v = A.view(rows, A.filtersFrom(new URLSearchParams('etapa=cerrados'), A.TURNIA), A.TURNIA);
-  assert.deepEqual(v.funnel.map((x) => x.count), [7, 5, 3, 3, 2, 1]);
+  assert.deepEqual(v.funnel.map((x) => x.count), [6, 5, 3, 3, 2, 1]); // a no fue saludado: no entra al embudo
   assert.deepEqual(v.items.map((r) => r.id), ['f']);
   // «Se quedaron» en Enviadas: les mandamos la demo y no la abrieron.
   const stayed = A.view(rows, A.filtersFrom(new URLSearchParams('paso=1&quedo=1'), A.TURNIA), A.TURNIA);
   assert.deepEqual(stayed.items.map((r) => r.id).sort(), ['c', 'f']);
   // Sin enviar, la demo cuenta solo en «Todo».
   const week = A.view(rows, { ...A.filtersFrom(new URLSearchParams(''), A.TURNIA), period: { key: '7', from: '2026-10-30', to: '2026-11-05' } }, A.TURNIA);
-  assert.deepEqual(week.funnel.map((x) => x.count), [2, 2, 1, 1, 0, 0]);
+  assert.deepEqual(week.funnel.map((x) => x.count), [3, 2, 1, 1, 0, 0]);
+});
+
+test('Turnia: el embudo de Odontólogos cuenta lo mismo que el Embudo contra la meta', () => {
+  const C = require('../prospecting/core');
+  const { turnia } = require('../prospecting/units').UNITS;
+  const accounts = [
+    { id: 'a', name: 'A', stage: 'por_contactar', touches: 0, phoneKind: 'celular' },
+    { id: 'b', name: 'B', stage: 'saludado', touches: 0, greetingSent: '2026-11-03 09:00', firstContact: '2026-11-03 09:00', phoneKind: 'celular' },
+    { id: 'c', name: 'C', stage: 'contactado', touches: 1, firstContact: '2026-11-03 09:00', demoTried: '2026-11-03 10:00', phoneKind: 'celular' },
+    { id: 'd', name: 'D', stage: 'contactado', touches: 1, firstContact: '2026-10-01 09:00', demoChat: '2026-10-02 10:00', phoneKind: 'celular' },
+    { id: 'e', name: 'E', stage: 'reunion', touches: 2, firstContact: '2026-10-20 09:00', phoneKind: 'celular' },
+    { id: 'f', name: 'F', stage: 'contactado', touches: 1, firstContact: '2026-11-01 09:00', phoneKind: 'fijo' },
+  ].map((a) => C.toAccounts([['ID'], ['x']], turnia) && a);
+  const rows = A.fromAccounts(accounts, { counted: turnia.counted, closed: C.closed, targets: turnia.targets });
+  for (const range of [null, { from: '2026-11-01', to: '2026-11-05' }]) {
+    const tf = C.targetFunnel(accounts, turnia, range ? { range } : {});
+    const period = range ? { key: 'rango', ...range } : { key: 'todo', from: null, to: null };
+    const v = A.view(rows, { ...A.filtersFrom(new URLSearchParams(''), A.TURNIA), period }, A.TURNIA);
+    assert.deepEqual(v.funnel.map((x) => x.count), tf.steps.map((s) => s.actual));
+  }
 });

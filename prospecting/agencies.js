@@ -218,12 +218,13 @@
     stageStep: { prospect: 'Por contactar', contacted: 'Saludado', demo_sent: 'Demo enviada', interacted: 'Interactuó', call: 'Llamada agendada', client: 'Cliente Fundador', closed: 'Cerrado' },
     stageTab: { prospect: 'Por contactar', contacted: 'Saludados', demo_sent: 'Demo enviada', interacted: 'Interactuaron', call: 'Llamada agendada', client: 'Clientes', closed: 'Cerrados' },
     stageParam: { prospect: 'por-contactar', contacted: 'saludados', demo_sent: 'demo-enviada', interacted: 'interactuaron', call: 'llamada', client: 'clientes', closed: 'cerrados' },
-    steps: ['Demos armadas', 'Enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
-    stepLabel: ['Armada', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
-    stayed: ['No se enviaron', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
-    ofPrevious: ['', 'de las armadas', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
-    lastNote: 'Setup y mes 1 cobrados', periodBy: 'Demo enviada', withDemoTab: 'Con demo', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
-    note: '«Abrieron la demo»: entraron a su /p/…; «Hablaron con Sofi»: conversaron con Sofi en la demo (o la probaron). Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
+    // Los mismos pasos y definiciones que el «Embudo contra la meta» (units.js → targets): empieza en el saludo.
+    steps: ['Saludos enviados', 'Demos enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
+    stepLabel: ['Saludado', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
+    stayed: ['Esperan la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
+    ofPrevious: ['', 'de los saludados', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
+    lastNote: 'Setup y mes 1 cobrados', periodBy: 'Primer contacto', withDemoTab: 'Contactados', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
+    note: 'Los mismos pasos que el Embudo contra la meta: «Abrieron la demo» es que entraron a su /p/… (o la probaron); «Hablaron con Sofi», que conversaron con ella. Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
   };
 
   /** «AAAA-MM-DD HH:mm» (hora de Buenos Aires, como las guarda el panel) a ISO. */
@@ -234,14 +235,19 @@
    * Turnia: las filas desde sus cuentas. El paso de su demo (0 armada … 5 cliente) y la etapa sale de los
    * hechos que ya registra su panel: envío, apertura, conversación con Sofi, llamada, cuenta y cobro.
    */
-  function fromAccounts(accounts, { counted, closed } = {}) {
+  function fromAccounts(accounts, { counted, closed, targets } = {}) {
     return accounts.filter((a) => !counted || counted(a)).map((a) => {
+      // Las mismas definiciones que los pasos del Embudo (units.js → targets de Turnia).
+      const greeted = Boolean(a.greetingSent || a.firstContact);
       const sent = (a.touches || 0) >= 1;
-      const opened = Boolean(a.demoOpened || a.demoTried || a.demoChat || a.demoClinic);
-      const chat = Boolean(a.demoChat || a.demoTried);
+      const opened = Boolean(a.demoOpened || a.demoTried || a.demoClinic || a.demoChat);
+      const chat = Boolean(a.demoChat);
       const call = Boolean(a.meeting) || a.stage === 'reunion';
-      const client = Boolean(a.customer || a.clientAt) || a.stage === 'cliente';
-      const step = client ? 5 : call ? 4 : chat ? 3 : opened ? 2 : sent ? 1 : 0;
+      const client = Boolean(a.customer) || a.stage === 'cliente';
+      // El paso es el más alto que cumple, con las funciones de los pasos del Embudo contra la meta
+      // (units.js → targets): así los dos cuentan exactamente lo mismo. -1: todavía no se le escribió.
+      let step = client ? 5 : call ? 4 : chat ? 3 : opened ? 2 : sent ? 1 : greeted ? 0 : -1;
+      if (targets && targets.length) { step = -1; targets.forEach((t, i) => { if (t.sheet && t.sheet(a)) step = i; }); }
       const isClosed = closed ? closed(a) : false;
       const stage = client ? 'client' : isClosed ? 'closed' : call ? 'call' : chat || opened || a.replied ? 'interacted' : sent ? 'demo_sent' : a.greetingSent || a.firstContact ? 'contacted' : 'prospect';
       const facts = [
@@ -249,13 +255,13 @@
         [a.demoTried, 'Probó la demo'], [a.demoOpened, 'Abrió la demo'], [a.replied, 'Respondió'], [a.lastContact, 'Le escribimos'], [a.greetingSent, 'Saludo enviado'],
       ].filter(([d]) => isDate(d)).map(([d, text]) => ({ at: iso(d), text })).filter((x) => x.at).sort((x, y) => y.at.localeCompare(x.at));
       return {
-        id: a.id, name: a.name, org: a.org, zone: a.zone, coverPhotoId: null, stage, step,
+        id: a.id, name: a.name, org: a.org, zone: a.zone, coverPhotoId: null, stage, step: Math.max(0, step),
         hasOwner: isDate(a.accountAt), subscribed: isDate(a.accountActive), client,
         score: null, touches: a.touches || 0, lastActivity: facts[0] || null,
         createdAt: iso(a.firstContact) || iso(a.greetingSent) || '2000-01-01T00:00:00.000Z',
         test: false, phone: a.phone, phoneKind: a.phoneKind, demoUrl: a.demoUrl || '',
-        // La fecha de la demo es la del envío: sin enviar, cuenta solo en «Todo».
-        demos: a.demoUrl || sent ? [{ id: a.id, sent, createdAt: sent ? iso(a.firstContact) || iso(a.lastContact) : null, step }] : [],
+        // En el embudo entra desde el saludo, con la fecha del primer contacto (la cohorte del Embudo).
+        demos: step >= 0 ? [{ id: a.id, sent, createdAt: iso(a.firstContact), step }] : [],
       };
     });
   }
