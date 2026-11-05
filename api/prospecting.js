@@ -170,17 +170,19 @@ const sheetFallback = (unit) => Boolean(unit.api && unit.api.fallback === 'sheet
 const readOnlyOf = (unit) => Boolean(unit.readOnly || (unit.api && !apiOf(unit) && !sheetFallback(unit)));
 
 // Llamada a la API de la app de la unidad (GET o POST con JSON).
-async function callApi(unit, { method = 'GET', body } = {}) {
+async function callApi(unit, { method = 'GET', body, query, timeout = 20000, raw = false } = {}) {
   const api = apiOf(unit);
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), timeout);
   try {
-    const r = await authFetch(api.url, {
+    const url = query ? `${api.url}?${new URLSearchParams(query)}` : api.url;
+    const r = await authFetch(url, {
       method,
       headers: { Authorization: `Bearer ${api.secret}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
       signal: ctrl.signal,
     });
+    if (raw && r.ok) return { type: r.headers.get('content-type') || 'application/octet-stream', bytes: Buffer.from(await r.arrayBuffer()) };
     const json = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = r.status === 401 ? `${unit.name} rechazó la clave: revisá que sea la misma en los dos proyectos.` : json.error || `${unit.name} respondió ${r.status}.`;
@@ -305,6 +307,52 @@ async function doSync(req, res) {
   try {
     const report = await callApi(unit, { method: 'POST', body: { sync: { csv } } });
     return res.status(200).json({ report });
+  } catch (err) {
+    return fail(res, err.status || 502, err.message);
+  }
+}
+
+// habita. · la lista «Inmobiliarias» de su equipo (/admin/inmobiliarias), por su API: las filas, la
+// portada de cada demo y las acciones de la lista (Creada/Enviada, links de Demo y Panel, scores).
+function agenciesUnit(req, res, id) {
+  const unit = UNITS[id];
+  if (!unit || !unit.agencies) { fail(res, 400, 'Esa unidad no tiene la lista de inmobiliarias.'); return null; }
+  if (!apiOf(unit)) { fail(res, 403, `Falta la clave de la API de ${unit.name} (${unit.api.secretEnvs.join(' o ')}).`); return null; }
+  return unit;
+}
+async function doAgencies(req, res) {
+  const unit = agenciesUnit(req, res, req.query.unit);
+  if (!unit) return;
+  try {
+    const out = await callApi(unit, { query: { vista: 'inmobiliarias' }, timeout: 55000 });
+    return res.status(200).json({ rows: out.rows || [], toReview: out.toReview || [], readAt: new Date().toISOString(), app: new URL(unit.appUrl).origin });
+  } catch (err) {
+    return fail(res, err.status || 502, err.message);
+  }
+}
+async function doAgencyThumb(req, res) {
+  const unit = agenciesUnit(req, res, req.query.unit);
+  if (!unit) return;
+  const foto = String(req.query.foto || '');
+  if (!/^[0-9a-f-]{36}$/i.test(foto)) return fail(res, 404, 'No encontramos la imagen.');
+  try {
+    const img = await callApi(unit, { query: { foto, w: String(Math.min(240, Number(req.query.w) || 120)) }, raw: true });
+    res.setHeader('Content-Type', img.type);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.status(200).end(img.bytes);
+  } catch (err) {
+    return fail(res, err.status || 502, err.message);
+  }
+}
+const AGENCY_ACTIONS = new Set(['demo-estado', 'link-demo', 'link-panel', 'recalcular-scores']);
+async function doAgency(req, res) {
+  const { unit: unitId, inmobiliaria, accion, enviada } = req.body || {};
+  const unit = agenciesUnit(req, res, unitId);
+  if (!unit) return;
+  if (!AGENCY_ACTIONS.has(accion)) return fail(res, 400, 'Acción desconocida.');
+  const body = accion === 'recalcular-scores' ? { accion } : { inmobiliaria, accion, ...(accion === 'demo-estado' ? { enviada: enviada === true } : {}) };
+  try {
+    return res.status(200).json(await callApi(unit, { method: 'POST', body, timeout: accion === 'recalcular-scores' ? 280000 : 30000 }));
   } catch (err) {
     return fail(res, err.status || 502, err.message);
   }
@@ -471,6 +519,9 @@ module.exports = async (req, res) => {
     if (op === 'template' && req.method === 'POST') return await doTemplate(req, res);
     if (op === 'bulk' && req.method === 'POST') return await doBulk(req, res, user);
     if (op === 'sync' && req.method === 'POST') return await doSync(req, res);
+    if (op === 'agencies' && req.method === 'GET') return await doAgencies(req, res);
+    if (op === 'agencyThumb' && req.method === 'GET') return await doAgencyThumb(req, res);
+    if (op === 'agency' && req.method === 'POST') return await doAgency(req, res);
     if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {

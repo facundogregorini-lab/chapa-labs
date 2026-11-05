@@ -132,5 +132,26 @@
     errors: {},
   });
 
-  window.ProspectingFixture = { build, metrics };
+  // habita. · la lista «Inmobiliarias» con inmobiliarias ficticias (mismas formas que su API).
+  function agencies() {
+    const names = ['Inmobiliaria Costa Azul', 'Propiedades del Puerto', 'Bosque Peralta Ramos Propiedades', 'Güemes Inmuebles', 'Alem Bienes Raíces', 'Playa Grande Propiedades', 'La Perla Inmobiliaria', 'Constitución Negocios', 'Punta Mogotes Inmuebles', 'Chauvin Propiedades', 'Centro Inmobiliario Mar', 'QA Habita', 'Los Troncos Bienes', 'San Carlos Inmuebles'];
+    const stages = ['prospect', 'contacted', 'demo_sent', 'demo_sent', 'interacted', 'interacted', 'panel', 'client', 'contacted', 'prospect', 'demo_sent', 'interacted', 'panel', 'demo_sent'];
+    const steps = [0, 0, 1, 1, 2, 3, 5, 6, 0, null, 1, 3, 4, 2];
+    const now = Date.now();
+    const rows = names.map((name, i) => {
+      const step = steps[i];
+      const created = new Date(now - (i * 2 + 1) * 86400000).toISOString();
+      const demos = step === null ? [] : [{ id: `d${i}`, sent: step >= 1, createdAt: created, step }, ...(i % 4 === 0 && step !== null ? [{ id: `d${i}b`, sent: false, createdAt: new Date(now - (i * 2 + 9) * 86400000).toISOString(), step: Math.min(step, 1) }] : [])];
+      return {
+        id: `ej-${i}`, name, coverPhotoId: null, stage: stages[i], hasOwner: step >= 4, subscribed: step === 6, prospect: true,
+        properties: demos.length + (i % 3), published: demos.length, score: step >= 2 ? 30 + step * 9 : null,
+        lastActivity: { at: new Date(now - i * 9 * 3600000).toISOString(), text: step >= 2 ? 'Vio una demo' : step === 1 ? 'Recibió la demo' : 'Creada en adquisición' },
+        createdAt: new Date(now - (i + 3) * 86400000).toISOString(), test: /^QA/.test(name), demos,
+        wa: i % 5 === 3 ? null : `549223${String(5000000 + i * 12345).slice(0, 7)}`, shareDemo: step >= 1 ? { id: `d${i}`, token: `tok${i}` } : null,
+      };
+    });
+    return { rows, toReview: [{ id: 'ej-2', name: 'Bosque Peralta Ramos Propiedades', claim_email: 'bosque.propiedades@gmail.com', claim_review: 'personal' }], app: 'https://www.habitaia.app' };
+  }
+
+  window.ProspectingFixture = { build, metrics, agencies };
 })();

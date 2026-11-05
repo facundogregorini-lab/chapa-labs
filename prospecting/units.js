@@ -150,6 +150,8 @@
     api: { urlEnv: 'HABITA_PROSPECTING_API_URL', url: 'https://www.habitaia.app/api/prospeccion', secretEnvs: ['HABITA_PROSPECTING_SECRET', 'HABITA_METRICS_SECRET'], rows: true, sync: true, templates: false, targets: false, fallback: 'sheet' },
     appUrl: 'https://www.habitaia.app/admin/prospeccion',
     appName: 'el panel de habita.',
+    // La lista «Inmobiliarias» de su equipo (/admin/inmobiliarias), tal cual, en la vista Inmobiliarias.
+    agencies: true,
     // La sincronización de la planilla con habita. (scripts/prospeccion-sync.gs) lee «Fecha envío» solo como día.
     dayColumns: ['firstContact'],
     metricsKey: 'amobla-ia',

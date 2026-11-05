@@ -42,6 +42,17 @@ Las etapas son las mismas para todas (`por_contactar`, `saludado`, `contactado`,
 - **Abajo**: en el Embudo de cada unidad, tocar una fila de «Por segmento» filtra todo el panel por ese valor (zona, SDR, prioridad…); tocar una etapa del embudo lleva a esas cuentas; tocar una cuenta abre su ficha.
 - El período (histórico, 7 días, 30 días, este mes) aplica al embudo, a los desgloses y a `/api/metricas`.
 
+## habita. · Inmobiliarias (`?vista=inmobiliarias`)
+
+La lista «Inmobiliarias» que armó Facu en el panel de habita. (`/admin/inmobiliarias`), tal cual, dentro de `/prospecting/habita`:
+
+- **Funnel de demos**: siete pasos (creadas → enviadas → con visita → con interacción → cuenta creada → cuenta con interacción → suscripciones), cada barra partida en verde (pasaron al siguiente) y naranja (se quedaron); tocar una parte filtra la lista (`paso`, `quedo=1`). Período por fecha de creación de la demo (Hoy, 7 días, 30 días, Este mes, Todo o Desde/Hasta). Las inmobiliarias de prueba (QA) no cuentan.
+- **Pestañas** por etapa comercial (Prospectos, Contactadas, Demo enviada, Interactuaron, Con panel, Clientes) y «Con demo creada», búsqueda, filtros (cuenta habita, lead score, última actividad), orden por lead score o actividad y páginas de 50. Los filtros quedan en la URL con los mismos nombres que allá.
+- **Cada fila**: portada, estado comercial, demo (Creada/Enviada se cambia a mano; lo demás se marca solo), cuenta, propiedades, lead score y última actividad; acciones: WhatsApp con «¡Buenas!», copiar el link de la Demo (con código de reclamo si no tiene cuenta) y el del Panel, Ver (su ficha en habita.) y «⋯» (nueva propiedad, editar, enlaces, cuenta y créditos).
+- Cuentas reclamadas para revisar y «Recalcular lead scores».
+
+Las reglas son las de su código, copiadas sin cambios en `prospecting/agencies.js` (de `commercial.ts` y `demo-funnel.ts`); las filas las calcula habita. y llegan por `GET /api/prospeccion?vista=inmobiliarias`. Las acciones van por la misma ruta (ver `docs/PROSPECCION.md` de amoblaia). Si Facu cambia una regla allá, hay que copiarla acá.
+
 ## Enviar con un agente de IA (`?vista=enviar`)
 
 Una sola tarjeta en un lugar fijo, para una persona o para un agente con computer use (por ejemplo, Claude en Chrome, que alterna entre este panel y la pestaña de WhatsApp Web). En la vista están las **instrucciones para el agente**, listas para copiar.

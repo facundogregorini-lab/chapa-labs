@@ -469,3 +469,116 @@ button.chip:hover { background: var(--glass-strong); }
 @keyframes lg-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes lg-draw { to { stroke-dashoffset: 0; } }
 @keyframes lg-ring { from { stroke-dashoffset: var(--c0, 176); } }
+
+/* ─── habita. · Inmobiliarias (la lista de /admin/inmobiliarias: mismos colores y formas, sobre vidrio) ─── */
+:root { --ag-green: #1e7a52; --ag-green-soft: rgba(30, 122, 82, 0.14); --ag-stayed: #e2a54a; --ag-stayed-on: #c9852a; }
+:root[data-theme="dark"] { --ag-green: #3fb07e; --ag-green-soft: rgba(63, 176, 126, 0.18); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ag-green: #3fb07e; --ag-green-soft: rgba(63, 176, 126, 0.18); } }
+.ag-funnel .card-head { flex-wrap: wrap; gap: 12px; }
+.ag-period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ag-range { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.ag-range .input { padding: 5px 8px; }
+.ag-f-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 12px; padding: 0; list-style: none; font-size: 13px; color: var(--muted); }
+.ag-f-legend li::before { content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; background: var(--ag-green); }
+.ag-f-legend li.is-stayed::before { background: var(--ag-stayed); }
+.ag-f-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; margin: 0 0 12px; padding: 0; list-style: none; }
+.ag-f-chart > li { display: flex; flex-direction: column; min-width: 0; }
+.ag-f-top { display: grid; justify-items: center; gap: 4px; padding: 6px 4px 8px; border: 0; border-radius: 12px; background: none; cursor: pointer; text-align: center; }
+.ag-f-top:hover, .ag-f-top:focus-visible { background: var(--glass-soft); }
+.ag-f-top.is-on { background: var(--ag-green-soft); box-shadow: inset 0 0 0 1px var(--ag-green); }
+.ag-f-top strong { font-size: 26px; line-height: 1; letter-spacing: -0.02em; }
+.ag-f-top small { min-height: 34px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.ag-f-plot { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 220px; background: repeating-linear-gradient(to top, var(--grid) 0 1px, transparent 1px 55px); }
+.ag-f-col { display: flex; flex-direction: column; width: 72%; min-height: 24px; border-radius: 12px 12px 5px 5px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 8px 18px -10px rgba(0, 0, 0, 0.35); }
+.ag-f-seg { display: flex; flex-basis: 0; align-items: center; justify-content: center; min-height: 22px; border: 0; cursor: pointer; font-size: 13px; font-weight: 800; transition: filter 0.15s; }
+.ag-f-seg + .ag-f-seg { border-top: 2px solid var(--glass-strong); }
+.ag-f-seg:hover, .ag-f-seg:focus-visible { filter: brightness(1.08); }
+.ag-f-seg.is-went { background: var(--ag-green); color: #fff; }
+.ag-f-seg.is-went.is-last { background: #1b3d31; }
+.ag-f-seg.is-stayed { background-color: var(--ag-stayed); background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px); color: #4a2f08; }
+.ag-f-seg.is-stayed.is-on { background-color: var(--ag-stayed-on); }
+.ag-f-seg.is-on { box-shadow: inset 0 0 0 3px var(--ink); }
+.ag-f-zero { display: block; width: 72%; height: 4px; border-radius: 3px; background: var(--glass-soft); }
+.ag-f-label { display: grid; align-content: start; gap: 2px; margin-top: 10px; min-height: 52px; font-size: 13px; font-weight: 700; text-align: center; }
+.ag-f-label small { font-size: 12px; font-weight: 600; color: #a86a17; }
+.ag-f-label small.is-went { color: var(--ag-green); }
+@media (prefers-reduced-motion: no-preference) {
+  main.entering .ag-f-col { transform-origin: bottom; animation: lg-grow-y 0.8s cubic-bezier(0.3, 1.4, 0.4, 1) both; animation-delay: calc(var(--i, 0) * 0.06s); }
+}
+@media (max-width: 900px) { .ag-f-chart { overflow-x: auto; grid-template-columns: repeat(7, minmax(96px, 1fr)); padding-bottom: 6px; } }
+@media (max-width: 640px) { .ag-f-plot { height: 160px; } }
+
+.ag-review { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.ag-toolbar .ag-tabs { margin-bottom: 10px; }
+.ag-filter { position: relative; }
+.ag-filter summary { list-style: none; cursor: pointer; }
+.ag-filter summary::-webkit-details-marker { display: none; }
+.ag-filter-form { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; display: grid; gap: 10px; width: 280px; padding: 14px; border-radius: 18px; background: var(--glass-strong); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); box-shadow: inset 0 0 0 1px var(--glass-line), var(--glass-shadow); }
+.ag-scope { margin: 0 4px; font-size: 14px; color: var(--ink-2); }
+.link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
+
+.ag-table td { vertical-align: middle; }
+.ag-name { display: flex; align-items: center; gap: 10px; text-decoration: none; min-width: 180px; }
+.ag-thumb { flex: none; width: 40px; height: 40px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; background: var(--glass-soft); box-shadow: inset 0 0 0 1px var(--glass-line); color: var(--muted); }
+.ag-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ag-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--glass-soft); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--glass-line); }
+.ag-pill i { font-style: normal; }
+.ag-pill.is-alert { background: rgba(208, 59, 59, 0.14); color: var(--bad-text); }
+.ag-stage.is-prospect { background: rgba(120, 130, 120, 0.14); }
+.ag-stage.is-contacted, .ag-score.is-warm { background: rgba(232, 160, 50, 0.18); color: #8a5a12; }
+.ag-stage.is-demo_sent { background: rgba(36, 87, 166, 0.14); color: #2457a6; }
+.ag-stage.is-interacted { background: rgba(122, 58, 168, 0.14); color: #7a3aa8; }
+.ag-stage.is-panel { background: rgba(22, 112, 106, 0.15); color: #16706a; }
+.ag-stage.is-client, .ag-account.is-active, .ag-score.is-hot { background: var(--ag-green-soft); color: var(--ag-green); }
+.ag-score.is-none { color: var(--muted); }
+:root[data-theme="dark"] .ag-stage.is-contacted, :root[data-theme="dark"] .ag-score.is-warm { color: #f0b860; }
+:root[data-theme="dark"] .ag-stage.is-demo_sent { color: #8fb4f0; }
+:root[data-theme="dark"] .ag-stage.is-interacted { color: #c39be6; }
+:root[data-theme="dark"] .ag-stage.is-panel { color: #6fd1c8; }
+.ag-demo { position: relative; display: grid; gap: 3px; justify-items: start; }
+.ag-demo small, .ag-when small { display: block; font-size: 12px; color: var(--muted); }
+.ag-step { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: rgba(120, 130, 120, 0.14); color: var(--ink-2); border: 1px solid transparent; }
+.ag-step.is-button { cursor: pointer; }
+.ag-step.is-button:hover { border-color: var(--glass-line); }
+.ag-step.is-step-1 { background: rgba(36, 87, 166, 0.14); color: #2457a6; }
+.ag-step.is-step-2 { background: rgba(22, 112, 106, 0.15); color: #16706a; }
+.ag-step.is-step-3 { background: rgba(122, 58, 168, 0.14); color: #7a3aa8; }
+.ag-step.is-step-4, .ag-step.is-step-5, .ag-step.is-step-6 { background: var(--ag-green-soft); color: var(--ag-green); }
+.ag-step-pop { position: fixed; z-index: 40; top: var(--at-top, 120px); left: var(--at-left, 20px); width: 280px; padding: 14px; border-radius: 18px; display: grid; gap: 6px; }
+.ag-step-pop p { margin: 0 0 4px; display: grid; }
+.ag-step-opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px; border: 0; border-radius: 12px; background: var(--glass-soft); cursor: pointer; box-shadow: inset 0 0 0 1px var(--glass-line); }
+.ag-step-opt small { display: block; color: var(--muted); font-size: 12px; }
+.ag-step-opt.is-on { box-shadow: inset 0 0 0 2px var(--ag-green); }
+.ag-step-opt .dot-opt { flex: none; width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--muted); }
+.ag-step-opt.is-on .dot-opt { box-shadow: inset 0 0 0 4px var(--ag-green); }
+.ag-when { display: grid; white-space: nowrap; }
+.is-actions { white-space: nowrap; }
+.is-actions > * { vertical-align: middle; }
+.ag-wa { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #25d366; color: #fff; cursor: pointer; box-shadow: 0 4px 12px -4px rgba(37, 211, 102, 0.7); }
+.ag-wa.is-off { background: var(--glass-soft); color: var(--muted); box-shadow: inset 0 0 0 1px var(--glass-line); cursor: not-allowed; }
+.ag-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 10px; border: 0; border-radius: 999px; background: var(--glass-soft); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: inset 0 0 0 1px var(--glass-line); }
+.ag-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.ag-chip.is-done { background: var(--ag-green-soft); color: var(--ag-green); }
+.ag-chip.is-error { color: var(--bad-text); }
+.ag-more { position: relative; display: inline-block; }
+.ag-more summary { list-style: none; }
+.ag-more summary::-webkit-details-marker { display: none; }
+.ag-more-list { position: fixed; z-index: 40; top: var(--at-top, 120px); left: var(--at-left, 20px); display: grid; width: 240px; padding: 6px; border-radius: 14px; }
+.ag-more-list a { padding: 8px 10px; border-radius: 10px; text-decoration: none; font-size: 14px; }
+.ag-more-list a:hover { background: var(--glass-soft); }
+.ag-sort { border: 0; background: none; padding: 0; cursor: pointer; color: inherit; font: inherit; }
+.ag-sort.is-on { color: var(--ink); }
+.ag-pages { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; }
+.ag-recalc { margin: 0 4px; font-size: 13px; color: var(--muted); }
+/* En el celular cada inmobiliaria es una tarjeta con botones grandes, como en la lista original. */
+@media (max-width: 760px) {
+  .ag-table thead { display: none; }
+  .ag-table, .ag-table tbody, .ag-table tr, .ag-table td { display: block; width: 100%; }
+  .ag-table tr { padding: 12px 0; border-bottom: 1px solid var(--grid); }
+  .ag-table td { border: 0; padding: 4px 0; text-align: left; }
+  .ag-table td[data-label]::before { content: attr(data-label); display: inline-block; min-width: 96px; font-size: 12px; color: var(--muted); }
+  .ag-table td.is-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 10px; }
+  .ag-wa { width: 44px; height: 44px; }
+  .ag-chip { height: 44px; padding: 0 14px; }
+  .ag-step-pop { position: fixed; left: 8px; right: 8px; bottom: 8px; top: auto; width: auto; }
+}
