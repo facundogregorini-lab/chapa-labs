@@ -289,6 +289,27 @@ async function doBulk(req, res, user) {
   return res.status(200).json({ results });
 }
 
+// habita.: la planilla alimenta la base de su panel. Su script por hora no corre, así que la pestaña
+// (tal como se ve, como la manda scripts/prospeccion-sync.gs) va desde acá a su API, que la importa.
+const csvCell = (v) => { const t = String(v ?? ''); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+async function doSync(req, res) {
+  const unit = UNITS[(req.body || {}).unit];
+  if (!unit || !unit.api || !unit.api.sync) return fail(res, 400, 'Esa unidad no sincroniza su planilla desde acá.');
+  if (!apiOf(unit)) return fail(res, 403, `Falta la clave de la API de ${unit.name}.`);
+  const sheet = sheetOf(unit);
+  if (!sheet) return fail(res, 503, `Falta configurar ${unit.sheetEnv} en Vercel.`);
+  const values = (await google.readTabs(sheet.id, [sheet.tab]))[sheet.tab] || [];
+  if (values.length < 2) return fail(res, 409, `La pestaña «${sheet.tab}» está vacía.`);
+  const width = Math.max(...values.map((r) => r.length));
+  const csv = values.map((r) => Array.from({ length: width }, (_, i) => csvCell(r[i])).join(',')).join('\n');
+  try {
+    const report = await callApi(unit, { method: 'POST', body: { sync: { csv } } });
+    return res.status(200).json({ report });
+  } catch (err) {
+    return fail(res, err.status || 502, err.message);
+  }
+}
+
 async function doAction(req, res, user) {
   const { unit: unitId, id, version, action } = req.body || {};
   const unit = UNITS[unitId];
@@ -407,6 +428,7 @@ module.exports = async (req, res) => {
       let apiError = null;
       let apiTargets = null;
       let accounts = data.accounts;
+      let lastImport;
       let events = data.events;
       if (unit.api && apiOf(unit)) {
         try {
@@ -417,6 +439,7 @@ module.exports = async (req, res) => {
           if (unit.api.rows) {
             accounts = core.toAccounts([out.header, ...(out.rows || [])], unit).accounts;
             events = Array.isArray(out.events) ? out.events : [];
+            lastImport = out.lastImport || null;
           }
           // La meta semanal es la del panel de la app; sin % guardados, valen los de fábrica.
           if (out.weeklyGoal) apiTargets = { perWeek: out.weeklyGoal, rates: out.funnelRates || {} };
@@ -435,6 +458,8 @@ module.exports = async (req, res) => {
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: unit.api && unit.api.rows && apiOf(unit) ? [] : missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts,
         events: events.slice(-8000),
+        // habita.: cuándo entró la planilla por última vez a su base (el panel la sincroniza si pasó una hora).
+        sync: unit.api && unit.api.sync && apiOf(unit) ? { lastImport: lastImport ? lastImport.at : null } : undefined,
         templates,
         clinics,
         apiError,
@@ -445,6 +470,7 @@ module.exports = async (req, res) => {
     if (op === 'setup' && req.method === 'POST') return await doSetup(req, res, user);
     if (op === 'template' && req.method === 'POST') return await doTemplate(req, res);
     if (op === 'bulk' && req.method === 'POST') return await doBulk(req, res, user);
+    if (op === 'sync' && req.method === 'POST') return await doSync(req, res);
     if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {

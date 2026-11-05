@@ -339,3 +339,26 @@ test('la clave sobrevive a una redirección a otro dominio (habitaia.vercel.app 
     global.fetch = realFetch;
   }
 });
+
+test('habita.: «Traer la planilla» manda la pestaña tal como se ve a su API', async () => {
+  process.env.HABITA_METRICS_SECRET = 'h'.repeat(40);
+  const realFetch = global.fetch;
+  let body = null;
+  global.fetch = async (url, opts = {}) => {
+    body = JSON.parse(opts.body);
+    return { ok: true, status: 200, headers: new Map(), json: async () => ({ created: 0, updated: 2, legacy_sends: 1 }) };
+  };
+  try {
+    const r = await call('sync', { method: 'POST', cookie, body: { unit: 'habita' } });
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.equal(r.body.report.legacy_sends, 1);
+    const lines = body.sync.csv.split('\n');
+    assert.ok(lines[0].startsWith('Código,Nombre,Teléfono,De quién es el teléfono,Zona,Estado,Notas'));
+    assert.ok(body.sync.csv.includes('Laura Pérez'));
+    const turnia = await call('sync', { method: 'POST', cookie, body: { unit: 'turnia' } });
+    assert.equal(turnia.statusCode, 400);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.HABITA_METRICS_SECRET;
+  }
+});

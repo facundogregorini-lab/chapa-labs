@@ -1,7 +1,13 @@
 {
   "rewrites": [
-    { "source": "/prospecting", "destination": "/prospecting/index.html" },
-    { "source": "/prospecting/:unit(todas|turnia|habita)", "destination": "/prospecting/index.html" }
+    {
+      "source": "/prospecting",
+      "destination": "/prospecting/index.html"
+    },
+    {
+      "source": "/prospecting/:unit(todas|turnia|habita)",
+      "destination": "/prospecting/index.html"
+    }
   ],
   "headers": [
     {
@@ -16,9 +22,20 @@
     {
       "source": "/prospecting/(.*)",
       "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "same-origin" }
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "same-origin"
+        }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/prospecting.js": {
+      "maxDuration": 60
+    }
+  }
 }

@@ -82,7 +82,7 @@
     return json;
   }
 
-  async function loadUnit(id, { quiet } = {}) {
+  async function loadUnit(id, { quiet, noSync } = {}) {
     if (state.demo) {
       state.data[id] = window.ProspectingFixture.build(unitOf(id));
       return;
@@ -91,9 +91,31 @@
     try {
       const d = await api('data', { query: { unit: id } });
       state.data[id] = d;
+      if (!noSync) maybeSync(id);
     } catch (err) {
       state.data[id] = { error: err.message, code: err.body && err.body.code };
       if (err.status === 401) { state.session.user = null; render(); }
+    }
+  }
+
+  // habita.: si la planilla no entró a su base en la última hora, se manda (una vez por sesión del panel).
+  const synced = {};
+  async function maybeSync(id, { force } = {}) {
+    const d = state.data[id];
+    if (state.demo || !d || !d.sync || synced[id] === 'running') return;
+    const age = d.sync.lastImport ? Date.now() - Date.parse(d.sync.lastImport) : Infinity;
+    if (!force && (synced[id] || age < 60 * 60 * 1000)) return;
+    synced[id] = 'running';
+    try {
+      const { report } = await api('sync', { method: 'POST', body: { unit: id } });
+      synced[id] = true;
+      const n = (report.created || 0) + (report.legacy_sends || 0) + (report.updated || 0);
+      if (force || n) toast(`Planilla traída: ${report.created || 0} cuentas nuevas, ${report.legacy_sends || 0} envíos históricos, ${report.updated || 0} actualizadas${report.held && report.held.length ? ` · ${report.held.length} para revisar en ${unitOf(id).appName}` : ''}.`);
+      await loadUnit(id, { quiet: true, noSync: true });
+      render();
+    } catch (err) {
+      synced[id] = true;
+      if (force) toast(err.message, true);
     }
   }
 
@@ -799,7 +821,7 @@
     const shown = list.slice(0, state.shown);
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Cuentas</span><h1>${int(list.length)} ${esc(u.entity.many)}</h1><p>${state.data[id].viaApi && u.api.rows ? `La base de ${esc(u.appName)}: cada cambio se guarda allá, con sus reglas.` : 'La base completa de la planilla. Los cambios se guardan en la misma fila.'}</p></div>
-        ${state.data[id].sheet && state.data[id].sheet.url ? `<a class="btn" href="${esc(state.data[id].sheet.url)}" target="_blank" rel="noopener">${icon.ext} Abrir la planilla</a>` : ''}</section>
+        <div class="btns">${state.data[id].sync ? `<button class="btn" type="button" data-action="sync" title="La planilla alimenta ${esc(u.appName)}: trae las cuentas y los envíos nuevos">Traer la planilla</button>` : ''}${state.data[id].sheet && state.data[id].sheet.url ? `<a class="btn" href="${esc(state.data[id].sheet.url)}" target="_blank" rel="noopener">${icon.ext} Abrir la planilla</a>` : ''}</div></section>
       ${sheetWarnings(id)}
       ${state.data[id].viaApi && !isReadOnly(id) ? bulkCard(id) : ''}
       ${crumbs(id)}
@@ -1406,6 +1428,7 @@
         break;
       }
       case 'more': state.shown += 100; render(); break;
+      case 'sync': toast('Trayendo la planilla…'); await maybeSync(state.unit, { force: true }); break;
       case 'bulk-open': state.bulk = { unit: state.unit, text: '', picks: {}, reviewed: false }; render(); { const ta = $('[data-bulk-text]'); if (ta) ta.focus(); } break;
       case 'bulk-close': if (!state.bulk || !state.bulk.running) { state.bulk = null; render(); } break;
       case 'bulk-review': if (state.bulk) { state.bulk.reviewed = true; state.bulk.results = null; render(); } break;
