@@ -13,6 +13,7 @@
 // Nunca devuelve nada sin sesión: las planillas tienen nombres y teléfonos.
 
 const google = require('./_google');
+const authFetch = require('./_authfetch');
 const session = require('./_session');
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
@@ -174,7 +175,7 @@ async function callApi(unit, { method = 'GET', body } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 20000);
   try {
-    const r = await fetch(api.url, {
+    const r = await authFetch(api.url, {
       method,
       headers: { Authorization: `Bearer ${api.secret}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
       body: body ? JSON.stringify(body) : undefined,
@@ -238,7 +239,7 @@ async function actionViaApi(res, unit, user, id, action) {
   let r;
   let body;
   try {
-    r = await fetch(api.url, {
+    r = await authFetch(api.url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${api.secret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: id, action, by: user.name }),

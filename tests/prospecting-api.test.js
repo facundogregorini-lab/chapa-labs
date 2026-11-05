@@ -309,7 +309,7 @@ test('habita. con la clave: las cuentas salen de su API y las acciones van allá
     assert.deepEqual(data.body.accounts.map((a) => [a.id, a.stage]), [['u-1', 'por_contactar'], ['u-2', 'respondio']]);
     assert.equal(data.body.events.length, 1);
     assert.deepEqual(data.body.sheet.missingColumns, []);
-    assert.equal(calls[0].url, 'https://habitaia.vercel.app/api/prospeccion');
+    assert.equal(calls[0].url, 'https://www.habitaia.app/api/prospeccion');
     assert.equal(calls[0].auth, `Bearer ${'h'.repeat(40)}`);
     const r = await call('action', { method: 'POST', cookie, body: { unit: 'habita', id: 'u-1', action: { type: 'sent', channel: 'whatsapp', template: 'whatsapp_1', text: 'Hola' } } });
     assert.equal(r.statusCode, 200, JSON.stringify(r.body));
@@ -319,5 +319,23 @@ test('habita. con la clave: las cuentas salen de su API y las acciones van allá
   } finally {
     global.fetch = realFetch;
     delete process.env.HABITA_METRICS_SECRET;
+  }
+});
+
+test('la clave sobrevive a una redirección a otro dominio (habitaia.vercel.app → www.habitaia.app)', async () => {
+  const authFetch = require('../api/_authfetch');
+  const realFetch = global.fetch;
+  const seen = [];
+  global.fetch = async (url, opts) => {
+    seen.push([String(url), opts.headers.Authorization, opts.redirect]);
+    if (String(url).startsWith('https://viejo.test')) return { status: 308, headers: new Map([['location', 'https://nuevo.test/api/x']]) };
+    return { status: 200, headers: new Map(), json: async () => ({ ok: true }) };
+  };
+  try {
+    const r = await authFetch('https://viejo.test/api/x', { headers: { Authorization: 'Bearer k' } });
+    assert.equal(r.status, 200);
+    assert.deepEqual(seen, [['https://viejo.test/api/x', 'Bearer k', 'manual'], ['https://nuevo.test/api/x', 'Bearer k', 'manual']]);
+  } finally {
+    global.fetch = realFetch;
   }
 });
