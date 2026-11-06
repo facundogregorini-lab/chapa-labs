@@ -46,6 +46,18 @@
         <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
         <p class="sub">Solo podés enviar desde el WhatsApp conectado a Turnia. «Buscar sus chats» marca a quienes ya tienen un chat con ese número; si falta alguno, confirmalo a mano con su línea. Los envíos se separan entre 3 y 6 minutos.</p>
         <div class="btns"><button class="btn small" type="button" data-detect>Buscar sus chats en el WhatsApp conectado</button></div>
+        <details class="voice-import">
+          <summary>¿Faltan contactos o les escribiste desde otro número? Importalos desde WhatsApp Web</summary>
+          <ol class="sub">
+            <li>En la computadora, abrí WhatsApp Web con el número desde el que les escribiste.</li>
+            <li>Tocá «Copiar código». En la pestaña de WhatsApp Web abrí la consola (F12 → Console, o Cmd+Opción+J en Mac), pegá y apretá Enter. Si Chrome pide escribir «allow pasting», escribilo y pegá de nuevo.</li>
+            <li>El código no manda nada: solo copia los números de tus chats. Pegalos acá, elegí la línea y tocá «Importar».</li>
+          </ol>
+          <div class="btns"><button class="btn small" type="button" data-copy-script>Copiar código</button></div>
+          <label class="field">Línea de ese WhatsApp<select data-import-sender></select></label>
+          <label class="field">Números copiados<textarea data-import-text rows="3" placeholder="Pegá acá lo que copió el código"></textarea></label>
+          <div class="btns"><button class="btn small" type="button" data-import>Importar</button></div>
+        </details>
         <div class="voice-list" data-people></div>
       </fieldset>
       <div class="btns">
@@ -101,6 +113,7 @@
     el('test').disabled = locked || !info?.ready || !note.value;
     el('contacts').disabled = locked || !info;
     el('detect').disabled = locked || !info?.ready;
+    el('import').disabled = locked || !info;
     if (info?.sender) el('detect').textContent = `Buscar sus chats en el WhatsApp ${info.sender}`;
     el('text').disabled = locked;
     el('stop').hidden = !running;
@@ -182,6 +195,10 @@
       new Option('Sin verificar', 'unknown'), new Option('Todos', 'all'));
       senderFilter.value = [...senderFilter.options].some((option) => option.value === previous)
         ? previous : data.sender || 'unknown';
+      const importSender = el('import-sender');
+      const chosen = importSender.value;
+      importSender.replaceChildren(...data.senderOptions.map((sender) => new Option(sender, sender)));
+      if (data.senderOptions.includes(chosen)) importSender.value = chosen;
       renderPeople();
       message(data.ready ? `WhatsApp emisor · ${data.sender}. Quedan ${data.remaining} audios hoy.` : 'El WhatsApp de Turnia necesita conexión.');
     } catch (error) {
@@ -224,6 +241,33 @@
   note.addEventListener('change', () => { setPreferred(note.value); load(); });
   el('sender-filter').addEventListener('change', renderPeople);
   el('people').addEventListener('change', controls);
+  el('copy-script').addEventListener('click', async () => {
+    const code = `(${whatsappWebScript.toString()})();`;
+    try {
+      await navigator.clipboard.writeText(code);
+      message('Código copiado. Pegalo en la consola de WhatsApp Web.');
+    } catch {
+      el('import-text').value = code;
+      el('import-text').select();
+      message('No se pudo copiar solo: copiá el código del cuadro (ya está seleccionado) y después reemplazalo por los números.');
+    }
+  });
+  el('import').addEventListener('click', async () => {
+    if (busy || running) return;
+    const phones = [...new Set(el('import-text').value.split(/[\n,;]+/)
+      .map((value) => value.replace(/\D/g, '')).filter((value) => value.length >= 10 && value.length <= 15))];
+    if (!phones.length) { message('Pegá los números que copió el código de WhatsApp Web.'); return; }
+    busy = true;
+    controls();
+    message(`Importando ${phones.length} números…`);
+    try {
+      const done = await request({ body: { action: 'import', sender: el('import-sender').value, phones } });
+      await load();
+      el('import-text').value = '';
+      message(`De ${done.received} números, ${done.phones} son celulares de la Argentina y ${done.matched} son odontólogos de la lista (${done.inserted} nuevos marcados «Desde ${done.sender}»).`);
+    } catch (error) { message(error.message); }
+    finally { busy = false; controls(); }
+  });
   el('detect').addEventListener('click', async () => {
     if (busy || running) return;
     busy = true;
@@ -384,4 +428,59 @@
   });
 
   window.addEventListener('beforeunload', (event) => { if (running) event.preventDefault(); });
+  // Se copia y se pega en la consola de WhatsApp Web (no corre en este panel). Lee la lista de
+  // chats de esa cuenta y copia sus números, uno por línea; los @lid se traducen con lo que sabe
+  // WhatsApp Web. No manda ni cambia nada.
+  function whatsappWebScript() {
+    return (async () => {
+      const phones = new Set();
+      const stats = { chats: 0, conNumero: 0, lid: 0, lidConNumero: 0, gruposYCanales: 0 };
+      const load = (name) => { try { return window.require(name); } catch { return null; } };
+      const digits = (wid) => {
+        const text = typeof wid === 'string' ? wid : wid?._serialized || (wid?.user && wid?.server ? `${wid.user}@${wid.server}` : '');
+        return /^(\d{8,15})@(c\.us|s\.whatsapp\.net)$/.exec(text || '')?.[1] || null;
+      };
+      const collections = load('WAWebCollections');
+      const contactApi = load('WAWebApiContact');
+      const lidPhone = (id, hint) => {
+        for (const guess of [() => hint, () => contactApi?.getPhoneNumber?.(id), () => collections?.Contact?.get?.(id)?.phoneNumber]) {
+          try { const found = digits(guess()); if (found) return found; } catch { /* siguiente */ }
+        }
+        return null;
+      };
+      const visit = (id, hint) => {
+        const text = typeof id === 'string' ? id : id?._serialized || '';
+        if (!text || text.startsWith('status@') || text.startsWith('0@')) return;
+        stats.chats++;
+        if (/@(g\.us|newsletter|broadcast)$/.test(text)) { stats.gruposYCanales++; return; }
+        let phone = digits(text);
+        if (phone) stats.conNumero++;
+        else if (text.endsWith('@lid')) {
+          stats.lid++;
+          phone = lidPhone(id, hint);
+          if (phone) stats.lidConNumero++;
+        }
+        if (phone) phones.add(phone);
+      };
+      const chats = collections?.Chat?.getModelsArray?.() || [];
+      for (const chat of chats) { try { visit(chat.id, chat.contact?.phoneNumber); } catch { visit(chat.id); } }
+      if (!phones.size) {
+        // Plan B: la base local de WhatsApp Web.
+        const db = await new Promise((ok, ko) => { const r = indexedDB.open('model-storage'); r.onsuccess = () => ok(r.result); r.onerror = () => ko(r.error); });
+        const all = (store) => new Promise((ok) => {
+          try { const r = db.transaction(store).objectStore(store).getAll(); r.onsuccess = () => ok(r.result || []); r.onerror = () => ok([]); } catch { ok([]); }
+        });
+        const byLid = new Map((await all('contact')).filter((c) => c.phoneNumber).map((c) => [c.id, c.phoneNumber]));
+        stats.chats = 0;
+        for (const chat of await all('chat')) visit(chat.id, byLid.get(chat.id));
+      }
+      const text = [...phones].join('\n');
+      let copied = false;
+      try { if (typeof copy === 'function') { copy(text); copied = true; } } catch { /* abajo */ }
+      if (!copied) { try { await navigator.clipboard.writeText(text); copied = true; } catch { /* abajo */ } }
+      console.log('Chapa Labs · chats de este WhatsApp', stats, `${phones.size} números`);
+      console.log(copied ? 'Listo: los números quedaron copiados. Pegalos en Chapa Labs → Mandar audios → Importar.' : `Copiá estos números y pegalos en Chapa Labs:\n${text}`);
+      return `${phones.size} números ${copied ? 'copiados' : 'listados arriba'}`;
+    })();
+  }
 })();
