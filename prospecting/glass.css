@@ -624,3 +624,8 @@ button.chip:hover { background: var(--glass-strong); }
 .voice-dialog details summary { cursor: pointer; margin-bottom: 8px; }
 .voice-dialog audio { max-width: 100%; }
 .voice-dialog fieldset { min-width: 0; }
+
+
+.voice-dialog .voice-person { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; }
+.voice-dialog .voice-senders { gap: 4px; }
+.voice-dialog .voice-senders button[aria-pressed="true"] { font-weight: 700; }
