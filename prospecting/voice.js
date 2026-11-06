@@ -43,7 +43,8 @@
       <label class="field">Texto previo opcional<textarea data-text rows="2" maxlength="500" placeholder="Usá {saludo} y {link} para personalizarlo"></textarea></label>
       <fieldset data-contacts>
         <legend>Destinatarios</legend>
-        <p class="sub">Marcá solo a quienes ya les escribiste desde el número emisor. Los envíos se separan entre 3 y 6 minutos.</p>
+        <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
+        <p class="sub">Solo podés enviar desde el WhatsApp conectado a Turnia. Confirmá una línea si ya le escribiste desde ese número. Los envíos se separan entre 3 y 6 minutos.</p>
         <div class="voice-list" data-people></div>
       </fieldset>
       <div class="btns">
@@ -97,7 +98,7 @@
     el('record').disabled = (busy || running || !info?.ready) && !recorder;
     el('preview').disabled = locked || !note.value;
     el('test').disabled = locked || !info?.ready || !note.value;
-    el('contacts').disabled = locked || !info?.ready || !note.value;
+    el('contacts').disabled = locked || !info;
     el('text').disabled = locked;
     el('stop').hidden = !running;
     const n = selected().length;
@@ -123,6 +124,44 @@
     throw new Error(data.error || 'Turnia no pudo completar la operación.');
   }
 
+  function renderPeople() {
+    if (!info) return;
+    const filter = el('sender-filter').value;
+    const rows = info.people.filter((row) =>
+      filter === 'all' || (filter === 'unknown' ? !row.senders.length : row.senders.includes(filter)));
+    el('people').replaceChildren(...rows.map((row) => {
+      const line = document.createElement('div');
+      line.className = 'voice-person';
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = row.id;
+      box.disabled = row.sent || !info.ready || !note.value || !row.senders.includes(info.sender);
+      const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : 'Sin verificar';
+      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, row.sent && 'Audio ya registrado'].filter(Boolean).join(' · ');
+      label.append(box, document.createTextNode(detail));
+      line.append(label);
+      const tags = document.createElement('div');
+      tags.className = 'btns voice-senders';
+      for (const sender of info.senderOptions) {
+        const tag = document.createElement('button');
+        const marked = row.senders.includes(sender);
+        tag.className = 'btn small ghost';
+        tag.type = 'button';
+        tag.dataset.sender = sender;
+        tag.dataset.person = row.id;
+        tag.setAttribute('aria-pressed', String(marked));
+        tag.setAttribute('aria-label', `${marked ? 'Quitar' : 'Confirmar'} ${sender} para ${row.name}`);
+        tag.textContent = `${marked ? '✓' : '+'} ${sender}`;
+        tags.append(tag);
+      }
+      line.append(tags);
+      return line;
+    }));
+    if (!rows.length) el('people').textContent = 'No hay contactos de esta etapa con ese emisor.';
+    controls();
+  }
+
   async function load() {
     const id = ++generation;
     busy = true;
@@ -133,17 +172,14 @@
       info = data;
       note.replaceChildren(new Option('Elegí un audio', ''), ...data.notes.map((row) => new Option(row.label, row.id)));
       note.value = preferred[group.value] || '';
-      el('people').replaceChildren(...data.people.map((row) => {
-        const label = document.createElement('label');
-        const box = document.createElement('input');
-        box.type = 'checkbox';
-        box.value = row.id;
-        box.disabled = row.sent;
-        const detail = [row.name, row.practice, row.last4 && '…' + row.last4, row.sent && 'Audio ya registrado'].filter(Boolean).join(' · ');
-        label.append(box, document.createTextNode(detail));
-        return label;
-      }));
-      if (!data.people.length) el('people').textContent = 'Por ahora no hay destinatarios habilitados en esta etapa.';
+      const senderFilter = el('sender-filter');
+      const previous = senderFilter.value;
+      senderFilter.replaceChildren(...data.senderOptions.map((sender) =>
+        new Option(sender === data.sender ? `${sender} · conectado` : sender, sender)),
+      new Option('Sin verificar', 'unknown'), new Option('Todos', 'all'));
+      senderFilter.value = [...senderFilter.options].some((option) => option.value === previous)
+        ? previous : data.sender || 'unknown';
+      renderPeople();
       message(data.ready ? `WhatsApp emisor · ${data.sender}. Quedan ${data.remaining} audios hoy.` : 'El WhatsApp de Turnia necesita conexión.');
     } catch (error) {
       info = null;
@@ -183,7 +219,22 @@
   });
   group.addEventListener('change', () => { setPreferred(preferred[group.value] || ''); load(); });
   note.addEventListener('change', () => { setPreferred(note.value); load(); });
+  el('sender-filter').addEventListener('change', renderPeople);
   el('people').addEventListener('change', controls);
+  el('people').addEventListener('click', async (event) => {
+    const tag = event.target.closest('button[data-sender]');
+    if (!tag || busy || running) return;
+    busy = true;
+    controls();
+    try {
+      await request({ body: {
+        action: 'source', person: tag.dataset.person, sender: tag.dataset.sender,
+        confirmed: tag.getAttribute('aria-pressed') !== 'true',
+      } });
+      await load();
+    } catch (error) { message(error.message); }
+    finally { busy = false; controls(); }
+  });
 
   el('record').addEventListener('click', async () => {
     if (recorder?.state === 'recording') { recorder.stop(); return; }
