@@ -232,7 +232,11 @@
     try {
       const found = await request({ body: { action: 'detect' } });
       await load();
-      message(`Se revisaron ${found.chats} chats del ${found.sender}: ${found.matched} son odontólogos de la lista (${found.inserted} nuevos marcados «Desde ${found.sender}»).`);
+      const k = found.kinds || {};
+      const detail = found.kinds
+        ? ` Detalle: ${k.numero} con número, ${k.lid} con @lid (${k.lidSinNumero} sin número), ${k.grupos} grupos, ${k.otros} otros; ${found.phones} teléfonos de Argentina.`
+        : '';
+      message(`Se revisaron ${found.chats} chats del ${found.sender}: ${found.matched} son odontólogos de la lista (${found.inserted} nuevos marcados «Desde ${found.sender}»).${detail}`);
     } catch (error) { message(error.message); }
     finally { busy = false; controls(); }
   });
