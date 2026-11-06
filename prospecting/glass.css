@@ -606,3 +606,21 @@ button.chip:hover { background: var(--glass-strong); }
 .ag-stage.is-closed { background: rgba(120, 120, 120, 0.14); color: var(--muted); }
 .ag-thumb.is-initials { font-size: 13px; font-weight: 800; color: var(--ink-2); background: color-mix(in srgb, var(--accent) 16%, var(--glass-soft)); }
 .ag-name > span { min-width: 0; }
+
+/* Audios de Turnia */
+.voice-dialog {
+  width: min(680px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 24px;
+  border-radius: 20px;
+  color: inherit;
+}
+.voice-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.voice-dialog [data-voice-controls], .voice-dialog form[data-upload] { display: grid; gap: 12px; }
+.voice-dialog [hidden] { display: none !important; }
+.voice-dialog .voice-fields { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.voice-dialog .voice-list { display: grid; gap: 8px; max-height: 220px; overflow: auto; }
+.voice-dialog .voice-list label { display: flex; align-items: center; gap: 8px; }
+.voice-dialog details summary { cursor: pointer; margin-bottom: 8px; }
+.voice-dialog audio { max-width: 100%; }
+.voice-dialog fieldset { min-width: 0; }

@@ -63,6 +63,8 @@ La misma vista de Facu, para Turnia, armada con sus cuentas (no hace falta nada 
 
 - **Teléfono y audio (06/11):** la columna «Zona» pasó a ser «Teléfono» (la zona queda al pasar el mouse). En «Mensajes», «🎤 Audio» registra con un toque que le mandaste un audio desde el celular: cuenta como mensaje, salvo que ese día ya haya salido uno, y queda la fecha en «Audio enviado» de la planilla de Turnia (🎤 ✓). Si fue por error, tocar 🎤 ✓ lo desmarca: Turnia borra la marca y, si ese audio había sumado un mensaje, lo descuenta. No aparece si no tiene WhatsApp, ni con los tres mensajes usados salvo que el último haya salido ese mismo día (el audio acompaña a ese mensaje). La búsqueda encuentra también por teléfono: alcanza con los últimos 4 números (desde 3 cifras, sin importar espacios ni guiones). La columna «Cuenta Turnia» se sacó para que la tabla respire: si es cliente lo dice el estado, y la cuenta (creada / activa) se sigue filtrando en «Filtrar» y se ve en la ficha.
 
+**Mandar audios.** Desde Odontólogos, autorizá con tu sesión administradora de Turnia. Elegí o grabá un audio para cada etapa y probalo primero con «Mandarme una prueba». La elección queda en tu navegador, y Turnia guarda el audio en formato de nota de voz de WhatsApp. Seleccioná a quienes ya les escribiste desde el número que muestra el panel. Turnia aplica el cupo y registra los envíos en el embudo. El botón 🎤 Audio de cada fila sigue siendo el registro de un audio enviado a mano.
+
 Las etapas y los pasos están en `prospecting/agencies.js` (`TURNIA`), junto a los de habita. (`HABITA`).
 
 ## Enviar con un agente de IA (`?vista=enviar`)

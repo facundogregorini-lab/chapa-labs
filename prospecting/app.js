@@ -992,7 +992,7 @@
     if (!d || d.loading) return '<div class="skeleton"></div><div class="skeleton"></div>';
     const app = d.app || (u.appUrl ? new URL(u.appUrl).origin : '');
     const head = `<section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · ${esc(cfg.title)}</span><h1>${esc(cfg.title)}</h1><p>${api_ ? `Todas las inmobiliarias, en un solo lugar: prospectos, leads y clientes. La misma lista de ${esc(u.appName)} (Inmobiliarias), con sus datos.` : `Todos los ${esc(cfg.many)}, en un solo lugar, con el embudo de su demo (/p/…) hasta el Cliente Fundador. La misma vista que armó Facu para habita., con los datos de ${esc(u.name)}.`}</p></div>
-      <div class="btns"><button class="btn" type="button" data-action="ag-reload">Actualizar</button>${api_ ? `<a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a>` : u.appUrl ? `<a class="btn" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>` : ''}</div></section>`;
+      <div class="btns">${id === 'turnia' && !state.demo ? '<button class="btn primary" type="button" data-voice-open>🎤 Mandar audios</button>' : ''}<button class="btn" type="button" data-action="ag-reload">Actualizar</button>${api_ ? `<a class="btn primary" href="${esc(app)}/admin/inmobiliarias/nueva" target="_blank" rel="noopener">+ Nueva inmobiliaria</a>` : u.appUrl ? `<a class="btn" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>` : ''}</div></section>`;
     if (d.error) return `${head}<section class="card glass"><h2>No pudimos cargar ${esc(api_ ? 'las inmobiliarias' : `los ${cfg.many}`)}</h2><p class="sub">${esc(d.error)}</p><button class="btn" type="button" data-action="ag-reload">Reintentar</button></section>`;
     const f = state.agf;
     const v = AG.view(d.rows, f, cfg);
@@ -1965,6 +1965,9 @@
   }
 
   // Al volver a la pestaña, se relee la planilla (alguien pudo cambiarla).
+  window.addEventListener('turnia-voice-sent', () => {
+    if (state.unit === 'turnia' && !state.demo) loadUnit('turnia', { quiet: true }).then(render);
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
       Promise.all(units().map((u) => loadUnit(u.id, { quiet: true }))).then(render);
