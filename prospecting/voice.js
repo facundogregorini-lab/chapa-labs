@@ -44,7 +44,8 @@
       <fieldset data-contacts>
         <legend>Destinatarios</legend>
         <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
-        <p class="sub">Solo podés enviar desde el WhatsApp conectado a Turnia. Confirmá una línea si ya le escribiste desde ese número. Los envíos se separan entre 3 y 6 minutos.</p>
+        <p class="sub">Solo podés enviar desde el WhatsApp conectado a Turnia. «Buscar sus chats» marca a quienes ya tienen un chat con ese número; si falta alguno, confirmalo a mano con su línea. Los envíos se separan entre 3 y 6 minutos.</p>
+        <div class="btns"><button class="btn small" type="button" data-detect>Buscar sus chats en el WhatsApp conectado</button></div>
         <div class="voice-list" data-people></div>
       </fieldset>
       <div class="btns">
@@ -99,6 +100,8 @@
     el('preview').disabled = locked || !note.value;
     el('test').disabled = locked || !info?.ready || !note.value;
     el('contacts').disabled = locked || !info;
+    el('detect').disabled = locked || !info?.ready;
+    if (info?.sender) el('detect').textContent = `Buscar sus chats en el WhatsApp ${info.sender}`;
     el('text').disabled = locked;
     el('stop').hidden = !running;
     const n = selected().length;
@@ -221,6 +224,18 @@
   note.addEventListener('change', () => { setPreferred(note.value); load(); });
   el('sender-filter').addEventListener('change', renderPeople);
   el('people').addEventListener('change', controls);
+  el('detect').addEventListener('click', async () => {
+    if (busy || running) return;
+    busy = true;
+    controls();
+    message('Buscando los chats del WhatsApp conectado…');
+    try {
+      const found = await request({ body: { action: 'detect' } });
+      await load();
+      message(`Se revisaron ${found.chats} chats del ${found.sender}: ${found.matched} son odontólogos de la lista (${found.inserted} nuevos marcados «Desde ${found.sender}»).`);
+    } catch (error) { message(error.message); }
+    finally { busy = false; controls(); }
+  });
   el('people').addEventListener('click', async (event) => {
     const tag = event.target.closest('button[data-sender]');
     if (!tag || busy || running) return;
