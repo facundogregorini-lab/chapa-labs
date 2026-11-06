@@ -209,6 +209,7 @@
     id: 'habita', slug: 'inmobiliarias', many: 'inmobiliarias', one: 'inmobiliaria', title: 'Inmobiliarias', all: 'Todas',
     stages: COMMERCIAL_STAGES, stageStep: STAGE_STEP, stageTab: STAGE_TAB, stageParam: STAGE_PARAM,
     steps: FUNNEL_STEPS, stepLabel: STEP_LABEL, stayed: STAYED, ofPrevious: OF_PREVIOUS,
+    activityHint: 'Lo último que hizo la inmobiliaria: abrir o usar una demo, responder, crear su cuenta o trabajar en su panel. No cuenta lo que hace el equipo (crear, editar o enviar).',
     lastNote: 'Clientes pagos', periodBy: 'Demo creada', withDemoTab: 'Con demo creada', accountLabel: ACCOUNT_LABEL, accountTitle: 'Cuenta habita', accountActive: 'Activa (suscripción)',
     note: '«Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Las inmobiliarias de prueba (QA) no cuentan.',
   };
@@ -226,6 +227,7 @@
     stepLabel: ['Saludado', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
     stayed: ['Esperan la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
     ofPrevious: ['', 'de los saludados', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
+    activityHint: 'Lo último que hizo el odontólogo: responder, abrir o probar su demo, hablar con Sofi, crear su cuenta, agendar la llamada o pagar. No cuenta lo que le mandamos (saludo, mensajes, audios).',
     lastNote: 'Setup y mes 1 cobrados', periodBy: 'Primer contacto', withDemoTab: 'Contactados', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
     note: 'Los mismos pasos que el Embudo contra la meta: «Abrieron la demo» es que entraron a su /p/… (o la probaron); «Hablaron con Sofi», que conversaron con ella. Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
   };
@@ -255,7 +257,8 @@
       const stage = client ? 'client' : isClosed ? 'closed' : call ? 'call' : chat || opened || a.replied ? 'interacted' : sent ? 'demo_sent' : a.greetingSent || a.firstContact ? 'contacted' : 'prospect';
       const facts = [
         [a.clientAt || a.customer, 'Cliente Fundador'], [a.meeting, 'Llamada agendada'], [a.accountAt, 'Creó su cuenta'], [a.demoChat, 'Habló con Sofi'],
-        [a.demoTried, 'Probó la demo'], [a.demoOpened, 'Abrió la demo'], [a.replied, 'Respondió'], [a.audioAt, 'Le mandamos un audio'], [a.lastContact, 'Le escribimos'], [a.greetingSent, 'Saludo enviado'],
+        [a.demoTried, 'Probó la demo'], [a.demoOpened, 'Abrió la demo'], [a.replied, 'Respondió'],
+        // Solo lo que hizo el odontólogo (activityHint): el saludo, los mensajes y los audios son nuestros.
       ].filter(([d]) => isDate(d)).map(([d, text]) => ({ at: iso(d), text })).filter((x) => x.at).sort((x, y) => y.at.localeCompare(x.at));
       return {
         id: a.id, name: a.name, org: a.org, zone: a.zone, coverPhotoId: null, stage, step: Math.max(0, step),

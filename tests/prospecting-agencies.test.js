@@ -78,6 +78,8 @@ test('Turnia: las filas desde sus cuentas, con el paso de su demo y la etapa', (
     ['a', 'prospect', 0], ['b', 'contacted', 0], ['c', 'demo_sent', 1], ['d', 'interacted', 3], ['e', 'call', 4], ['f', 'closed', 1], ['g', 'client', 5],
   ]);
   assert.equal(rows[3].lastActivity.text, 'Habló con Sofi');
+  // Lo que le mandamos (saludo, mensajes) no es actividad suya: Caro solo recibió la demo.
+  assert.equal(rows[2].lastActivity, null);
   assert.equal(A.accountState(rows[6]), 'active');
   const v = A.view(rows, A.filtersFrom(new URLSearchParams('etapa=cerrados'), A.TURNIA), A.TURNIA);
   assert.deepEqual(v.funnel.map((x) => x.count), [6, 5, 3, 3, 2, 1]); // a no fue saludado: no entra al embudo

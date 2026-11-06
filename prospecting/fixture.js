@@ -147,7 +147,8 @@
       return {
         id: `ej-${i}`, name, coverPhotoId: null, stage: stages[i], hasOwner: step >= 4, subscribed: step === 6, prospect: true,
         properties: demos.length + (i % 3), published: demos.length, score: step >= 2 ? 30 + step * 9 : null,
-        lastActivity: { at: new Date(now - i * 9 * 3600000).toISOString(), text: step >= 2 ? 'Vio una demo' : step === 1 ? 'Recibió la demo' : 'Creada en adquisición' },
+        // Solo lo que hizo la inmobiliaria: sin visitas a su demo, nada (crearla o enviarla es del equipo).
+        lastActivity: step >= 2 ? { at: new Date(now - i * 9 * 3600000).toISOString(), text: step >= 3 ? 'Interactuó con la demo' : 'Abrió la demo' } : null,
         createdAt: new Date(now - (i + 3) * 86400000).toISOString(), test: /^QA/.test(name), demos,
         wa: i % 5 === 3 ? null : `549223${String(5000000 + i * 12345).slice(0, 7)}`, shareDemo: step >= 1 ? { id: `d${i}`, token: `tok${i}` } : null,
       };
