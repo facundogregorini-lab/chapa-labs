@@ -16,6 +16,28 @@
       <form method="dialog"><button class="btn ghost" aria-label="Cerrar audios">Cerrar</button></form></div>
     <p role="status" data-status></p>
     <button class="btn primary" type="button" data-authorize>Autorizar con Turnia</button>
+    <section class="voice-rules" aria-labelledby="voice-rules-title">
+      <h3 id="voice-rules-title">Reglas de envío</h3>
+      <p class="sub" data-rules-summary>Autorizá con Turnia para ver el cupo disponible y ajustar las tandas y las pausas.</p>
+      <p class="sub">Horario de 8 a 21 h de Buenos Aires. El cupo diario se comparte entre las dos líneas. El 5483 se elige al abrir y el 0022 personal requiere tu selección.</p>
+      <details data-rules-details hidden>
+        <summary>Ajustar cupos y pausas</summary>
+        <form data-rules-form>
+          <fieldset data-rules-fields disabled>
+            <div class="voice-fields">
+              <label class="field">Audios por día entre ambas líneas<input name="dailyLimit" type="number" min="1" step="1" required></label>
+              <label class="field">Contactos por tanda<input name="batchSize" type="number" min="1" step="1" required></label>
+              <label class="field">Pausa mínima en minutos<input name="pauseMinMinutes" type="number" min="1" max="60" step="1" required></label>
+              <label class="field">Pausa máxima en minutos<input name="pauseMaxMinutes" type="number" min="1" max="60" step="1" required></label>
+            </div>
+            <p class="sub">Una tanda es el grupo que seleccionás y confirmás de una vez. Chapa elige una pausa entre el mínimo y el máximo antes del próximo contacto. Estos ajustes se aplican a ambas líneas.</p>
+            <button class="btn small" type="submit">Guardar reglas</button>
+          </fieldset>
+          <p class="sub" role="status" data-rules-status></p>
+        </form>
+      </details>
+      <p class="sub">Las pausas y los cupos ordenan el envío. WhatsApp puede restringir cuentas que usan automatización.</p>
+    </section>
     <div data-voice-controls hidden>
       <div class="voice-fields">
         <label class="field">Etapa<select data-group>
@@ -46,10 +68,11 @@
         <legend>Destinatarios</legend>
         <label class="field">Enviar desde<select data-emitter></select></label>
         <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
-        <p class="sub">Confirmá una línea si ya le escribiste desde ese número. La búsqueda de chats muestra sugerencias para revisar. El cupo diario es compartido y hay pausas de 3 a 6 minutos en cada tanda.</p>
+        <p class="sub">Confirmá una línea si ya le escribiste desde ese número. La búsqueda de chats muestra sugerencias para revisar. Las reglas de arriba se aplican a cada tanda.</p>
         <div class="btns"><button class="btn small" type="button" data-detect>Buscar chats para revisar</button></div>
-        <button class="btn small" type="button" data-pick>Seleccionar hasta el cupo disponible</button>
+        <button class="btn small" type="button" data-pick>Armar una tanda</button>
         <p class="sub" data-count></p>
+        <p class="sub" data-selection></p>
         <div class="voice-list" data-people></div>
       </fieldset>
       <div class="btns">
@@ -71,6 +94,7 @@
   const note = el('note');
   const emitter = el('emitter');
   const form = el('upload');
+  const rulesForm = el('rules-form');
   let preferred = {};
   try { preferred = JSON.parse(localStorage.getItem(selectionKey)) || {}; } catch { /* almacenamiento desactivado */ }
   let token = '';
@@ -102,6 +126,22 @@
     return [...el('people').querySelectorAll('input:checked')];
   }
 
+  function selectionLimit() {
+    return Math.min(info?.remaining || 0, info?.rules?.batchSize || 0);
+  }
+
+  function renderRules() {
+    if (!info?.rules) return;
+    const rules = info.rules;
+    el('rules-status').textContent = '';
+    for (const [key, value] of Object.entries(rules)) {
+      const input = rulesForm.elements.namedItem(key);
+      if (input) input.value = String(value);
+    }
+    el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} audios y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${rules.pauseMinMinutes} a ${rules.pauseMaxMinutes} minutos.`;
+    el('rules-details').hidden = false;
+  }
+
   function controls() {
     el('authorize').hidden = Boolean(token);
     el('voice-controls').hidden = !token;
@@ -109,6 +149,7 @@
     group.disabled = locked;
     note.disabled = locked;
     emitter.disabled = locked;
+    el('rules-fields').disabled = locked || !token || !info?.rules;
     el('save').disabled = locked || !info?.ready;
     el('file').disabled = locked;
     el('record').disabled = (busy || running || !info?.ready) && !recorder;
@@ -121,9 +162,11 @@
     el('stop').hidden = !running;
     el('review').hidden = !reviewing;
     el('send').hidden = reviewing || running;
-    el('pick').disabled = locked || !info?.ready || !info.remaining || !el('people').querySelector('input:not(:disabled)');
+    el('pick').disabled = locked || !info?.ready || !selectionLimit() || !el('people').querySelector('input:not(:disabled)');
     const n = selected().length;
-    el('send').disabled = locked || !info?.ready || !note.value || !n || n > info.remaining;
+    el('send').disabled = locked || !info?.ready || !note.value || !n || n > selectionLimit();
+    el('pick').textContent = selectionLimit() ? `Armar tanda de hasta ${selectionLimit()}` : 'Armar una tanda';
+    el('selection').textContent = info?.rules ? `Elegidos ${n} · máximo ${selectionLimit()} en esta tanda` : '';
     el('send').textContent = n ? `Revisar tanda de ${n}` : 'Revisar tanda';
   }
 
@@ -143,7 +186,7 @@
       controls();
     }
     const error = new Error(data.error || 'Turnia no pudo completar la operación.');
-    if (r.status === 429 && Number.isInteger(data.retryAfter) && data.retryAfter > 0 && data.retryAfter <= 180) {
+    if (r.status === 429 && Number.isInteger(data.retryAfter) && data.retryAfter > 0 && data.retryAfter <= 3600) {
       error.retryAfter = data.retryAfter;
     }
     throw error;
@@ -201,7 +244,8 @@
     try {
       const data = await request({ query: { group: group.value, note: preferred[group.value] || '', sender } });
       if (id !== generation) return;
-      info = { ...data, ready: data.ready && data.sender === sender };
+      info = { ...data, ready: data.ready && data.sender === sender && Boolean(data.rules) };
+      renderRules();
       emitter.replaceChildren(...data.senderOptions.map((ending) =>
         new Option(ending === '0022' ? '0022 · personal' : ending, ending)));
       emitter.value = sender;
@@ -267,8 +311,28 @@
   el('sender-filter').addEventListener('change', renderPeople);
   el('pick').addEventListener('click', () => {
     const available = [...el('people').querySelectorAll('input:not(:disabled)')];
-    available.forEach((box, index) => { box.checked = index < info.remaining; });
+    available.forEach((box, index) => { box.checked = index < selectionLimit(); });
     controls();
+  });
+  rulesForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (busy || running || reviewing || recorder || !info?.rules) return;
+    const rules = Object.fromEntries([...new FormData(rulesForm)].map(([key, value]) => [key, Number(value)]));
+    if (rules.batchSize > rules.dailyLimit || rules.pauseMaxMinutes < rules.pauseMinMinutes) {
+      el('rules-status').textContent = rules.batchSize > rules.dailyLimit
+        ? 'La tanda debe ser igual o menor que el cupo diario.'
+        : 'La pausa máxima debe ser igual o mayor que la mínima.';
+      return;
+    }
+    busy = true;
+    controls();
+    el('rules-status').textContent = 'Guardando reglas…';
+    try {
+      await request({ body: { action: 'rules', rules } });
+      await load();
+      el('rules-status').textContent = 'Reglas guardadas para ambas líneas.';
+    } catch (error) { el('rules-status').textContent = error.message; }
+    finally { busy = false; controls(); }
   });
   el('people').addEventListener('change', controls);
   el('detect').addEventListener('click', async () => {
@@ -419,7 +483,8 @@
   el('confirm').addEventListener('click', async () => {
     if (!reviewing || running || busy || !info?.ready || info.sender !== emitter.value) return;
     const boxes = selected();
-    if (!boxes.length || boxes.length > info.remaining) return;
+    if (!boxes.length || boxes.length > selectionLimit()) return;
+    const rules = info.rules;
     const base = { action: 'send', sender: info.sender, group: group.value, note: note.value, text: el('text').value };
     reviewing = false;
     running = true;
@@ -446,7 +511,7 @@
         break;
       }
       if (paused || failures >= 2 || i === boxes.length - 1 || !token || !dialog.open) break;
-      await waitForNext(180 + Math.floor(Math.random() * 181), `${sent} aceptados por WAHA.`);
+      await waitForNext((rules.pauseMinMinutes * 60) + Math.floor(Math.random() * ((rules.pauseMaxMinutes - rules.pauseMinMinutes) * 60 + 1)), `${sent} aceptados por WAHA.`);
     }
     running = false;
     if (token && dialog.open) await load();
