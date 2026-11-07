@@ -46,14 +46,22 @@
         <legend>Destinatarios</legend>
         <label class="field">Enviar desde<select data-emitter></select></label>
         <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
-        <p class="sub">Solo podés enviar desde el WhatsApp conectado a Turnia. «Buscar sus chats» marca a quienes ya tienen un chat con ese número; si falta alguno, confirmalo a mano con su línea. Los envíos se separan entre 3 y 6 minutos.</p>
-        <div class="btns"><button class="btn small" type="button" data-detect>Buscar sus chats en el WhatsApp conectado</button></div>
+        <p class="sub">Confirmá una línea si ya le escribiste desde ese número. La búsqueda de chats muestra sugerencias para revisar. El cupo diario es compartido y hay pausas de 3 a 6 minutos en cada tanda.</p>
+        <div class="btns"><button class="btn small" type="button" data-detect>Buscar chats para revisar</button></div>
         <button class="btn small" type="button" data-pick>Seleccionar hasta el cupo disponible</button>
+        <p class="sub" data-count></p>
         <div class="voice-list" data-people></div>
       </fieldset>
       <div class="btns">
-        <button class="btn primary" type="button" data-send>Enviar a seleccionados</button>
+        <button class="btn primary" type="button" data-send>Revisar tanda</button>
         <button class="btn" type="button" data-stop hidden>Detener los próximos envíos</button>
+      </div>
+      <div data-review role="group" aria-label="Confirmar tanda" hidden>
+        <p data-summary></p>
+        <div class="btns">
+          <button class="btn ghost" type="button" data-back>Volver a la selección</button>
+          <button class="btn primary" type="button" data-confirm>Confirmar envío</button>
+        </div>
       </div>
     </div>`;
   document.body.append(dialog);
@@ -71,6 +79,8 @@
   let generation = 0;
   let busy = false;
   let running = false;
+  let reviewing = false;
+  let suggested = new Set();
   let paused = false;
   let recorder;
   let draft;
@@ -95,7 +105,7 @@
   function controls() {
     el('authorize').hidden = Boolean(token);
     el('voice-controls').hidden = !token;
-    const locked = busy || running || Boolean(recorder);
+    const locked = busy || running || reviewing || Boolean(recorder);
     group.disabled = locked;
     note.disabled = locked;
     emitter.disabled = locked;
@@ -106,13 +116,15 @@
     el('test').disabled = locked || !info?.ready || !info.testTo || !note.value;
     el('contacts').disabled = locked || !info;
     el('detect').disabled = locked || !info?.ready;
-    if (info?.sender) el('detect').textContent = `Buscar sus chats en el WhatsApp ${info.sender}`;
+    if (info?.sender) el('detect').textContent = `Buscar chats del ${info.sender} para revisar`;
     el('text').disabled = locked;
     el('stop').hidden = !running;
+    el('review').hidden = !reviewing;
+    el('send').hidden = reviewing || running;
     el('pick').disabled = locked || !info?.ready || !info.remaining || !el('people').querySelector('input:not(:disabled)');
     const n = selected().length;
     el('send').disabled = locked || !info?.ready || !note.value || !n || n > info.remaining;
-    el('send').textContent = n ? `Enviar a ${n} seleccionados` : 'Enviar a seleccionados';
+    el('send').textContent = n ? `Revisar tanda de ${n}` : 'Revisar tanda';
   }
 
   async function request({ query, body, binary } = {}) {
@@ -130,7 +142,11 @@
       info = null;
       controls();
     }
-    throw new Error(data.error || 'Turnia no pudo completar la operación.');
+    const error = new Error(data.error || 'Turnia no pudo completar la operación.');
+    if (r.status === 429 && Number.isInteger(data.retryAfter) && data.retryAfter > 0 && data.retryAfter <= 180) {
+      error.retryAfter = data.retryAfter;
+    }
+    throw error;
   }
 
   function renderPeople() {
@@ -147,7 +163,9 @@
       box.value = row.id;
       box.disabled = row.sent || !info.ready || !note.value || !row.senders.includes(info.sender);
       const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : 'Sin verificar';
-      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, row.sent && 'Audio ya registrado'].filter(Boolean).join(' · ');
+      const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && 'Audio ya registrado o reservado';
+      const suggestion = suggested.has(row.id) && !row.senders.includes(info.sender) && 'Chat encontrado, pendiente de confirmar';
+      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, suggestion, delivery].filter(Boolean).join(' · ');
       label.append(box, document.createTextNode(detail));
       line.append(label);
       const tags = document.createElement('div');
@@ -167,6 +185,10 @@
       line.append(tags);
       return line;
     }));
+    const available = rows.filter((row) => !row.sent && row.senders.includes(info.sender)).length;
+    el('count').textContent = info.ready
+      ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}`
+      : `${rows.length} en esta vista`;
     if (!rows.length) el('people').textContent = 'No hay contactos de esta etapa con ese emisor.';
     controls();
   }
@@ -217,6 +239,7 @@
     if (!running) {
       emitter.value = initialSender;
       el('sender-filter').value = initialSender;
+      suggested.clear();
     }
     dialog.showModal();
     controls();
@@ -224,6 +247,8 @@
   });
   dialog.addEventListener('close', () => {
     paused = true;
+    reviewing = false;
+    controls();
     if (recorder?.state === 'recording') recorder.stop();
   });
   el('authorize').addEventListener('click', () => {
@@ -238,7 +263,7 @@
   });
   group.addEventListener('change', () => { setPreferred(preferred[group.value] || ''); load(); });
   note.addEventListener('change', () => { setPreferred(note.value); load(); });
-  emitter.addEventListener('change', () => { el('sender-filter').value = emitter.value; load(); });
+  emitter.addEventListener('change', () => { suggested.clear(); el('sender-filter').value = emitter.value; load(); });
   el('sender-filter').addEventListener('change', renderPeople);
   el('pick').addEventListener('click', () => {
     const available = [...el('people').querySelectorAll('input:not(:disabled)')];
@@ -253,12 +278,10 @@
     message('Buscando los chats del WhatsApp conectado…');
     try {
       const found = await request({ body: { action: 'detect', sender: info.sender } });
-      await load();
-      const k = found.kinds || {};
-      const detail = found.kinds
-        ? ` Detalle: ${k.numero} con número, ${k.lid} con @lid (${k.lidSinNumero} sin número), ${k.grupos} grupos, ${k.otros} otros; ${found.phones} teléfonos de Argentina.`
-        : '';
-      message(`Se revisaron ${found.chats} chats del ${found.sender}: ${found.matched} son odontólogos de la lista (${found.inserted} nuevos marcados «Desde ${found.sender}»).${detail}`);
+      suggested = new Set(found.suggestions || []);
+      el('sender-filter').value = 'all';
+      renderPeople();
+      message(`Se revisaron ${found.chats} chats del ${found.sender}. Hay ${suggested.size} sugerencias entre todas las etapas. Confirmá solo las que reconozcas como envíos desde esa línea.`);
     } catch (error) { message(error.message); }
     finally { busy = false; controls(); }
   });
@@ -370,12 +393,35 @@
     finally { busy = false; controls(); }
   });
 
-  el('stop').addEventListener('click', () => { paused = true; });
-  el('send').addEventListener('click', async () => {
-    if (running || busy || !info?.ready) return;
+  async function waitForNext(seconds, status) {
+    const next = Date.now() + seconds * 1000;
+    while (Date.now() < next && !paused) {
+      const left = Math.ceil((next - Date.now()) / 1000);
+      message(`${status} Próximo intento en ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.`);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  el('stop').addEventListener('click', () => {
+    paused = true;
+    message('Deteniendo la tanda. Si hay un envío en curso, se registra su resultado.');
+  });
+  el('send').addEventListener('click', () => {
+    if (el('send').disabled) return;
+    const boxes = selected();
+    const label = note.selectedOptions[0]?.textContent || '';
+    el('summary').textContent = `Vas a enviar «${label}» a ${boxes.length} desde el ${info.sender}${info.sender === '0022' ? ' personal' : ''}.`;
+    reviewing = true;
+    controls();
+    el('back').focus();
+  });
+  el('back').addEventListener('click', () => { reviewing = false; controls(); el('send').focus(); });
+  el('confirm').addEventListener('click', async () => {
+    if (!reviewing || running || busy || !info?.ready || info.sender !== emitter.value) return;
     const boxes = selected();
     if (!boxes.length || boxes.length > info.remaining) return;
     const base = { action: 'send', sender: info.sender, group: group.value, note: note.value, text: el('text').value };
+    reviewing = false;
     running = true;
     paused = false;
     controls();
@@ -383,27 +429,28 @@
     let failures = 0;
     let lastError = '';
     for (const [i, box] of boxes.entries()) {
-      if (paused || !token || !dialog.open) break;
-      message(`Enviando ${i + 1} de ${boxes.length}…`);
-      try {
-        await request({ body: { ...base, person: box.value } });
-        failures = 0;
-        sent += 1;
-      } catch (error) {
-        failures += 1;
-        lastError = error.message;
+      while (!paused && token && dialog.open) {
+        message(`Enviando ${i + 1} de ${boxes.length} desde el ${base.sender}…`);
+        try {
+          await request({ body: { ...base, person: box.value } });
+          failures = 0;
+          sent += 1;
+        } catch (error) {
+          if (error.retryAfter) {
+            await waitForNext(error.retryAfter, 'Pausa del servidor entre tandas o líneas.');
+            continue;
+          }
+          failures += 1;
+          lastError = error.message;
+        }
+        break;
       }
-      if (failures >= 2 || i === boxes.length - 1 || !token) break;
-      const next = Date.now() + (180 + Math.floor(Math.random() * 181)) * 1000;
-      while (Date.now() < next && !paused) {
-        const seconds = Math.ceil((next - Date.now()) / 1000);
-        message(`${sent} aceptados por WAHA. Próximo intento en ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.${lastError ? ' ' + lastError : ''}`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      if (paused || failures >= 2 || i === boxes.length - 1 || !token || !dialog.open) break;
+      await waitForNext(180 + Math.floor(Math.random() * 181), `${sent} aceptados por WAHA.`);
     }
     running = false;
     if (token && dialog.open) await load();
-    message(`${sent} de ${boxes.length} aceptados por WAHA.${lastError ? ' ' + lastError : ''}`);
+    message(`${paused ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.${lastError ? ' ' + lastError : ''}`);
     controls();
     if (sent) window.dispatchEvent(new Event('turnia-voice-sent'));
   });
