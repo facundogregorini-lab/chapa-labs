@@ -20,22 +20,21 @@
       <h3 id="voice-rules-title">Reglas de envío</h3>
       <p class="sub" data-rules-summary>Autorizá con Turnia para ver el cupo disponible y ajustar las tandas y las pausas.</p>
       <p class="sub">Horario de 8 a 21 h de Buenos Aires. El cupo diario se comparte entre las dos líneas. El 5483 se elige al abrir y el 0022 personal requiere tu selección.</p>
-      <details data-rules-details hidden>
-        <summary>Ajustar cupos y pausas</summary>
+      <div data-rules-details>
         <form data-rules-form>
           <fieldset data-rules-fields disabled>
             <div class="voice-fields">
               <label class="field">Audios por día entre ambas líneas<input name="dailyLimit" type="number" min="1" step="1" required></label>
               <label class="field">Contactos por tanda<input name="batchSize" type="number" min="1" step="1" required></label>
-              <label class="field">Pausa mínima en minutos<input name="pauseMinMinutes" type="number" min="1" max="60" step="1" required></label>
-              <label class="field">Pausa máxima en minutos<input name="pauseMaxMinutes" type="number" min="1" max="60" step="1" required></label>
+              <label class="field">Espera mínima entre envíos (segundos)<input name="pauseMinSeconds" type="number" min="1" max="3600" step="1" required></label>
+              <label class="field">Espera máxima entre envíos (segundos)<input name="pauseMaxSeconds" type="number" min="1" max="3600" step="1" required></label>
             </div>
             <p class="sub">Una tanda es el grupo que seleccionás y confirmás de una vez. Chapa elige una pausa entre el mínimo y el máximo antes del próximo contacto. Estos ajustes se aplican a ambas líneas.</p>
             <button class="btn small" type="submit">Guardar reglas</button>
           </fieldset>
           <p class="sub" role="status" data-rules-status></p>
         </form>
-      </details>
+      </div>
       <p class="sub">Las pausas y los cupos ordenan el envío. WhatsApp puede restringir cuentas que usan automatización.</p>
     </section>
     <div data-voice-controls hidden>
@@ -77,6 +76,7 @@
       </fieldset>
       <div class="btns">
         <button class="btn primary" type="button" data-send>Revisar tanda</button>
+        <button class="btn" type="button" data-adjust>Cambiar tanda y pausa</button>
         <button class="btn" type="button" data-stop hidden>Detener los próximos envíos</button>
       </div>
       <div data-review role="group" aria-label="Confirmar tanda" hidden>
@@ -104,6 +104,8 @@
   let busy = false;
   let running = false;
   let reviewing = false;
+  let rulesDirty = false;
+  let adjustAfterSend = false;
   let suggested = new Set();
   let paused = false;
   let recorder;
@@ -130,43 +132,69 @@
     return Math.min(info?.remaining || 0, info?.rules?.batchSize || 0);
   }
 
+  function readRules() {
+    const value = (key) => Number(rulesForm.elements.namedItem(key).value);
+    return {
+      dailyLimit: value('dailyLimit'), batchSize: value('batchSize'),
+      pauseMinMinutes: value('pauseMinSeconds') / 60, pauseMaxMinutes: value('pauseMaxSeconds') / 60,
+    };
+  }
+
+  function pauseLabel(rules) {
+    const min = Math.round(rules.pauseMinMinutes * 60);
+    const max = Math.round(rules.pauseMaxMinutes * 60);
+    return min % 60 === 0 && max % 60 === 0
+      ? `${min / 60} a ${max / 60} minutos` : `${min} a ${max} segundos`;
+  }
+
   function renderRules() {
     if (!info?.rules) return;
     const rules = info.rules;
+    rulesDirty = false;
     el('rules-status').textContent = '';
-    for (const [key, value] of Object.entries(rules)) {
-      const input = rulesForm.elements.namedItem(key);
-      if (input) input.value = String(value);
-    }
-    el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} audios y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${rules.pauseMinMinutes} a ${rules.pauseMaxMinutes} minutos.`;
-    el('rules-details').hidden = false;
+    const fields = {
+      dailyLimit: rules.dailyLimit, batchSize: rules.batchSize,
+      pauseMinSeconds: Math.round(rules.pauseMinMinutes * 60),
+      pauseMaxSeconds: Math.round(rules.pauseMaxMinutes * 60),
+    };
+    for (const [key, value] of Object.entries(fields)) rulesForm.elements.namedItem(key).value = String(value);
+    el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} audios y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${pauseLabel(rules)}.`;
+  }
+
+  function focusRules() {
+    reviewing = false;
+    controls();
+    rulesForm.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    rulesForm.elements.namedItem('batchSize').focus({ preventScroll: true });
   }
 
   function controls() {
     el('authorize').hidden = Boolean(token);
     el('voice-controls').hidden = !token;
     const locked = busy || running || reviewing || Boolean(recorder);
-    group.disabled = locked;
-    note.disabled = locked;
-    emitter.disabled = locked;
+    group.disabled = locked || rulesDirty;
+    note.disabled = locked || rulesDirty;
+    emitter.disabled = locked || rulesDirty;
     el('rules-fields').disabled = locked || !token || !info?.rules;
     el('save').disabled = locked || !info?.ready;
     el('file').disabled = locked;
     el('record').disabled = (busy || running || !info?.ready) && !recorder;
     el('preview').disabled = locked || !note.value;
     el('test').disabled = locked || !info?.ready || !info.testTo || !note.value;
-    el('contacts').disabled = locked || !info;
+    el('contacts').disabled = locked || !info || rulesDirty;
     el('detect').disabled = locked || !info?.ready;
     if (info?.sender) el('detect').textContent = `Buscar chats del ${info.sender} para revisar`;
     el('text').disabled = locked;
     el('stop').hidden = !running;
+    el('adjust').disabled = busy || Boolean(recorder) || !info?.rules;
+    el('adjust').textContent = running ? 'Detener y cambiar ajustes' : 'Cambiar tanda y pausa';
     el('review').hidden = !reviewing;
     el('send').hidden = reviewing || running;
-    el('pick').disabled = locked || !info?.ready || !selectionLimit() || !el('people').querySelector('input:not(:disabled)');
+    el('pick').disabled = locked || rulesDirty || !info?.ready || !selectionLimit() || !el('people').querySelector('input:not(:disabled)');
     const n = selected().length;
-    el('send').disabled = locked || !info?.ready || !note.value || !n || n > selectionLimit();
+    el('send').disabled = locked || rulesDirty || !info?.ready || !note.value || !n || n > selectionLimit();
     el('pick').textContent = selectionLimit() ? `Armar tanda de hasta ${selectionLimit()}` : 'Armar una tanda';
-    el('selection').textContent = info?.rules ? `Elegidos ${n} · máximo ${selectionLimit()} en esta tanda` : '';
+    el('selection').textContent = rulesDirty ? 'Guardá los ajustes de tanda y pausa para aplicarlos.' : info?.rules ? `Elegidos ${n} · máximo ${selectionLimit()} en esta tanda` : '';
     el('send').textContent = n ? `Revisar tanda de ${n}` : 'Revisar tanda';
   }
 
@@ -293,6 +321,7 @@
     paused = true;
     reviewing = false;
     controls();
+    adjustAfterSend = false;
     if (recorder?.state === 'recording') recorder.stop();
   });
   el('authorize').addEventListener('click', () => {
@@ -314,10 +343,16 @@
     available.forEach((box, index) => { box.checked = index < selectionLimit(); });
     controls();
   });
+  rulesForm.addEventListener('input', () => {
+    if (!info?.rules) return;
+    rulesDirty = Object.entries(readRules()).some(([key, value]) => value !== info.rules[key]);
+    el('rules-status').textContent = rulesDirty ? 'Cambios sin guardar. Tocá Guardar reglas para aplicarlos.' : '';
+    controls();
+  });
   rulesForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (busy || running || reviewing || recorder || !info?.rules) return;
-    const rules = Object.fromEntries([...new FormData(rulesForm)].map(([key, value]) => [key, Number(value)]));
+    const rules = readRules();
     if (rules.batchSize > rules.dailyLimit || rules.pauseMaxMinutes < rules.pauseMinMinutes) {
       el('rules-status').textContent = rules.batchSize > rules.dailyLimit
         ? 'La tanda debe ser igual o menor que el cupo diario.'
@@ -466,6 +501,13 @@
     }
   }
 
+  el('adjust').addEventListener('click', () => {
+    if (running) {
+      adjustAfterSend = true;
+      paused = true;
+      message('Deteniendo la tanda para cambiar la cantidad o la espera.');
+    } else focusRules();
+  });
   el('stop').addEventListener('click', () => {
     paused = true;
     message('Deteniendo la tanda. Si hay un envío en curso, se registra su resultado.');
@@ -474,7 +516,7 @@
     if (el('send').disabled) return;
     const boxes = selected();
     const label = note.selectedOptions[0]?.textContent || '';
-    el('summary').textContent = `Vas a enviar «${label}» a ${boxes.length} desde el ${info.sender}${info.sender === '0022' ? ' personal' : ''}.`;
+    el('summary').textContent = `Vas a enviar «${label}» a ${boxes.length} desde el ${info.sender}${info.sender === '0022' ? ' personal' : ''}. Pausa guardada de ${pauseLabel(info.rules)}.`;
     reviewing = true;
     controls();
     el('back').focus();
@@ -517,6 +559,7 @@
     if (token && dialog.open) await load();
     message(`${paused ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.${lastError ? ' ' + lastError : ''}`);
     controls();
+    if (adjustAfterSend && dialog.open) { adjustAfterSend = false; focusRules(); }
     if (sent) window.dispatchEvent(new Event('turnia-voice-sent'));
   });
 

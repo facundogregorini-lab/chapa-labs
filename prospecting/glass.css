@@ -634,4 +634,4 @@ button.chip:hover { background: var(--glass-strong); }
 .voice-dialog .voice-rules h3 { margin: 0 0 8px; }
 .voice-dialog .voice-rules form, .voice-dialog .voice-rules fieldset { display: grid; gap: 12px; }
 .voice-dialog .voice-rules fieldset { padding: 0; border: 0; margin: 0; }
-.voice-dialog .voice-rules details { margin-top: 10px; }
+.voice-dialog .voice-rules [data-rules-details] { margin-top: 10px; }
