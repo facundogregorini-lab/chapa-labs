@@ -176,6 +176,7 @@
     note.disabled = locked || rulesDirty;
     emitter.disabled = locked || rulesDirty;
     el('rules-fields').disabled = locked || !token || !info?.rules;
+    rulesForm.querySelector('button[type=submit]').classList.toggle('primary', rulesDirty);
     el('save').disabled = locked || !info?.ready;
     el('file').disabled = locked;
     el('record').disabled = (busy || running || !info?.ready) && !recorder;
@@ -193,9 +194,9 @@
     el('pick').disabled = locked || rulesDirty || !info?.ready || !selectionLimit() || !el('people').querySelector('input:not(:disabled)');
     const n = selected().length;
     el('send').disabled = locked || rulesDirty || !info?.ready || !note.value || !n || n > selectionLimit();
-    el('pick').textContent = selectionLimit() ? `Armar tanda de hasta ${selectionLimit()}` : 'Armar una tanda';
+    el('pick').textContent = rulesDirty ? 'Guardá las reglas para aplicar la tanda' : selectionLimit() ? `Armar tanda de hasta ${selectionLimit()}` : 'Armar una tanda';
     el('selection').textContent = rulesDirty ? 'Guardá los ajustes de tanda y pausa para aplicarlos.' : info?.rules ? `Elegidos ${n} · máximo ${selectionLimit()} en esta tanda` : '';
-    el('send').textContent = n ? `Revisar tanda de ${n}` : 'Revisar tanda';
+    el('send').textContent = rulesDirty ? 'Guardá los ajustes antes de enviar' : n ? `Revisar tanda de ${n}` : 'Revisar tanda';
   }
 
   async function request({ query, body, binary } = {}) {
