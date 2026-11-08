@@ -430,7 +430,7 @@ async function doSetup(req, res, user) {
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
 // va a la app de su unidad a nombre de quien opera.
-const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save']);
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'whatsapp-sync']);
 
 async function doFollowup(req, res) {
   const want = req.query.unit && req.query.unit !== 'todas' ? [UNITS[req.query.unit]].filter(Boolean) : Object.values(UNITS);
@@ -447,6 +447,21 @@ async function doFollowup(req, res) {
   return res.status(200).json({ units: out, readAt: new Date().toISOString() });
 }
 
+// La lectura diaria de WhatsApp de Turnia: el cron de Vercel (vercel.json, 8 de Argentina) pide que
+// Turnia lea los chats de sus dos líneas de WAHA y abra las respuestas nuevas. Turnia no repite una
+// lectura de menos de 10 minutos, así que llamarlo de más no cuesta nada.
+async function doWhatsappCron(req, res) {
+  const unit = UNITS.turnia;
+  if (!unit || !unit.api || !apiOf(unit)) return fail(res, 403, 'Falta la clave de la API de Turnia.');
+  try {
+    const out = await callApi(unit, { method: 'POST', body: { by: 'Lectura diaria', followup: { op: 'whatsapp-sync' } }, timeout: 280000 });
+    const w = out && out.whatsapp;
+    return res.status(200).json({ ok: true, totals: w ? w.totals : null, lines: w ? w.lines.map((l) => ({ line: l.line, status: l.status })) : [] });
+  } catch (err) {
+    return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);
+  }
+}
+
 async function doTask(req, res, user) {
   const body = req.body || {};
   const unit = UNITS[body.unit];
@@ -455,7 +470,7 @@ async function doTask(req, res, user) {
   const f = body.followup && typeof body.followup === 'object' ? body.followup : null;
   if (!f || !FOLLOWUP_OPS.has(f.op)) return fail(res, 400, 'Operación de Follow-up desconocida.');
   try {
-    const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: 45000 });
+    const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: f.op === 'whatsapp-sync' ? 280000 : 45000 });
     return res.status(200).json({ result: out });
   } catch (err) {
     return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);
@@ -496,6 +511,8 @@ module.exports = async (req, res) => {
       return res.status(200).json({ ok: true });
     }
 
+    // El cron no tiene sesión: solo pide la lectura de WhatsApp, que no manda nada.
+    if (op === 'whatsapp-cron' && req.method === 'GET') return await doWhatsappCron(req, res);
     const user = session.read(req);
     if (!user) return fail(res, 401, 'Iniciá sesión.');
     if (!googleReady()) return fail(res, 503, 'Falta configurar la cuenta de servicio de Google.', { code: 'NO_GOOGLE' });
