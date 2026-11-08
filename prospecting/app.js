@@ -1689,7 +1689,7 @@
         ${kpi('Conversaciones', int(t.conversaciones), 'Personas a las que les escribimos')}
         ${kpi('Respondieron', int(t.respondieron), t.conversaciones ? `${Math.round((t.respondieron / t.conversaciones) * 100)}% de las conversaciones` : '')}
         ${kpi('Esperan respuesta', int(t.esperanRespuesta), 'El último mensaje es de ellos')}
-        ${kpi('Nuevas', int(t.nuevas), `${int(t.abiertas)} pasaron a Respuestas`)}
+        ${kpi('Nuevas', int(t.nuevas), `${int(t.abiertas)} pasaron a Respuestas${t.corregidas ? ` · ${int(t.corregidas)} corregidas (eran automáticas)` : ''}`)}
       </div>
       ${w.pending.length ? `<div class="rows">${w.pending.slice(0, shown).map((p) => `<div class="arow" data-testid="fu-wa-pending"><div class="who"><strong>${esc(p.name)}</strong><div class="meta"><span>Al ${esc(p.line)}</span>·<span>${esc(p.at)}</span></div><div class="meta" style="white-space:pre-wrap">«${esc(p.text)}»</div></div><div class="acts">${p.key ? `<button class="btn small" type="button" data-fu="from-ficha" data-fu-key="${esc(p.key)}">Abrir</button>` : ''}</div></div>`).join('')}${w.pending.length > shown ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="fu-wa">Ver los ${int(w.pending.length - shown)} restantes</button></div>` : ''}</div>` : ''}
     </section>`;
