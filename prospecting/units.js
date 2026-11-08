@@ -33,7 +33,18 @@
     // Para cuando el panel escriba en una planilla propia: trae las señales de la app.
     signals: { env: 'TURNIA_SIGNALS_SHEET_ID', tab: 'Prospección', fields: ['demoOpened', 'demoTried', 'demoUrl'] },
     // En la planilla de Turnia, «Contactado» sin mensajes y con el saludo enviado es «saludado».
-    enrich: (a) => (a.stage === 'contactado' && !a.touches && a.greetingSent ? Object.assign(a, { stage: 'saludado' }) : a),
+    // La lista sale de «Fuente» cuando empieza con «Lista N» (la planilla de Turnia no tiene columna Lista), y
+    // «Hace Google Ads» o «anuncios en Instagram y Facebook» de «Señales»: los que pagan anuncios son los más
+    // calientes y van primero en la cola.
+    enrich: (a) => {
+      if (a.stage === 'contactado' && !a.touches && a.greetingSent) a.stage = 'saludado';
+      const list = /^\s*lista\s*(\d+)/i.exec(a.source || '');
+      if (!a.campaign && list) a.campaign = `Lista ${list[1]}`;
+      a.googleAds = /google ads/i.test(a.signals || '');
+      a.metaAds = /meta ads|anuncios en (instagram|facebook)/i.test(a.signals || '');
+      a.ads = a.googleAds || a.metaAds;
+      return a;
+    },
     metricsKey: 'turnia',
     dashboardHash: '#turnia',
     entity: { one: 'odontólogo', many: 'odontólogos', org: 'Consultorio' },

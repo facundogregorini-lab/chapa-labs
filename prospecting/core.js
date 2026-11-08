@@ -250,11 +250,12 @@
     return out;
   }
   // Los nuevos que de verdad se pueden contactar: con canal, sin número usado y un número una sola vez
-  // (por la persona de mejor prioridad), en el orden en que se reciben.
+  // (por la persona de mejor prioridad), en el orden en que se reciben. A igual prioridad, primero los que
+  // pagan anuncios en Google, Instagram o Facebook (Turnia lo marca en «Señales»).
   function freshContacts(accounts, unit) {
     const used = usedPhones(accounts);
     const sorted = accounts.filter((a) => !isContacted(a) && !closed(a) && !a.optOut && counted(a, unit) && canMessage(a, unit) && !used.has(phoneKey(a.phone)))
-      .sort((x, y) => (x.priority || 9) - (y.priority || 9) || (y.score ?? -1) - (x.score ?? -1) || x.row - y.row);
+      .sort((x, y) => (x.priority || 9) - (y.priority || 9) || (y.ads ? 1 : 0) - (x.ads ? 1 : 0) || (y.score ?? -1) - (x.score ?? -1) || x.row - y.row);
     const seen = new Set();
     return sorted.filter((a) => {
       const k = phoneKey(a.phone);
