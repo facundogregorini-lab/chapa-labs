@@ -221,7 +221,7 @@ Cada paso de la planilla incluye a los siguientes (quien conversó en la demo ta
 
 ## Pendiente
 
-- Probar en vivo con las dos planillas reales (se probó con planillas simuladas con sus mismas columnas y con el modo de ejemplo).
+- La lista completa y en orden de lo que falta del centro comercial (tanda real, login, crear demos de habita., respuestas automáticas, retirar lo repetido) está en [`CENTRO_COMERCIAL.md`](CENTRO_COMERCIAL.md) → «Pendientes, en orden».
 - Señales de demo de habita. por cuenta (hoy su `/api/metricas` da solo totales): un endpoint por cuenta en amoblaia, o que su panel escriba «Abrió la demo» en la planilla.
 - Leer respuestas solas desde WAHA (Turnia) para no tener que marcar «Respondió» a mano (hoy se registran en la tarea, «Registrar una respuesta»).
 - Crear una demo de habita. desde Chapa: falta una API segura en amoblaia; por ahora, «Su panel» abre el editor.
