@@ -22,7 +22,11 @@
   function item(unit, q, snap, bucket, now = Date.now()) {
     const labels = (snap && snap.labels) || {};
     const titles = Object.fromEntries(((snap && snap.stages) || []).map((s) => [s.key, s.title]));
+    const goals = Object.fromEntries(((snap && snap.stages) || []).map((s) => [s.key, s.goal]));
     const isHabita = unit === 'habita';
+    // «Next best action» es el nombre genérico del paso principal en habita.: se muestra a qué lleva.
+    const label = isHabita ? q.actionLabel || q.action || '' : q.action || '';
+    const action = /^next best action$/i.test(label) && goals[q.stage] ? `Llevar a: ${goals[q.stage]}` : label;
     return {
       unit,
       key: `${unit}:${q.agencyId || q.id}`,
@@ -38,7 +42,7 @@
       situationLabel: q.situationLabel || (labels.situations && labels.situations[q.situation]) || q.situation || '',
       situationNote: q.situationNote || '',
       // habita.: la acción es una clave («presentacion») con su etiqueta; Turnia manda la etiqueta.
-      action: isHabita ? q.actionLabel || q.action || '' : q.action || '',
+      action,
       actionKey: isHabita ? q.action || null : null,
       actionReason: q.actionReason || '',
       group: GROUPS.includes(q.group) ? q.group : 'seguimientos',

@@ -33,6 +33,8 @@ test('junta las dos colas: prioridad y grupo (las respuestas primero)', () => {
   const n = F.normalize({ habita, turnia: { ...turnia }, otra: { error: 'Falta la clave' } }, NOW);
   assert.deepEqual(n.queue.map((x) => x.key), ['habita:a2', 'turnia:t1', 'habita:a1']);
   assert.equal(n.errors.otra, 'Falta la clave');
+  const generic = F.item('habita', { agencyId: 'g', stage: 'no-contactado', action: 'principal', actionLabel: 'Next best action' }, { stages: [{ key: 'no-contactado', title: 'No contactado', goal: 'Contactado' }] }, 'cola');
+  assert.equal(generic.action, 'Llevar a: Contactado');
   const a2 = n.queue.find((x) => x.id === 'a2');
   assert.deepEqual(a2.claim, { by: 'Facu', until: later });
   assert.equal(a2.action, 'Presentación');
