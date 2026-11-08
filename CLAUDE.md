@@ -1,6 +1,8 @@
 # Chapa Labs · instrucciones del proyecto
 
-Antes de tocar `/prospecting`, leé [`docs/PROSPECCION.md`](docs/PROSPECCION.md). El repo es público: nunca subas ids de planillas, claves ni datos personales.
+Antes de tocar `/prospecting`, leé [`docs/CENTRO_COMERCIAL.md`](docs/CENTRO_COMERCIAL.md) (cómo se conectan Chapa, habita. y Turnia, el estado y los pendientes en orden) y [`docs/PROSPECCION.md`](docs/PROSPECCION.md) (la guía del panel). El repo es público: nunca subas ids de planillas, claves ni datos personales.
+
+Este archivo y `AGENTS.md` dicen lo mismo (uno para Claude Code, el otro para cualquier otro agente): si cambiás uno, cambiá el otro.
 
 ## Regla: cada mejora de habita. se lleva a Turnia
 
