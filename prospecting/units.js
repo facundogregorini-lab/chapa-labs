@@ -138,6 +138,12 @@
       { key: 'llamadas', label: 'Llamadas agendadas', hint: 'Reunión de 15 minutos («Reunión» en Turnia)', rate: 0.45, sheet: (a) => Boolean(a.meeting) || a.stage === 'reunion' },
       { key: 'fundadores', label: 'Clientes Fundadores', hint: 'Setup y mes 1 cobrados («Cliente» en Turnia)', rate: 0.5, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
     ],
+    // Las versiones de su demo personal (/p/<código>), para ver cuál convierte mejor. El corte es el de
+    // turniasalud src/lib/demo-version.ts (el deploy de #138, en hora de Argentina): si cambia, cambiar los dos.
+    demoVersions: [
+      { key: 'con_probar', label: 'A · Con «Probar la demo»', when: 'hasta el 07/11', until: '2026-11-07 12:30', steps: 'Abrió → tocó «Probar la demo» → eligió voz o chat → habló con Sofi' },
+      { key: 'esfera', label: 'B · Pantalla única con la esfera', when: 'desde el 07/11', from: '2026-11-07 12:30', steps: 'Abrió → tocó la esfera (empieza la charla) → habló con Sofi' },
+    ],
     // Posventa: las garantías del Programa Fundadores (src/content/precios.ts en Turnia).
     onboarding: { setupDays: 14, firstMonthInteractions: 50 },
     // Lo que sigue al embudo comercial, desde /api/metricas de Turnia (totales, sin datos personales).

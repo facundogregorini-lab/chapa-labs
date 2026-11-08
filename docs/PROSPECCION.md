@@ -58,6 +58,13 @@ Las reglas son las de su código, copiadas sin cambios en `prospecting/agencies.
 La misma vista de Facu, para Turnia, armada con sus cuentas (no hace falta nada nuevo en Turnia):
 
 - **Embudo de su demo** (`/p/<código>`), los mismos seis pasos y definiciones que el «Embudo contra la meta» (se calculan con las mismas funciones, `targets` de `units.js`, y un test lo verifica): saludos enviados → demos enviadas → abrieron la demo → hablaron con Sofi → llamada agendada → Clientes Fundadores, en barras partidas que filtran la lista. El período es por el primer contacto (la misma cohorte). Los fijos sin respuesta no cuentan.
+- **La demo, por versión** (Turnia → Embudo, 08/11): el 07/11 la demo personal pasó a una sola pantalla y se sacó el botón «Probar la demo». La tarjeta compara las dos versiones (`demoVersions` en `units.js`, `C.demoVersions` en `core.js`).
+  - **A:** con «Probar la demo», hasta el 07/11 a las 12:30.
+  - **B:** la pantalla única con la esfera, desde ese momento.
+  - **Qué compara:** abrieron → empezaron → hablaron con Sofi. Lo que vale es **abrieron → hablaron**, porque «empezaron» (tocar «Probar la demo» o la esfera) no significa lo mismo en las dos.
+  - **Cómo asigna:** cada persona va a la versión de su primera apertura.
+  - **El corte:** es el de turniasalud `src/lib/demo-version.ts`. Si cambia, cambiar los dos.
+  - **El resto:** en Turnia, `EMBUDO.md` → «Las dos versiones de la demo personal», y el tablero «Turnia · Prospección» de PostHog.
 - **Etapas**: por contactar, saludado, demo enviada, interactuó (abrió, probó, habló con Sofi o respondió), llamada agendada, cliente y cerrado.
 - **Cada fila**: estado, demo (Armada → «Enviada» registra el saludo, si faltaba, y la demo, como el registro en lote), teléfono, mensajes (de 3) y última actividad. Acciones: WhatsApp (abre el mensaje que le toca y después pregunta si salió, como en Hoy), copiar su demo, su ficha y «⋯».
 

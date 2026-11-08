@@ -483,6 +483,17 @@
     }).join('')}</div>`;
   }
 
+  /** La demo personal por versión (Turnia): cuál convierte mejor de «abrieron» a «hablaron con Sofi». */
+  function demoVersionsHtml(u, accounts) {
+    const vs = C.demoVersions(accounts, u);
+    if (!vs) return '';
+    const best = vs.filter((v) => v.abrieron >= 15).sort((a, b) => b.rate - a.rate)[0];
+    return `<section class="card glass" data-testid="demo-versions"><div class="card-head"><div><h2>La demo, por versión</h2><p class="sub">Cada persona va a la versión de su primera apertura. Se compara <strong>abrieron → hablaron con Sofi</strong>: «empezaron» (tocar «Probar la demo» o la esfera) no significa lo mismo en las dos. Con menos de 15 aperturas, una persona mueve mucho el porcentaje.</p></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Versión</th><th class="n">Abrieron</th><th class="n">Empezaron</th><th class="n">Hablaron con Sofi</th><th>Abrieron → hablaron</th></tr></thead><tbody>
+      ${vs.map((v) => `<tr><td><strong>${esc(v.label)}</strong> <span class="sub">· ${esc(v.when)}</span><div class="sub">${esc(v.steps)}</div></td><td class="n">${int(v.abrieron)}</td><td class="n">${int(v.empezaron)}</td><td class="n">${int(v.hablaron)}</td><td>${pct(v.rate)}${v.abrieron && v.abrieron < 15 ? ' <span class="chip warn">Muestra chica</span>' : best && best.key === v.key && vs.length > 1 ? ' <span class="chip">Mejor</span>' : ''}</td></tr>`).join('')}
+      </tbody></table></div></section>`;
+  }
+
   function renderFunnelView(id) {
     const u = unitOf(id);
     const d = state.data[id];
@@ -499,6 +510,7 @@
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Embudo</span><h1>${int(f.contactados)} contactados, ${int(f.respondieron)} respondieron</h1><p>${esc(u.icp)}</p></div>${periodSeg()}</section>
       ${crumbs(id)}
       <section class="card glass" data-testid="target-card"><div class="card-head"><div><h2>Embudo contra la meta</h2><p class="sub">Saludos: ${int(withTargets(u).targets[0].perWeek)} por semana. Cada paso, la conversión esperada sobre el anterior. Lo de la planilla es la cohorte contactada en el período; lo de la app, el mismo período desde su <code>/api/metricas</code>.${d.targets && d.targets.by ? ` Metas ajustadas por ${esc(d.targets.by)}.` : ''}</p></div>${state.editingTargets === id ? '' : '<button class="btn small" type="button" data-action="edit-targets" data-testid="edit-targets">Editar metas</button>'}</div>${state.editingTargets === id ? targetsForm(id) : targetHtml(u, list)}</section>
+      ${demoVersionsHtml(u, scoped(id))}
       <section class="card glass"><div class="kpis">
         ${kpi('Prospectados', int(f.prospectados), `${int(f.porContactar)} por contactar con canal`)}
         ${kpi('Contactados', int(f.contactados), state.period === 'all' ? 'Histórico' : 'Primer contacto en el período')}

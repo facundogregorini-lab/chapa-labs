@@ -108,6 +108,34 @@ Implementación:
 - **Turnia:** levantar un Postgres local y correr `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npx vitest run` (544 tests). Las pruebas de la cola están en `src/test/followup-queue.integration.test.ts` y las de la lectura de WhatsApp en `src/test/whatsapp-sync.integration.test.ts`. CI corre `npx next typegen` antes de `tsc`.
 - **habita.:** `npx vitest run` (1265 tests); las pruebas de este contrato están en `tests/followup-chapa.test.ts`.
 
+## El embudo de Turnia y las versiones de su demo (08/11)
+
+- **Hablar con Sofi es la conversión de la demo:** la persona le escribió o le habló. Es la misma definición en los cuatro lados:
+  - el embudo semanal de Turnia (`EMBUDO.md`, `npm run embudo`);
+  - PostHog;
+  - Chapa;
+  - el panel de Turnia.
+  
+  Antes, el embudo semanal contaba como «interacción» que empezara la charla, y el panel contaba como conversión «la probaron».
+- **Dos versiones de la demo personal:**
+  - **A:** con «Probar la demo», hasta el 07/11 a las 12:30.
+  - **B:** la pantalla única con la esfera, desde ese momento.
+  
+  Se comparan de punta a punta, abrieron → hablaron con Sofi:
+  - **en Chapa:** Turnia → Embudo → «La demo, por versión»;
+  - **en PostHog:** tablero «Turnia · Prospección» → «Turnia · Demo personal: A contra B», por visita;
+  - **en Turnia:** `npm run embudo`.
+- **Dónde se define cada embudo:**
+
+  | Dónde | Pasos | Archivo |
+  | --- | --- | --- |
+  | Embudo semanal | saludos → demos enviadas → visitadas → hablaron con Sofi → cuentas creadas → activas → clientes pagos | turniasalud `EMBUDO.md` y `scripts/embudo.mjs` |
+  | Chapa, «Embudo contra la meta» y el embudo de la demo | saludos → demos enviadas → abrieron → hablaron con Sofi → llamada agendada → Clientes Fundadores | chapa-labs `prospecting/units.js` (`targets`) |
+  | Follow-up | sin saludo → … → conversó, sin cuenta → cuenta, sin actividad → activa, sin pago | turniasalud `src/lib/sales/followup-stages.ts` |
+  | PostHog | demo enviada → visitó → habló con Sofi → respondió | tablero «Turnia · Prospección» |
+
+- **Diferencia pendiente:** después de «hablaron con Sofi», el embudo semanal y el Follow-up siguen por la cuenta (creada, activa, pago), mientras que Chapa sigue por la llamada y el Cliente Fundador. Hay que acordar cuál es el final del embudo.
+
 ## Estado al 08/11/2026
 
 - **En producción:**
