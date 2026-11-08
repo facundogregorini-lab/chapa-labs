@@ -616,7 +616,7 @@
     return `<span class="stage ${C.closed(a) ? 'closed' : ''}" style="--o:${0.35 + Math.max(0, lvl) * 0.13}">${esc(u.stageLabel(a.stage))}</span>`;
   }
   function signals(a) {
-    return `${a.demoTried ? '<span class="signal">Probó la demo</span>' : a.demoOpened ? '<span class="signal">Abrió la demo</span>' : ''}`;
+    return `${a.demoTried ? '<span class="signal">Probó la demo</span>' : a.demoOpened ? '<span class="signal">Abrió la demo</span>' : ''}${a.googleAds ? '<span class="signal" title="Paga anuncios en Google: de los más calientes">Google Ads</span>' : ''}`;
   }
 
   function accountRow(a, u, block) {
@@ -1057,7 +1057,7 @@
       }
       const wa = !api_ ? (u.canMessage(r) ? `<button type="button" class="ag-wa" data-ag-wa-account="${esc(r.id)}" aria-label="Escribir a ${esc(r.name)} por WhatsApp" title="Escribir por WhatsApp: abre el mensaje que le toca y después pregunta si salió">${WA_LOGO}</button>` : `<span class="ag-wa is-off" role="img" aria-label="Sin WhatsApp" title="Sin WhatsApp (fijo o por revisar)">${WA_LOGO}</span>`) : r.wa ? `<button type="button" class="ag-wa" data-ag-wa="${esc(r.wa)}" aria-label="Escribir a ${esc(r.name)} por WhatsApp" title="Escribir por WhatsApp («¡Buenas!»)">${WA_LOGO}</button>` : `<span class="ag-wa is-off" role="img" aria-label="Falta su WhatsApp" title="Falta su WhatsApp: cargalo en «Editar inmobiliaria»">${WA_LOGO}</span>`;
       return `<tr>
-        <td class="is-name">${api_ ? `<a class="ag-name" href="${esc(base)}" target="_blank" rel="noopener">` : `<a class="ag-name" href="#" data-open-account="${esc(r.id)}">`}${agThumb(id, r.coverPhotoId, r.name)}<span><strong>${esc(r.name)}</strong>${!api_ && r.org && r.org !== r.name ? `<small class="sub" style="display:block">${esc(r.org)}</small>` : ''}</span></a></td>
+        <td class="is-name">${api_ ? `<a class="ag-name" href="${esc(base)}" target="_blank" rel="noopener">` : `<a class="ag-name" href="#" data-open-account="${esc(r.id)}">`}${agThumb(id, r.coverPhotoId, r.name)}<span><strong>${esc(r.name)}</strong>${r.googleAds ? ' <span class="signal" title="Paga anuncios en Google: de los más calientes">Google Ads</span>' : ''}${!api_ && r.org && r.org !== r.name ? `<small class="sub" style="display:block">${esc(r.org)}</small>` : ''}</span></a></td>
         <td class="is-stage" data-label="Estado">${agStagePill(r.stage, cfg)}</td>
         <td class="is-demo" data-label="Demo">${demo}</td>
         ${api_ ? `<td class="is-account" data-label="Cuenta">${accountPill(AG.accountState(r), cfg)}</td>` : ''}

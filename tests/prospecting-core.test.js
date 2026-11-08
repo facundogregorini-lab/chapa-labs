@@ -378,3 +378,28 @@ test('desmarcar un audio borra la marca y deja la historia', () => {
   assert.equal(r.events[0].type, 'audio_desmarcado');
   assert.throws(() => C.applyAction({ ...a, audioAt: '' }, { type: 'unaudio' }, { unit: turnia, by: 'Axel' }));
 });
+
+test('Turnia: la lista sale de «Fuente» y los que hacen Google Ads van primero entre los nuevos de igual prioridad', () => {
+  const { turnia } = require('../prospecting/units').UNITS;
+  const { accounts } = C.toAccounts([
+    ['Código', 'Nombre', 'Zona', 'Teléfono', 'De quién es el teléfono', 'Prioridad', 'Estado', 'Mensajes', 'Señales', 'Fuente'],
+    ['a', 'Sin anuncios', 'Tandil', '+54 9 249 500-0001', 'Celular', '1', 'Por contactar', '0', 'tiene web', 'Lista 4 · Google Maps (08/11)'],
+    ['b', 'Con anuncios', 'Pinamar', '+54 9 2254 50-0002', 'Celular', '1', 'Por contactar', '0', 'Hace Google Ads: anuncios vistos en Argentina hasta el 16/10/2026', 'Lista 4 · Google Maps (08/11)'],
+    ['c', 'Prioridad 2 con anuncios', 'Necochea', '+54 9 2262 50-0003', 'Celular', '2', 'Por contactar', '0', 'Hace Google Ads', 'Lista 4 · Google Maps (08/11)'],
+    ['d', 'De la lista 1', 'Mar del Plata', '+54 9 223 500-0004', 'Celular', '1', 'Por contactar', '0', '', 'Círculo Odontológico de Mar del Plata (comp.org.ar)'],
+  ], turnia);
+  const by = Object.fromEntries(accounts.map((a) => [a.id, a]));
+  assert.equal(by.a.campaign, 'Lista 4');
+  assert.equal(by.d.campaign, '');
+  assert.equal(by.b.googleAds, true);
+  assert.equal(by.a.googleAds, false);
+  const q = C.queue(accounts, turnia, { todayDay: '2026-11-09' });
+  assert.deepEqual(q.fresh.map((a) => a.id), ['b', 'a', 'd', 'c']);
+  // En la vista Odontólogos, la búsqueda encuentra por lista, zona y «google ads».
+  const A = require('../prospecting/agencies');
+  const rows = A.fromAccounts(accounts, { counted: turnia.counted, closed: C.closed, targets: turnia.targets });
+  const ids = (q2) => A.filterRows(rows, { q: q2 }).map((r) => r.id).sort();
+  assert.deepEqual(ids('google ads'), ['b', 'c']);
+  assert.deepEqual(ids('lista 4'), ['a', 'b', 'c']);
+  assert.deepEqual(ids('tandil'), ['a']);
+});
