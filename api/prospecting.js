@@ -7,6 +7,8 @@
 //   GET  ?op=data&unit=turnia        cuentas, actividad y plantillas de esa unidad
 //   POST ?op=action {unit,id,version,action}   aplica una acción a una cuenta
 //   POST ?op=setup  {unit}           agrega las columnas y pestañas que falten
+//   GET  ?op=followup&unit=todas     la cola de Follow-up de cada unidad (la calcula su app)
+//   POST ?op=task {unit, followup}   una operación de esa cola (claim, open, confirm…) a nombre de quien opera
 //
 // Variables: PROSPECTING_PASSWORD (ver _session.js), la cuenta de servicio (ver
 // _google.js) y, por unidad, <ID>_PROSPECTING_SHEET_ID (ver prospecting/units.js).
@@ -424,6 +426,42 @@ async function doSetup(req, res, user) {
   res.status(200).json({ ok: true, addedTabs: add, newIds: ids.length });
 }
 
+// ─── Follow-up: la cola de cada unidad, calculada por su app ────
+// Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
+// tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
+// va a la app de su unidad a nombre de quien opera.
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save']);
+
+async function doFollowup(req, res) {
+  const want = req.query.unit && req.query.unit !== 'todas' ? [UNITS[req.query.unit]].filter(Boolean) : Object.values(UNITS);
+  if (!want.length) return fail(res, 404, 'No existe esa unidad.');
+  const out = {};
+  await Promise.all(want.map(async (unit) => {
+    if (!unit.api || !apiOf(unit)) { out[unit.id] = { error: `Falta la clave de la API de ${unit.name} (${(unit.api && unit.api.secretEnvs || []).join(' o ')}).` }; return; }
+    try {
+      out[unit.id] = await callApi(unit, { query: { vista: 'followup' }, timeout: 45000 });
+    } catch (err) {
+      out[unit.id] = { error: err.status === 404 || err.status === 400 ? `${unit.name} todavía no tiene la cola de Follow-up publicada.` : err.message };
+    }
+  }));
+  return res.status(200).json({ units: out, readAt: new Date().toISOString() });
+}
+
+async function doTask(req, res, user) {
+  const body = req.body || {};
+  const unit = UNITS[body.unit];
+  if (!unit) return fail(res, 404, 'No existe esa unidad.');
+  if (!unit.api || !apiOf(unit)) return fail(res, 403, `Para operar ${unit.name} falta la clave de su API.`);
+  const f = body.followup && typeof body.followup === 'object' ? body.followup : null;
+  if (!f || !FOLLOWUP_OPS.has(f.op)) return fail(res, 400, 'Operación de Follow-up desconocida.');
+  try {
+    const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: 45000 });
+    return res.status(200).json({ result: out });
+  } catch (err) {
+    return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const op = (req.query && req.query.op) || '';
@@ -478,6 +516,7 @@ module.exports = async (req, res) => {
       let accounts = data.accounts;
       let lastImport;
       let events = data.events;
+      let rowsFromApi = false;
       if (unit.api && apiOf(unit)) {
         try {
           const out = await callApi(unit);
@@ -488,6 +527,17 @@ module.exports = async (req, res) => {
             accounts = core.toAccounts([out.header, ...(out.rows || [])], unit).accounts;
             events = Array.isArray(out.events) ? out.events : [];
             lastImport = out.lastImport || null;
+          }
+          // Turnia: las filas salen de su base (?vista=filas); si su API todavía no lo tiene, queda la planilla.
+          if (unit.api.rowsQuery) {
+            try {
+              const rows = await callApi(unit, { query: unit.api.rowsQuery });
+              if (Array.isArray(rows.header) && Array.isArray(rows.rows)) {
+                accounts = core.toAccounts([rows.header, ...rows.rows], unit).accounts;
+                if (Array.isArray(rows.events)) events = rows.events;
+                rowsFromApi = true;
+              }
+            } catch { /* la planilla de siempre */ }
           }
           // La meta semanal es la del panel de la app; sin % guardados, valen los de fábrica.
           if (out.weeklyGoal) apiTargets = { perWeek: out.weeklyGoal, rates: out.funnelRates || {} };
@@ -503,6 +553,7 @@ module.exports = async (req, res) => {
         targets: targets && targets.perWeek ? targets : null,
         readOnly: readOnlyOf(unit),
         viaApi: Boolean(unit.api && apiOf(unit)),
+        rowsFromApi,
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: unit.api && unit.api.rows && apiOf(unit) ? [] : missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts,
         events: events.slice(-8000),
@@ -523,6 +574,8 @@ module.exports = async (req, res) => {
     if (op === 'agencyThumb' && req.method === 'GET') return await doAgencyThumb(req, res);
     if (op === 'agency' && req.method === 'POST') return await doAgency(req, res);
     if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
+    if (op === 'followup' && req.method === 'GET') return await doFollowup(req, res);
+    if (op === 'task' && req.method === 'POST') return await doTask(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {
     console.error('prospecting_error', op, err.message);
