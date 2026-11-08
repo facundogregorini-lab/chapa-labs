@@ -136,7 +136,7 @@
     const m = location.pathname.match(/^\/prospecting\/?(turnia|habita|todas)?/);
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
-    state.view = state.unit === 'todas' ? 'resumen' : ['hoy', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'].includes(v) ? v : 'hoy';
+    state.view = state.unit === 'todas' ? (TODAS_VIEWS.includes(v) ? v : 'hoy') : UNIT_VIEWS.includes(v) ? v : 'hoy';
     if (v === 'odontologos' && state.unit === 'turnia') state.view = 'inmobiliarias';
     if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
@@ -144,9 +144,13 @@
     // Los filtros de la lista son de cada unidad: al cambiar de unidad, vuelven a cero.
     if (unit !== state.unit && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
     state.unit = unit;
-    state.view = unit === 'todas' ? 'resumen' : view || 'hoy';
+    // La bandeja comercial: en «Todas», cada vista es una pestaña; en una unidad, «Follow-up» con sus vistas.
+    if (unit === 'todas') state.view = view === 'followup' ? state.fu.sub : TODAS_VIEWS.includes(view) ? view : 'hoy';
+    else if (UNIT_VIEWS.includes(view)) state.view = view;
+    else if (FU_VIEWS.includes(view)) { state.fu.sub = view; state.view = 'followup'; }
+    else state.view = 'hoy';
     state.shown = 100;
-    const url = state.view === 'inmobiliarias' ? agUrl() : `/prospecting${unit === 'todas' ? '' : `/${unit}`}${unit !== 'todas' && state.view !== 'hoy' ? `?vista=${state.view}` : ''}${state.demo ? (unit !== 'todas' && state.view !== 'hoy' ? '&' : '?') + 'ejemplo=1' : ''}`;
+    const url = state.view === 'inmobiliarias' ? agUrl() : `/prospecting${unit === 'todas' ? '' : `/${unit}`}${state.view !== 'hoy' ? `?vista=${state.view}` : ''}${state.demo ? (state.view !== 'hoy' ? '&' : '?') + 'ejemplo=1' : ''}`;
     history[replace ? 'replaceState' : 'pushState']({}, '', url);
     render();
     main.focus({ preventScroll: true });
@@ -193,8 +197,8 @@
     const segs = [['todas', 'Todas', 's1'], ...units().map((u) => [u.id, u.name, u.color])];
     $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
     const tabs = state.unit === 'todas'
-      ? [['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
+      ? [['hoy', 'Hoy', fuCount('todas')], ['pipeline', 'Pipeline'], ['prospectos', 'Prospectos'], ['secuencias', 'Secuencias'], ['rendimiento', 'Rendimiento'], ['resumen', 'Resumen']]
+      : [['hoy', 'Hoy', queueCount()], ['followup', 'Follow-up', fuCount(state.unit)], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
     $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
     document.body.dataset.unit = state.unit;
     const userBtn = $('#user');
@@ -227,7 +231,9 @@
     const s = state.session;
     if (!state.demo && !s.google) { main.innerHTML = setupScreen(); return after(); }
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
-    if (state.unit === 'todas') main.innerHTML = renderOverview();
+    if (isFu() && !state.demo && !state.fu.n && !state.fu.loading && !state.fu.error) setTimeout(() => loadFollowup(), 0);
+    if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderOverview() : renderFu();
+    else if (state.view === 'followup') main.innerHTML = renderFu();
     else {
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
@@ -1316,6 +1322,7 @@
           <div class="btns" style="align-items:flex-end"><label class="field" style="flex:1 1 140px">Fecha<input type="date" data-next-at value="${esc(C.dayOf(a.nextAt))}"></label><label class="field" style="flex:2 1 180px">Qué hacer<input data-next-step value="${esc(a.nextStep)}"></label><button class="btn small" type="button" data-action="schedule">Guardar</button></div>
         </div>`}
         ${u.api && !u.api.rows && !isReadOnly(state.unit) ? accountSection(a, u) : ''}
+        ${productActivity(a, u)}
         <div class="section"><h3>Datos</h3>
           <dl class="facts">
             ${a.org && a.org !== a.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(a.org)}</dd>` : ''}
@@ -1530,6 +1537,430 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove('on'), err ? 6000 : 3200);
   }
+
+  // ─── Bandeja comercial: el Follow-up de cada app, junto ──────────
+  // La cola la arma cada app (habita. y Turnia) con sus reglas, sus bloqueos, sus tomas de 10 minutos
+  // y sus resultados (prospecting/followup.js la pone en una sola forma). Acá se mira, se filtra y se
+  // ejecuta: cada acción va a la app de su unidad a nombre de quien opera.
+  const F = window.ProspectingFollowup;
+  const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
+  const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
+  const UNIT_VIEWS = ['hoy', 'followup', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
+  state.fu = { raw: null, n: null, loading: false, error: null, at: 0, f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
+  const isFu = () => (state.unit === 'todas' ? FU_VIEWS.includes(state.view) : state.view === 'followup');
+  const fuView = () => (state.unit === 'todas' ? state.view : state.fu.sub);
+  const fuScope = () => (state.unit === 'todas' ? state.fu.f.unit || 'todas' : state.unit);
+  const fuUnits = () => units().filter((u) => fuScope() === 'todas' || u.id === fuScope());
+  const fuName = (id) => (unitOf(id) || { name: id }).name;
+  const fuDot = (id) => { const u = unitOf(id); return u ? `<span class="eyebrow" style="color:${color(u)};font-size:12px">● ${esc(u.name)}</span>` : ''; };
+  const ago = (iso) => {
+    if (!iso) return '';
+    const h = (Date.now() - Date.parse(iso)) / 3600000;
+    if (!Number.isFinite(h)) return '';
+    if (h < 1) return 'hace minutos';
+    if (h < 24) return `hace ${Math.round(h)} h`;
+    return `hace ${Math.round(h / 24)} d`;
+  };
+  const dayTime = (iso) => (iso ? new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : '');
+
+  function fuCount(scope) {
+    if (!state.fu.n) return 0;
+    return F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length;
+  }
+
+  async function loadFollowup({ quiet } = {}) {
+    if (state.demo) { state.fu.n = F.normalize({}); state.fu.raw = { units: {} }; return; }
+    if (state.fu.loading || !state.session || !state.session.user) return;
+    state.fu.loading = true;
+    if (!quiet) render();
+    try {
+      state.fu.raw = await api('followup', { query: { unit: 'todas' } });
+      state.fu.n = F.normalize(state.fu.raw.units);
+      state.fu.at = Date.now();
+      state.fu.error = null;
+    } catch (err) {
+      state.fu.error = err.message;
+      if (err.status === 401) state.session.user = null;
+    } finally {
+      state.fu.loading = false;
+      // Con una tarea abierta no se redibuja: se perdería lo que se está escribiendo.
+      if (!state.fu.task) render(); else renderTopOnly();
+    }
+  }
+  function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
+
+  async function fuOp(unit, followup, { label } = {}) {
+    if (state.fu.busy) return null;
+    state.fu.busy = true;
+    try {
+      const { result } = await api('task', { method: 'POST', body: { unit, followup } });
+      if (label) toast(label);
+      if (result && result.warning) toast(result.warning, true);
+      return result || {};
+    } catch (err) {
+      toast(err.message, true);
+      return null;
+    } finally {
+      state.fu.busy = false;
+    }
+  }
+
+  function fuFind(key) {
+    const n = state.fu.n;
+    return n ? [...n.queue, ...n.scheduled, ...n.blocked].find((x) => x.key === key) : null;
+  }
+
+  async function fuClaim(it) {
+    const r = await fuOp(it.unit, { op: 'claim', inmobiliaria: it.id });
+    if (!r) { loadFollowup({ quiet: true }); return; }
+    state.fu.task = F.prepared(it.unit, r, it);
+    state.fu.task.mode = 'ejecutar';
+    render();
+    loadFollowup({ quiet: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function fuNext() {
+    const cur = state.fu.task && state.fu.task.item && state.fu.task.item.key;
+    state.fu.task = null;
+    await loadFollowup({ quiet: true });
+    const me = state.session && state.session.user && state.session.user.name;
+    const next = F.filter(state.fu.n ? state.fu.n.queue : [], { unit: fuScope(), owner: state.fu.f.owner, priority: state.fu.f.priority, group: state.fu.f.group })
+      .find((x) => x.key !== cur && (!x.claim || x.claim.by === me));
+    if (next) await fuClaim(next);
+    else { toast('No quedan tareas libres en la cola.'); render(); }
+  }
+
+  // ── Las vistas ──
+  function renderFu() {
+    if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
+    if (state.fu.task) return renderFuTask(state.fu.task);
+    const v = fuView();
+    const sub = state.unit === 'todas' ? '' : `<div class="toolbar" style="margin-bottom:4px"><div class="seg" role="tablist" aria-label="Follow-up de ${esc(fuName(state.unit))}">${FU_VIEWS.map((k) => `<button type="button" role="tab" data-fu="sub" data-fu-sub="${k}" aria-selected="${v === k}">${esc(FU_LABEL[k])}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div></div>`;
+    if (!state.fu.n) {
+      if (state.fu.error) return `${sub}<div class="notice glass"><span class="badge off">Sin conexión</span><span>${esc(state.fu.error)}</span><button class="btn small" type="button" data-fu="reload">Reintentar</button></div>`;
+      return `${sub}<div class="skeleton"></div><div class="skeleton"></div>`;
+    }
+    const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
+      .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('');
+    const body = { hoy: fuHoy, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento }[v] || fuHoy;
+    return sub + errors + body();
+  }
+
+  function fuToolbar({ search = true, groups = true, filters = true } = {}) {
+    const f = state.fu.f;
+    const n = state.fu.n;
+    const owners = [...new Set([...n.queue, ...n.scheduled, ...n.blocked].map((x) => x.owner).filter(Boolean))].sort();
+    const unitSeg = state.unit === 'todas' ? `<div class="seg" role="group" aria-label="Producto">${[['todas', 'Todas'], ...units().map((u) => [u.id, u.name])].map(([id, l]) => `<button type="button" data-fu="unit" data-fu-unit="${id}" aria-pressed="${(f.unit || 'todas') === id}">${esc(l)}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div>` : '';
+    return `<div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${unitSeg}
+      ${groups ? `<select class="input" data-fu-filter="group" aria-label="Tipo de acción"><option value="">Todas las acciones</option>${F.GROUPS.map((g) => `<option value="${g}" ${f.group === g ? 'selected' : ''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select>` : ''}
+      ${filters ? `<select class="input" data-fu-filter="priority" aria-label="Prioridad"><option value="">Toda prioridad</option>${['alta', 'media', 'baja'].map((p) => `<option value="${p}" ${f.priority === p ? 'selected' : ''}>Prioridad ${F.PRIORITY_LABEL[p].toLowerCase()}</option>`).join('')}</select>
+      <select class="input" data-fu-filter="owner" aria-label="Responsable"><option value="">Todos los responsables</option><option value="—" ${f.owner === '—' ? 'selected' : ''}>Sin responsable</option>${owners.map((o) => `<option ${f.owner === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>` : ''}
+      ${search ? `<input class="input" type="search" data-fu-search placeholder="Buscar nombre, zona, etapa…" value="${esc(f.q || '')}" aria-label="Buscar" style="flex:1 1 180px">` : ''}
+      <button class="btn small ghost" type="button" data-fu="reload" title="Actualizar">↻ ${state.fu.loading ? 'Actualizando…' : state.fu.at ? `Actualizado ${esc(ago(new Date(state.fu.at).toISOString()))}` : 'Actualizar'}</button></div>`;
+  }
+
+  function fuRow(x, { button = true } = {}) {
+    const me = state.session && state.session.user && state.session.user.name;
+    const other = x.claim && x.claim.by !== me;
+    const pill = { alta: 'live', media: 'demo', baja: 'plain' }[x.priority];
+    const status = x.claim ? `<span class="badge ${other ? 'off' : 'live'}">${other ? `Lo tiene ${esc(x.claim.by)}` : 'Lo tenés vos'}</span>`
+      : x.blocked ? `<span class="badge off" title="${esc(x.blocked)}">Bloqueada</span>`
+      : x.dueAt ? `<span class="badge plain">Sale ${esc(dayTime(x.dueAt))}</span>` : '';
+    const action = !button ? '' : other || x.blocked || x.dueAt || !x.action ? '' : `<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">${icon.wa} ${esc(x.action)}</button>`;
+    return `<div class="arow" data-testid="fu-item" data-fu-unit-id="${esc(x.unit)}" data-fu-open="${esc(x.key)}" data-priority="${esc(x.priority)}" data-group="${esc(x.group)}" tabindex="0" role="button" aria-label="Abrir ${esc(x.name)}">
+      <div class="who"><strong>${esc(x.name)}</strong><div class="meta">${fuDot(x.unit)}${x.sub && x.sub !== x.name ? `<span>${esc(x.sub)}</span>·` : ''}${x.zone ? `<span>${esc(x.zone)}</span>` : ''}<span class="stage">${esc(x.stageTitle)}</span>${x.situation && x.situation !== 'sin_respuesta' ? `<span class="signal">${esc(x.situationLabel)}</span>` : ''}<span class="badge ${pill}">${esc(F.PRIORITY_LABEL[x.priority])}</span>${x.owner ? `<span>· ${esc(x.owner)}</span>` : ''}${x.since ? `<span>· últ. ${esc(ago(x.since))}</span>` : ''}${x.ads ? '<span class="signal">Paga anuncios</span>' : ''}${status}</div>
+      ${x.blocked ? `<div class="meta" style="color:var(--bad-text)">${esc(x.blocked)}</div>` : ''}</div>
+      <div class="acts">${action}</div></div>`;
+  }
+
+  function fuHoy() {
+    const scope = fuScope();
+    const f = state.fu.f;
+    const s = F.summary(state.fu.n, scope);
+    const list = F.filter(state.fu.n.queue, { ...f, unit: scope });
+    const sched = F.filter(state.fu.n.scheduled, { ...f, unit: scope });
+    const blocked = F.filter(state.fu.n.blocked, { ...f, unit: scope });
+    const free = list.filter((x) => !x.claim).length;
+    const groups = F.GROUPS.map((g) => [g, list.filter((x) => x.group === g)]).filter(([, l]) => l.length);
+    const shown = (g) => (state.more[`fu-${g}`] ? 1e9 : 20);
+    return `
+      <section class="hero"><div><span class="eyebrow">${scope === 'todas' ? 'Todas las unidades' : esc(fuName(scope))} · Hoy</span><h1>${free ? `${int(free)} ${free === 1 ? 'acción lista' : 'acciones listas'} para ejecutar` : 'No quedan acciones libres'}</h1><p>Primero las respuestas y las demos prometidas. Tocá una tarea para tomarla: mientras la tenés, nadie más puede mandarle.</p></div>
+        <button type="button" class="btn primary" data-fu="next" ${free ? '' : 'disabled'} data-testid="fu-take-next">Tomar la siguiente</button></section>
+      <section class="card glass" aria-label="Resumen de la cola"><div class="kpis">
+        ${kpi('Listas para hoy', int(s.ready), `${int(s.claimed)} tomadas ahora`)}
+        ${kpi('Respuestas', int(s.replies), 'Esperan acción')}
+        ${kpi('Demos pendientes', int(s.demos), 'Por crear o enviar')}
+        ${kpi('Programadas', int(s.scheduled), 'Salen más adelante')}
+        ${kpi('Bloqueadas', int(s.blocked), 'Con el motivo a la vista')}
+        ${kpi('Hechas hoy', int(s.doneToday), `${int(s.newToday)} contactos nuevos`)}
+      </div></section>
+      ${fuToolbar()}
+      ${groups.length ? groups.map(([g, l]) => `<section class="card glass block" data-open="true" aria-label="${esc(F.GROUP_LABEL[g])}"><div class="block-head" style="cursor:default"><div><h3>${esc(F.GROUP_LABEL[g])} <span class="count num">${l.length}</span></h3></div></div><div class="rows">${l.slice(0, shown(g)).map((x) => fuRow(x)).join('')}${l.length > shown(g) ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="fu-${g}">Ver los ${int(l.length - shown(g))} restantes</button></div>` : ''}</div></section>`).join('') : '<section class="card glass"><p class="empty">Nada para ejecutar con estos filtros.</p></section>'}
+      <details class="card glass" ${state.fu.open.sched ? 'open' : ''} data-fu-details="sched"><summary><strong>Programadas</strong> <span class="count num">${sched.length}</span> <span class="sub">· su paso sale más adelante</span></summary><div class="rows">${sched.slice(0, 50).map((x) => fuRow(x, { button: false })).join('') || '<p class="empty">Ninguna.</p>'}</div></details>
+      <details class="card glass" ${state.fu.open.blocked ? 'open' : ''} data-fu-details="blocked"><summary><strong>Bloqueadas</strong> <span class="count num">${blocked.length}</span> <span class="sub">· ${esc(fuBlockReasons(blocked))}</span></summary><div class="rows">${blocked.slice(0, 50).map((x) => fuRow(x, { button: false })).join('') || '<p class="empty">Ninguna.</p>'}</div></details>`;
+  }
+  function fuBlockReasons(list) {
+    const c = {};
+    for (const x of list) { const k = String(x.blocked || '').split(':')[0].split('(')[0].trim(); c[k] = (c[k] || 0) + 1; }
+    return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(' · ') || 'sin bloqueos';
+  }
+
+  function fuPipeline() {
+    const n = state.fu.n;
+    const cards = fuUnits().filter((u) => n.units[u.id]).map((u) => {
+      const snap = n.units[u.id];
+      const all = [...n.queue, ...n.scheduled, ...n.blocked].filter((x) => x.unit === u.id);
+      const max = Math.max(1, ...(snap.funnel || []).map((s) => s.reached));
+      const rows = (snap.funnel || []).map((s) => {
+        const here = all.filter((x) => x.stage === s.key);
+        const stuck = here.filter((x) => x.blocked).length;
+        return `<tr><td><strong>${esc(s.title)}</strong><div class="sub">→ ${esc(s.goal)}</div></td>
+          <td style="width:34%"><div style="height:10px;border-radius:6px;background:var(--glass-soft)"><div style="height:10px;border-radius:6px;width:${Math.round((s.reached / max) * 100)}%;background:${color(u)}"></div></div><div class="sub num">${int(s.reached)} llegaron</div></td>
+          <td class="num">${int(s.waiting)}</td><td class="num">${pct(s.rate)}</td><td class="num">${stuck ? `<span style="color:var(--bad-text)">${int(stuck)}</span>` : '—'}</td></tr>`;
+      }).join('');
+      const timing = (snap.timing || []).filter((t) => t.medianHours !== null && t.medianHours !== undefined);
+      return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Embudo de ${esc(u.name)}</h2><p class="sub">Con las etapas y las definiciones de ${esc(u.name)}: los números son los de su panel.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Llegaron</th><th>Esperan</th><th>Pasan a la siguiente</th><th>Bloqueadas</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${timing.length ? `<p class="sub" style="margin:10px 0 0">Tiempo mediano: ${timing.map((t) => `${esc(t.from)} → ${esc(t.to)}: ${t.medianHours < 48 ? `${Math.round(t.medianHours)} h` : `${Math.round(t.medianHours / 24)} d`}`).join(' · ')}</p>` : ''}</section>`;
+    }).join('');
+    return `<section class="hero"><div><span class="eyebrow">Pipeline</span><h1>El embudo de cada producto</h1><p>Cada producto mide con sus propias etapas: no se suman etapas distintas. «Bloqueadas» son las que esperan algo (horario, número, texto) para avanzar.</p></div></section>${fuToolbar({ search: false, groups: false, filters: false })}${cards || '<section class="card glass"><p class="empty">Sin datos de los productos.</p></section>'}`;
+  }
+
+  function fuProspectos() {
+    const n = state.fu.n;
+    const f = state.fu.f;
+    const all = F.filter([...n.queue, ...n.scheduled, ...n.blocked], { ...f, unit: fuScope() });
+    const shown = state.more['fu-prospectos'] ? all.length : 100;
+    return `<section class="hero"><div><span class="eyebrow">Prospectos</span><h1>${int(all.length)} en seguimiento</h1><p>Todos los que tienen una próxima acción en algún producto. Tocá uno para ver su contexto, su historia y lo que se puede hacer.</p></div></section>
+      ${fuToolbar()}
+      <section class="card glass"><div class="table-wrap"><table><thead><tr><th>Prospecto</th><th>Producto</th><th>Responsable</th><th>Etapa</th><th>Situación</th><th>Próxima acción</th><th>Prioridad</th><th>Último contacto</th><th>Estado</th></tr></thead><tbody>
+      ${all.slice(0, shown).map((x) => `<tr data-fu-open="${esc(x.key)}" tabindex="0" style="cursor:pointer"><td><strong>${esc(x.name)}</strong>${x.sub && x.sub !== x.name ? `<div class="sub">${esc(x.sub)}</div>` : ''}</td><td>${esc(fuName(x.unit))}</td><td>${esc(x.owner || '—')}</td><td>${esc(x.stageTitle)}</td><td>${esc(x.situationLabel)}</td><td>${esc(x.action || x.actionReason || '—')}</td><td>${esc(F.PRIORITY_LABEL[x.priority])}</td><td>${esc(ago(x.since) || '—')}</td><td>${x.claim ? `Lo tiene ${esc(x.claim.by)}` : x.blocked ? `<span style="color:var(--bad-text)">${esc(x.blocked)}</span>` : x.dueAt ? `Sale ${esc(dayTime(x.dueAt))}` : 'Lista'}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">Sin resultados.</td></tr>'}
+      </tbody></table></div>${all.length > shown ? `<div style="text-align:center;padding:8px"><button class="btn small" type="button" data-more-block="fu-prospectos">Ver los ${int(all.length - shown)} restantes</button></div>` : ''}</section>`;
+  }
+
+  function fuSecuencias() {
+    const n = state.fu.n;
+    return `<section class="hero"><div><span class="eyebrow">Secuencias y mensajes</span><h1>Qué se manda en cada etapa</h1><p>Las reglas y los mensajes son los de cada producto. Una versión nueva se mide aparte; «Probar 50/50» la manda a la mitad de la etapa, siempre la misma mitad.</p></div></section>
+      ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
+      ${fuUnits().filter((u) => n.units[u.id]).map((u) => {
+        const snap = n.units[u.id];
+        const rules = F.ruleRows(u.id, snap);
+        const versions = F.versionRows(u.id, snap);
+        const stages = snap.stages || [];
+        return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Reglas de ${esc(u.name)}</h2><p class="sub">${u.id === 'habita' ? 'Se editan sin deploy: gana la primera regla (por orden) que corresponde a la situación.' : 'Siguen la cadencia de Prospección de Turnia (días hábiles, tres mensajes como máximo).'}</p></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Cuándo</th><th>Acción</th><th>Espera</th>${u.id === 'habita' ? '<th>Horario</th><th></th>' : '<th>Sale cuando</th>'}</tr></thead><tbody>
+          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
+          </tbody></table></div></section>
+          ${stages.map((s) => {
+            const vs = versions.filter((v) => v.stage === s.key);
+            return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
+              ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
+                ${v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
+                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p></div>`).join('') || '<p class="sub">Sin versiones.</p>'}
+              <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns"><select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit">Guardar versión</button></div></form>
+            </details>`;
+          }).join('')}`;
+      }).join('')}`;
+  }
+
+  function fuRendimiento() {
+    const n = state.fu.n;
+    const scope = fuScope();
+    const actors = F.actorRows(n, scope);
+    return `<section class="hero"><div><span class="eyebrow">Rendimiento</span><h1>Qué mensajes y quién convierten</h1><p>Conversión: que la persona o la inmobiliaria avanzó de etapa después del envío, con la definición de cada producto. Con menos de 30 envíos, la muestra es chica.</p></div></section>
+      ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
+      ${fuUnits().filter((u) => n.units[u.id]).map((u) => {
+        const snap = n.units[u.id];
+        const rows = F.versionRows(u.id, snap).filter((v) => v.executed > 0 || v.status !== 'archived');
+        const sent = rows.reduce((s, v) => s + v.executed, 0);
+        const conv = rows.reduce((s, v) => s + v.conversions, 0);
+        const funnel = snap.funnel || [];
+        return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>${esc(u.name)}</h2></div></div>
+          <div class="kpis">${kpi('Enviados desde Follow-up', int(sent), 'Una vez por persona y versión')}${kpi('Avanzaron después', int(conv), pct(sent ? conv / sent : null))}${funnel.slice(0, 3).map((s) => kpi(`${esc(s.title)} → ${esc(s.goal)}`, pct(s.rate), `${int(s.reached)} llegaron`)).join('')}</div>
+          <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Etapa</th><th>Versión</th><th>Enviadas</th><th>Avanzaron</th><th>Tasa</th>${u.id === 'habita' ? '<th>Tiempo mediano</th>' : ''}</tr></thead><tbody>
+          ${rows.map((v) => `<tr><td>${esc(v.stageTitle)}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</td><td>V${v.version} ${v.status === 'test' ? '(a prueba)' : v.status === 'archived' ? '(archivada)' : ''}</td><td class="num">${int(v.executed)}</td><td class="num">${int(v.conversions)}</td><td class="num">${pct(v.rate)}${v.small ? ' <span class="sub">muestra chica</span>' : ''}${v.best ? ' <span class="signal">Mejor</span>' : ''}</td>${u.id === 'habita' ? `<td class="num">${v.medianHours === null || v.medianHours === undefined ? '—' : `${Math.round(v.medianHours)} h`}</td>` : ''}</tr>`).join('') || '<tr><td colspan="6" class="empty">Todavía no hay envíos desde Follow-up.</td></tr>'}
+          </tbody></table></div></section>`;
+      }).join('')}
+      <section class="card glass"><div class="card-head"><div><h2>Por responsable</h2><p class="sub">Envíos confirmados por cada persona y cuántos avanzaron después.</p></div></div>
+        <div class="table-wrap"><table><thead><tr><th>Quién</th><th>Producto</th><th>Enviados</th><th>Avanzaron</th><th>Tasa</th></tr></thead><tbody>
+        ${actors.map((a) => `<tr><td>${esc(a.actor)}</td><td>${esc(fuName(a.unit))}</td><td class="num">${int(a.executions)}</td><td class="num">${int(a.conversions)}</td><td class="num">${pct(a.rate)}${a.executions < 30 ? ' <span class="sub">muestra chica</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Todavía no hay envíos.</td></tr>'}
+        </tbody></table></div></section>`;
+  }
+
+  // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
+  function renderFuTask(t) {
+    const it = t.item || {};
+    const u = unitOf(t.unit);
+    const snap = state.fu.n && state.fu.n.units[t.unit];
+    const situations = (snap && snap.labels && snap.labels.situations) || {};
+    const exec = t.mode === 'ejecutar';
+    const acc = fuAccount(t.unit, it);
+    const me = state.session && state.session.user && state.session.user.name;
+    const otherClaim = it.claim && it.claim.by !== me;
+    return `${demoBanner()}
+      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<button class="btn small ghost" type="button" data-fu="release">Soltar sin hacer nada</button><span class="sub">La tenés vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}: nadie más puede mandarle.</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
+      <section class="hero"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>${esc(it.stageTitle || '')}${it.situationLabel ? ` · ${esc(it.situationLabel)}` : ''}${t.actionLabel || it.action ? ` · ${esc(t.actionLabel || it.action)}` : ''}</p></div></section>
+      <div class="grid cols-3" data-testid="fu-detail">
+        <section class="card glass"><h2>Contexto</h2>
+          <dl class="facts">${it.sub && it.sub !== it.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(it.sub)}</dd>` : ''}${t.phone || it.phone ? `<dt>WhatsApp</dt><dd>${esc(t.phone || it.phone)}</dd>` : ''}${it.zone ? `<dt>Zona</dt><dd>${esc(it.zone)}</dd>` : ''}<dt>Etapa</dt><dd>${esc(it.stageTitle || '')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[it.priority] || '')}${it.priorityManual ? ' (a mano)' : ''}</dd>${it.owner ? `<dt>Responsable</dt><dd>${esc(it.owner)}</dd>` : ''}${it.since ? `<dt>Último contacto</dt><dd>${esc(ago(it.since))}${it.lastText ? ` · ${esc(it.lastText)}` : ''}</dd>` : ''}${it.blocked ? `<dt>Bloqueada</dt><dd style="color:var(--bad-text)">${esc(it.blocked)}</dd>` : ''}${it.dueAt ? `<dt>Programada</dt><dd>${esc(dayTime(it.dueAt))}</dd>` : ''}</dl>
+          <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${Object.entries(situations).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
+          <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${Object.entries(situations).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
+          <div class="section"><h3>Prioridad y responsable</h3><div class="btns">${['alta', 'media', 'baja'].map((p) => `<button class="btn small ${it.priority === p ? 'primary' : ''}" type="button" data-fu="priority" data-fu-priority="${p}">${F.PRIORITY_LABEL[p]}</button>`).join('')}<button class="btn small ghost" type="button" data-fu="priority" data-fu-priority="">Automática</button></div>
+            ${t.unit === 'turnia' ? `<form class="btns" data-fu-owner><input class="input" name="responsable" list="fu-owners" value="${esc(it.owner || '')}" placeholder="Facu, Axel…" style="flex:1 1 120px" aria-label="Responsable"><datalist id="fu-owners"><option>Facu</option><option>Axel</option>${me ? `<option>${esc(me)}</option>` : ''}</datalist><button class="btn small" type="submit">Asignar</button></form>` : '<p class="sub" style="margin:0">En habita. el responsable es el SDR de la cuenta.</p>'}</div>
+          ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
+        </section>
+        <section class="card glass"><h2>Mensaje</h2>
+          ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}
+            ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
+            ${t.notes ? `<div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes)}</p></div>` : ''}`
+          : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !it.blocked && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
+          <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
+        </section>
+        <section class="card glass"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
+          ${exec && t.checklist.length ? `<ul class="history" data-testid="fu-checklist">${t.checklist.map((c) => `<li data-check="${esc(c.key)}" data-ok="${c.ok}"><time>${c.ok ? '✓' : '✗'}</time><span><strong>${esc(c.label)}</strong>${c.note ? ` · ${esc(c.note)}` : ''}</span></li>`).join('')}</ul>` : ''}
+          ${exec ? `<div class="btns">${t.whatsappUrl ? `<button class="btn primary" type="button" data-fu="open" data-testid="fu-open">${icon.wa} Abrir WhatsApp</button>` : ''}<button class="btn ${t.whatsappUrl ? '' : 'primary'}" type="button" data-fu="confirm" data-testid="fu-confirm" data-arm="Confirmar: el mensaje salió">Confirmar envío</button></div>
+            <p class="sub" style="margin:0">Abrir el chat no cuenta. Confirmá cuando lo veas enviado; si el número del chat no coincide, no lo mandes.</p>
+            <form class="section" data-fu-fail><h3>No salió</h3><input class="input" name="motivo" placeholder="Por qué" aria-label="Motivo"><select class="input" name="tipo" aria-label="Tipo"><option value="">Otro motivo</option><option value="sin_whatsapp">No tiene WhatsApp</option><option value="numero_incorrecto">Número incorrecto</option></select><button class="btn small" type="submit">Registrar que no salió</button></form>` : ''}
+          <form class="section" data-fu-snooze><h3>Omitir o reprogramar</h3><div class="btns">${[['1', 'Mañana'], ['3', 'En 3 días'], ['7', 'En una semana']].map(([d, l]) => `<button class="btn small" type="button" data-fu="snooze-days" data-fu-days="${d}">${l}</button>`).join('')}</div><input class="input" type="date" name="hasta" aria-label="Otra fecha"><input class="input" name="motivo" placeholder="Motivo (opcional)"><button class="btn small" type="submit">Reprogramar</button>${it.snoozedUntil ? `<button class="btn small ghost" type="button" data-fu="unsnooze">Volver a la cola</button>` : ''}</form>
+          ${exec ? `<button class="btn ghost" type="button" data-fu="next-after">Siguiente pendiente →</button>` : ''}
+        </section>
+      </div>`;
+  }
+
+  /** La cuenta de la planilla o de la app que corresponde a esta tarea (para abrir su ficha). */
+  function fuAccount(unit, it) {
+    const d = state.data[unit];
+    if (!d || !d.accounts || !it) return null;
+    const name = String(it.name || '').trim().toLowerCase();
+    return d.accounts.find((a) => (it.code && a.id === it.code) || a.id === it.id) || d.accounts.find((a) => name && (String(a.org || '').trim().toLowerCase() === name || String(a.name || '').trim().toLowerCase() === name)) || null;
+  }
+
+  /** En la ficha: lo que dice la bandeja (situación, próxima acción, quién la tiene). */
+  function fuForAccount(a, unit) {
+    const n = state.fu.n;
+    if (!n) return null;
+    const name = String(a.org || a.name || '').trim().toLowerCase();
+    return [...n.queue, ...n.scheduled, ...n.blocked].find((x) => x.unit === unit && (x.code === a.id || x.id === a.id || (name && x.name.trim().toLowerCase() === name))) || null;
+  }
+  function productActivity(a, u) {
+    const link = u.demoLink(a);
+    const facts = [
+      link ? ['Su demo', `<a href="${esc(link)}" target="_blank" rel="noopener">${esc(link.replace(/^https?:\/\//, ''))}</a>`] : null,
+      a.demoOpened ? ['Abrió la demo', esc(when(a.demoOpened))] : null,
+      a.demoTried ? ['Probó la demo', esc(when(a.demoTried))] : null,
+      a.demoChat ? ['Conversó en la demo', esc(when(a.demoChat))] : null,
+      a.accountAt ? ['Cuenta creada', `${esc(when(a.accountAt))}${a.accountClinic ? ` · ${esc(a.accountClinic)}` : ''}`] : null,
+      a.accountActive ? ['Cuenta activa', esc(when(a.accountActive))] : null,
+      a.operationalAt ? ['Operativa desde', esc(when(a.operationalAt))] : null,
+      a.clientAt ? ['Cliente desde', esc(when(a.clientAt))] : null,
+    ].filter(Boolean);
+    const fu = fuForAccount(a, u.id);
+    return `${fu ? `<div class="section"><h3>Operación comercial · Follow-up</h3><p style="margin:0"><strong>${esc(fu.action || fu.actionReason || 'Sin acción')}</strong> · ${esc(fu.stageTitle)}${fu.situationLabel ? ` · ${esc(fu.situationLabel)}` : ''}</p><p class="sub" style="margin:0">${fu.claim ? `Lo tiene ${esc(fu.claim.by)}` : fu.blocked ? esc(fu.blocked) : fu.dueAt ? `Sale ${esc(dayTime(fu.dueAt))}` : 'En la cola'}${fu.owner ? ` · responsable ${esc(fu.owner)}` : ''}</p><div class="btns"><button class="btn small" type="button" data-fu="from-ficha" data-fu-key="${esc(fu.key)}">Abrir en la bandeja</button></div></div>` : ''}
+      <div class="section"><h3>Actividad de producto</h3>${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>` : `<p class="sub" style="margin:0">Todavía no hay actividad en ${esc(u.name)}.</p>`}</div>`;
+  }
+
+  // ── Eventos de la bandeja ──
+  document.addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-fu], [data-fu-open]');
+    if (!t || !main.contains(t) && !$('#drawer').contains(t)) return;
+    const ds = t.dataset;
+    if (ds.fu === undefined && ds.fuOpen) {
+      if (e.target.closest('button, a')) return;
+      const it = fuFind(ds.fuOpen);
+      if (it) { state.fu.task = { unit: it.unit, mode: 'ver', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      return;
+    }
+    if (ds.arm && ds.armed !== '1') return; // la confirmación en dos clics la maneja el panel
+    const task = state.fu.task;
+    const it = task && task.item;
+    const fields = () => ({ ...F.taskFields(it), ...(task.versionId ? { version: task.versionId } : {}), ...(task.actionKey ? { tarea: task.actionKey } : {}), ...(task.stage ? { etapa: task.stage } : {}) });
+    switch (ds.fu) {
+      case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); render(); break;
+      case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
+      case 'reload': loadFollowup(); break;
+      case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
+      case 'next': await fuNext(); break;
+      case 'back': state.fu.task = null; render(); loadFollowup({ quiet: true }); break;
+      case 'release': if (await fuOp(task.unit, { op: 'release', inmobiliaria: it.id }, { label: 'Quedó libre.' })) { state.fu.task = null; loadFollowup(); } break;
+      case 'copy': copy(task.messages[Number(ds.fuIndex)] || task.message); break;
+      case 'open':
+        if (await fuOp(task.unit, { op: 'open', ...fields() })) window.open(task.whatsappUrl, 'chapa-whatsapp');
+        break;
+      case 'confirm': {
+        const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: task.messages.join('\n\n') || task.message }, { label: 'Envío confirmado.' });
+        if (r) { state.fu.task = null; await loadFollowup({ quiet: true }); render(); }
+        break;
+      }
+      case 'next-after': await fuNext(); break;
+      case 'priority': if (await fuOp(task.unit, { op: 'priority', inmobiliaria: it.id, prioridad: ds.fuPriority || null }, { label: 'Prioridad guardada.' })) { it.priority = ds.fuPriority || it.priority; it.priorityManual = Boolean(ds.fuPriority); render(); loadFollowup({ quiet: true }); } break;
+      case 'snooze-days': {
+        const d = new Date(Date.now() + Number(ds.fuDays) * 86400000);
+        d.setUTCHours(12, 0, 0, 0);
+        if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: d.toISOString() }, { label: `Reprogramada para el ${d.toLocaleDateString('es-AR')}.` })) { state.fu.task = null; loadFollowup(); }
+        break;
+      }
+      case 'unsnooze': if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, volver: true }, { label: 'Volvió a la cola.' })) { state.fu.task = null; loadFollowup(); } break;
+      case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); openDrawer(ds.fuAccount); break; }
+      case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
+      case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
+      case 'rule-toggle': {
+        const snap = state.fu.n.units[ds.fuUnitId];
+        const rule = snap && (snap.rules || []).find((r) => r.key === ds.fuRule);
+        if (rule && await fuOp(ds.fuUnitId, { op: 'rule-save', key: rule.key, valores: { ...rule, enabled: !rule.enabled } }, { label: rule.enabled ? 'Regla apagada.' : 'Regla prendida.' })) loadFollowup();
+        break;
+      }
+      default: break;
+    }
+  });
+  document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form]')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const fd = Object.fromEntries(new FormData(form));
+    const task = state.fu.task;
+    const it = task && task.item;
+    if (form.matches('[data-fu-version-form]')) {
+      const unit = form.dataset.fuUnitId;
+      const valores = { stage: form.dataset.fuStage, channel: 'whatsapp', trigger: '', body: fd.body, ctas: unit === 'habita' ? ['whatsapp', 'demo', 'copy'] : ['whatsapp', 'demo', 'copy'], status: fd.status };
+      if (await fuOp(unit, { op: 'version-create', valores }, { label: 'Versión guardada.' })) loadFollowup();
+      return;
+    }
+    if (!task) return;
+    if (form.matches('[data-fu-situation]')) {
+      if (await fuOp(task.unit, { op: 'situation', inmobiliaria: it.id, situacion: fd.situacion, texto: fd.texto }, { label: 'Situación guardada.' })) { state.fu.task = null; loadFollowup(); }
+    } else if (form.matches('[data-fu-reply]')) {
+      if (await fuOp(task.unit, { op: 'reply', inmobiliaria: it.id, texto: fd.texto, ...(fd.clasificacion ? { clasificacion: fd.clasificacion, confianza: 1 } : {}) }, { label: 'Respuesta registrada.' })) { state.fu.task = null; loadFollowup(); }
+    } else if (form.matches('[data-fu-owner]')) {
+      if (await fuOp(task.unit, { op: 'owner', inmobiliaria: it.id, responsable: fd.responsable }, { label: 'Responsable asignado.' })) { it.owner = fd.responsable; render(); loadFollowup({ quiet: true }); }
+    } else if (form.matches('[data-fu-fail]')) {
+      if (!fd.motivo && !fd.tipo) { toast('Contá por qué no salió.', true); return; }
+      const f = { ...F.taskFields(it), ...(task.versionId ? { version: task.versionId } : {}), ...(task.actionKey ? { tarea: task.actionKey } : {}), ...(task.stage ? { etapa: task.stage } : {}) };
+      if (await fuOp(task.unit, { op: 'fail', ...f, motivo: fd.motivo, ...(fd.tipo ? { tipo: fd.tipo } : {}) }, { label: 'Registrado: no salió.' })) { state.fu.task = null; loadFollowup(); }
+    } else if (form.matches('[data-fu-snooze]')) {
+      if (!fd.hasta) { toast('Elegí la fecha.', true); return; }
+      const until = new Date(`${fd.hasta}T09:00:00-03:00`).toISOString();
+      if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: until, motivo: fd.motivo }, { label: 'Reprogramada.' })) { state.fu.task = null; loadFollowup(); }
+    }
+  }, true);
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+  });
+  document.addEventListener('toggle', (e) => {
+    if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
+  }, true);
+  document.addEventListener('input', (e) => {
+    if (!e.target.matches('[data-fu-search]')) return;
+    state.fu.f.q = e.target.value;
+    clearTimeout(e.target._t);
+    e.target._t = setTimeout(() => { const pos = e.target.selectionStart; render(); const s = $('[data-fu-search]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); } }, 200);
+  });
+  // La cola se relee cada minuto mientras se mira (así se ve lo que toma la otra persona).
+  setInterval(() => {
+    if (document.visibilityState === 'visible' && isFu() && !state.fu.task && !state.fu.busy && !state.demo) loadFollowup({ quiet: true });
+  }, 60000);
 
   // ─── Eventos ────────────────────────────────────────────────
   document.addEventListener('click', async (e) => {
@@ -1975,6 +2406,7 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
       Promise.all(units().map((u) => loadUnit(u.id, { quiet: true }))).then(render);
+      if (isFu() && !state.fu.task) loadFollowup({ quiet: true });
     }
   });
 

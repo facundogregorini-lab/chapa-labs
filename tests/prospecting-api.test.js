@@ -158,7 +158,7 @@ test('Turnia con la clave: las acciones van a su API y vuelve la fila nueva', as
     assert.equal(data.body.viaApi, true);
     const r = await call('action', { method: 'POST', cookie, body: { unit: 'turnia', id: 'ana-111', action: { type: 'sent', channel: 'whatsapp', kind: 'saludo' } } });
     assert.equal(r.statusCode, 200, JSON.stringify(r.body));
-    assert.equal(sent.url, 'https://turniasalud.vercel.app/api/prospeccion');
+    assert.equal(sent.url, 'https://turniasalud.app/api/prospeccion');
     assert.equal(sent.auth, `Bearer ${'s'.repeat(40)}`);
     assert.deepEqual(sent.body.action, { type: 'sent', channel: 'whatsapp', kind: 'saludo' });
     assert.equal(sent.body.code, 'ana-111');
@@ -359,6 +359,71 @@ test('habita.: «Traer la planilla» manda la pestaña tal como se ve a su API',
     assert.equal(turnia.statusCode, 400);
   } finally {
     global.fetch = realFetch;
+    delete process.env.HABITA_METRICS_SECRET;
+  }
+});
+
+test('Turnia: las filas salen de su base (?vista=filas); si su API no las tiene, de la planilla', async () => {
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  book.tabs['Prospección'] = [['Código', 'Nombre', 'Estado', 'Mensajes'], ['ana-111', 'Ana', 'Por contactar', '0']];
+  const realFetch = global.fetch;
+  const urls = [];
+  let rows = true;
+  global.fetch = async (url) => {
+    urls.push(String(url));
+    if (String(url).includes('vista=filas')) {
+      if (!rows) return { ok: false, status: 404, json: async () => ({ error: 'no' }) };
+      return { ok: true, status: 200, json: async () => ({ header: ['Código', 'Nombre', 'Estado', 'Mensajes', 'Fuente'], rows: [['ana-111', 'Ana', 'Respondió', 1, 'Lista 4 · Maps'], ['beto-222', 'Beto', 'Por contactar', 0, '']], events: [{ at: '2026-11-08 10:00', id: 'ana-111', account: 'Ana', type: 'mensaje', channel: 'whatsapp' }] }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ templates: [], clinics: [] }) };
+  };
+  try {
+    let data = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.equal(data.body.rowsFromApi, true);
+    assert.deepEqual(data.body.accounts.map((a) => [a.id, a.stage, a.campaign]), [['ana-111', 'respondio', 'Lista 4'], ['beto-222', 'por_contactar', '']]);
+    assert.equal(data.body.events.length, 1);
+    assert.ok(urls.some((u) => u === 'https://turniasalud.app/api/prospeccion?vista=filas'));
+    rows = false;
+    data = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.equal(data.body.rowsFromApi, false);
+    assert.deepEqual(data.body.accounts.map((a) => a.id), ['ana-111']);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});
+
+test('Follow-up: junta la cola de cada unidad y manda cada acción a su app a nombre de quien opera', async () => {
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  process.env.HABITA_METRICS_SECRET = 'h'.repeat(40);
+  const realFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push({ url: u, method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
+    if (u.includes('habitaia') && u.includes('vista=followup')) return { ok: true, status: 200, json: async () => ({ summary: { ready: 2 }, queue: [{ agencyId: 'a1' }] }) };
+    if (u.includes('turniasalud') && u.includes('vista=followup')) return { ok: false, status: 400, json: async () => ({ error: 'Falta la persona o la acción.' }) };
+    if (opts.method === 'POST' && u.includes('turniasalud')) return { ok: false, status: 409, json: async () => ({ error: 'Ana la está ejecutando Facu.' }) };
+    return { ok: true, status: 200, json: async () => ({ message: 'Hola', versionId: 'v1' }) };
+  };
+  try {
+    const q = await call('followup', { query: { unit: 'todas' }, cookie });
+    assert.equal(q.statusCode, 200);
+    assert.equal(q.body.units.habita.summary.ready, 2);
+    assert.match(q.body.units.turnia.error, /todavía no tiene la cola/);
+    const ok = await call('task', { method: 'POST', cookie, body: { unit: 'habita', followup: { op: 'claim', inmobiliaria: 'a1' } } });
+    assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.result.message, 'Hola');
+    const sent = calls.find((c) => c.method === 'POST' && c.url.includes('habitaia'));
+    assert.deepEqual(sent.body, { by: 'Axel', followup: { op: 'claim', inmobiliaria: 'a1' } });
+    const busy = await call('task', { method: 'POST', cookie, body: { unit: 'turnia', followup: { op: 'confirm', inmobiliaria: 'x' } } });
+    assert.equal(busy.statusCode, 409);
+    assert.equal(busy.body.error, 'Ana la está ejecutando Facu.');
+    const bad = await call('task', { method: 'POST', cookie, body: { unit: 'habita', followup: { op: 'borrar' } } });
+    assert.equal(bad.statusCode, 400);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
     delete process.env.HABITA_METRICS_SECRET;
   }
 });

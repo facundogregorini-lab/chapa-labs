@@ -25,8 +25,9 @@
     tab: 'Prospección',
     // Por eso las acciones no se escriben en la planilla: van a la API de Turnia (POST /api/prospeccion),
     // que aplica las mismas reglas que su panel y vuelve a copiar la planilla. Sin la clave, solo lectura.
-    api: { urlEnv: 'TURNIA_PROSPECTING_API_URL', url: 'https://turniasalud.vercel.app/api/prospeccion', secretEnvs: ['TURNIA_PROSPECTING_SECRET', 'TURNIA_METRICS_SECRET'] },
-    appUrl: 'https://turniasalud.vercel.app/panel/prospeccion',
+    // Las filas, de su base (?vista=filas); sin eso (o si falla), de la planilla espejo.
+    api: { urlEnv: 'TURNIA_PROSPECTING_API_URL', url: 'https://turniasalud.app/api/prospeccion', secretEnvs: ['TURNIA_PROSPECTING_SECRET', 'TURNIA_METRICS_SECRET'], rowsQuery: { vista: 'filas' } },
+    appUrl: 'https://turniasalud.app/panel/prospeccion',
     appName: 'el panel de Turnia',
     // La vista «Odontólogos»: la lista con el embudo de demos de habita. (de Facu), armada con estas cuentas.
     agencies: 'accounts',

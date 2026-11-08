@@ -96,6 +96,19 @@ Una sola tarjeta en un lugar fijo, para una persona o para un agente con compute
 - Leer las respuestas solas (WAHA en Turnia) en vez de mirar el chat para «¿respondió el saludo?».
 - Detectar en WhatsApp Web el aviso de número inválido sin que el agente lo tenga que leer.
 
+## Bandeja comercial: Follow-up de todas las unidades (08/11)
+
+Chapa Labs es la pantalla comercial única de habita. y Turnia. **No guarda ni recalcula la cola:** cada app la arma con sus etapas, sus reglas, sus bloqueos, sus tomas de 10 minutos y sus resultados (habita.: amoblaia `src/lib/followup`; Turnia: turniasalud `src/lib/sales/followup-queue.ts`). Chapa la lee, la junta (`prospecting/followup.js`, puro) y manda cada acción a la app de su unidad a nombre de quien opera.
+
+- **«Todas»** tiene las pestañas **Hoy** (la cola de las dos unidades: respuestas, demos pendientes, seguimientos y contactos nuevos; programadas y bloqueadas con su motivo), **Pipeline** (el embudo de cada producto con sus etapas, sin sumar etapas distintas), **Prospectos** (todos los que tienen una próxima acción), **Secuencias** (reglas y versiones de cada producto; nueva versión, «Probar 50/50», activar, prender o apagar reglas de habita.), **Rendimiento** (por versión y por responsable) y **Resumen** (el de siempre). Filtros: producto, tipo de acción, prioridad, responsable y texto.
+- **En cada unidad**, la pestaña **Follow-up** muestra lo mismo filtrado a esa unidad.
+- **Ejecutar**: tocar una tarea la toma (claim) en la app; mientras la tenés, la otra persona ve «Lo tiene Facu» y no puede tomarla ni confirmarla. El detalle tiene tres partes, como el de habita.: contexto (situación, respuesta, prioridad, responsable, historia), mensaje (paso a paso, con copiar) y checklist con Abrir WhatsApp, Confirmar envío (en dos clics), No salió, Reprogramar y Siguiente pendiente. Confirmar es idempotente en las dos apps.
+- **La ficha** de cada cuenta suma «Operación comercial · Follow-up» (su próxima acción y quién la tiene) y «Actividad de producto» (demo, visitas, cuenta, actividad, cliente).
+- **Turnia** ya no depende de la planilla espejo: las filas salen de su base (`GET /api/prospeccion?vista=filas`); si eso falla, se lee la planilla como antes.
+- **API de Chapa**: `GET ?op=followup&unit=todas` y `POST ?op=task { unit, followup: { op, ... } }`. Cada app recibe `{ by, followup }` en su `/api/prospeccion` con la clave de siempre.
+- La cola se relee cada minuto mientras se mira.
+- **El panel sigue abierto sin contraseña** (decisión del 08/11): antes de compartir el link, poner `PROSPECTING_PASSWORD` en Vercel.
+
 ## Liquid glass
 
 Fondo: `prospecting/fondo.jpg`, «St. Moritz on an evening during the winter in Switzerland», de [GoodFreePhotos](https://www.goodfreephotos.com/Free-Stock-Photos/st-moritz-on-an-evening-during-the-winter-in-switzerland.jpg.php) (CC0, dominio público). Para cambiarlo alcanza con reemplazar el archivo; sin archivo queda la luz de color.
@@ -147,7 +160,7 @@ El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel
 
 **habita. (sin su API).** El panel reconoce sus columnas (Inmobiliaria, SDR, Número, Confianza del número, Estado, Fecha envío, Grupo Habita…), escribe con su mismo vocabulario («Enviado», «Número incorrecto», «No interesado») y la fecha de envío como día, así que la sincronización por hora con `/admin/prospeccion` (`scripts/prospeccion-sync.gs` en amoblaia) sigue funcionando. «Motivo / próximo paso» (la nota de la investigación) se muestra como señal y no se pisa: el próximo paso del panel va en una columna propia que se agrega al primer cambio. En la vista de la unidad, «Preparar la planilla» agrega las pestañas Actividad y Mensajes.
 
-**Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel reescribe la pestaña «Prospección» entera. Por eso el panel la **lee** (siempre al día) pero **no la escribe**: cada acción de `/prospecting/turnia` va a la API de Turnia (`POST https://turniasalud.vercel.app/api/prospeccion`), que aplica las mismas reglas que su panel (saludo primero, tres mensajes, la baja para siempre, PostHog) y vuelve a copiar la planilla.
+**Turnia.** Su planilla la escribe la app de Turnia: con cada cambio en su panel reescribe la pestaña «Prospección» entera. Por eso el panel la **lee** (siempre al día) pero **no la escribe**: cada acción de `/prospecting/turnia` va a la API de Turnia (`POST https://turniasalud.app/api/prospeccion`), que aplica las mismas reglas que su panel (saludo primero, tres mensajes, la baja para siempre, PostHog) y vuelve a copiar la planilla.
 
 - La clave: `TURNIA_METRICS_SECRET` en chapa-labs (la misma que `METRICS_SECRET` en Turnia, que ya usa `/api/metricas`). Si se quiere una clave aparte para escribir: `TURNIA_PROSPECTING_SECRET` acá y `PROSPECTING_API_SECRET` en Turnia. Otra URL: `TURNIA_PROSPECTING_API_URL`.
 - Sin clave, Turnia queda en solo lectura y la ficha lleva al panel de Turnia.
@@ -210,5 +223,7 @@ Cada paso de la planilla incluye a los siguientes (quien conversó en la demo ta
 
 - Probar en vivo con las dos planillas reales (se probó con planillas simuladas con sus mismas columnas y con el modo de ejemplo).
 - Señales de demo de habita. por cuenta (hoy su `/api/metricas` da solo totales): un endpoint por cuenta en amoblaia, o que su panel escriba «Abrió la demo» en la planilla.
-- Leer respuestas solas desde WAHA (Turnia) para no tener que marcar «Respondió» a mano.
+- Leer respuestas solas desde WAHA (Turnia) para no tener que marcar «Respondió» a mano (hoy se registran en la tarea, «Registrar una respuesta»).
+- Crear una demo de habita. desde Chapa: falta una API segura en amoblaia; por ahora, «Su panel» abre el editor.
+- Login por persona (hoy el panel queda abierto, por decisión del usuario).
 - Pasar de la planilla a una base cuando el volumen lo pida: el motor no cambia, solo `api/prospecting.js`.
