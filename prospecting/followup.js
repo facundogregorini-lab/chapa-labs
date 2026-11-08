@@ -214,5 +214,28 @@
     return rows.sort((a, b) => b.executions - a.executions);
   }
 
-  return { GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  /**
+   * La lectura diaria de WhatsApp de una unidad (hoy solo Turnia: lee los chats de sus dos líneas de
+   * WAHA y abre las respuestas nuevas), lista para mostrar. null si la unidad no la tiene.
+   */
+  function whatsapp(n, unit = 'turnia') {
+    const snap = n && n.units && n.units[unit];
+    if (!snap || !('whatsapp' in snap)) return null;
+    const r = snap.whatsapp;
+    if (!r) return { unit, never: true, lines: [], pending: [], totals: null, at: null };
+    const lines = (r.lines || []).map((l) => ({
+      line: l.line,
+      ok: l.status === 'ok',
+      text: l.status === 'ok'
+        ? `${l.prospects || 0} de la base con chat${l.unread ? ` (${l.unread} sin leer: se completan en la próxima)` : ''}`
+        : l.status === 'sin_configurar' ? 'Sin conectar: falta su WAHA en Turnia' : l.problem || 'No se pudo leer',
+    }));
+    const pending = (r.pending || []).map((p) => {
+      const it = (n.queue.concat(n.scheduled, n.blocked)).find((x) => x.unit === unit && x.code === p.code);
+      return { ...p, key: it ? it.key : null };
+    });
+    return { unit, never: false, at: r.at, trigger: r.trigger || '', totals: r.totals || {}, lines, pending };
+  }
+
+  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });

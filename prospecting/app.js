@@ -1675,6 +1675,26 @@
       <div class="acts">${action}</div></div>`;
   }
 
+  /** La lectura diaria de los chats de WhatsApp de Turnia: cómo estamos y a quién falta contestarle. */
+  function fuWhatsapp(scope) {
+    if (scope !== 'todas' && scope !== 'turnia') return '';
+    const w = F.whatsapp(state.fu.n, 'turnia');
+    if (!w) return '';
+    const btn = `<button class="btn small" type="button" data-fu="wa-sync" ${state.fu.waBusy ? 'disabled' : ''}>${state.fu.waBusy ? 'Leyendo los chats…' : 'Leer WhatsApp ahora'}</button>`;
+    if (w.never) return `<section class="card glass" aria-label="WhatsApp de Turnia"><div class="block-head" style="cursor:default"><div><h3>WhatsApp de Turnia</h3><p class="sub" style="margin:0">Todavía no se leyeron los chats. Se leen solos una vez por día, a las 8.</p></div>${btn}</div></section>`;
+    const t = w.totals;
+    const shown = state.more['fu-wa'] ? 1e9 : 8;
+    return `<section class="card glass" aria-label="WhatsApp de Turnia" data-testid="fu-whatsapp"><div class="block-head" style="cursor:default"><div><h3>WhatsApp de Turnia</h3><p class="sub" style="margin:0">Leído ${esc(ago(w.at))}${w.trigger ? ` · ${esc(w.trigger)}` : ''} · ${w.lines.map((l) => `<span class="badge ${l.ok ? 'live' : 'off'}">${esc(l.line)}</span> ${esc(l.text)}`).join(' · ')}</p></div>${btn}</div>
+      <div class="kpis">
+        ${kpi('Conversaciones', int(t.conversaciones), 'Personas a las que les escribimos')}
+        ${kpi('Respondieron', int(t.respondieron), t.conversaciones ? `${Math.round((t.respondieron / t.conversaciones) * 100)}% de las conversaciones` : '')}
+        ${kpi('Esperan respuesta', int(t.esperanRespuesta), 'El último mensaje es de ellos')}
+        ${kpi('Nuevas', int(t.nuevas), `${int(t.abiertas)} pasaron a Respuestas`)}
+      </div>
+      ${w.pending.length ? `<div class="rows">${w.pending.slice(0, shown).map((p) => `<div class="arow" data-testid="fu-wa-pending"><div class="who"><strong>${esc(p.name)}</strong><div class="meta"><span>Al ${esc(p.line)}</span>·<span>${esc(p.at)}</span></div><div class="meta" style="white-space:pre-wrap">«${esc(p.text)}»</div></div><div class="acts">${p.key ? `<button class="btn small" type="button" data-fu="from-ficha" data-fu-key="${esc(p.key)}">Abrir</button>` : ''}</div></div>`).join('')}${w.pending.length > shown ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="fu-wa">Ver los ${int(w.pending.length - shown)} restantes</button></div>` : ''}</div>` : ''}
+    </section>`;
+  }
+
   function fuHoy() {
     const scope = fuScope();
     const f = state.fu.f;
@@ -1696,6 +1716,7 @@
         ${kpi('Bloqueadas', int(s.blocked), 'Con el motivo a la vista')}
         ${kpi('Hechas hoy', int(s.doneToday), `${int(s.newToday)} contactos nuevos`)}
       </div></section>
+      ${fuWhatsapp(scope)}
       ${fuToolbar()}
       ${groups.length ? groups.map(([g, l]) => `<section class="card glass block" data-open="true" aria-label="${esc(F.GROUP_LABEL[g])}"><div class="block-head" style="cursor:default"><div><h3>${esc(F.GROUP_LABEL[g])} <span class="count num">${l.length}</span></h3></div></div><div class="rows">${l.slice(0, shown(g)).map((x) => fuRow(x)).join('')}${l.length > shown(g) ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="fu-${g}">Ver los ${int(l.length - shown(g))} restantes</button></div>` : ''}</div></section>`).join('') : '<section class="card glass"><p class="empty">Nada para ejecutar con estos filtros.</p></section>'}
       <details class="card glass" ${state.fu.open.sched ? 'open' : ''} data-fu-details="sched"><summary><strong>Programadas</strong> <span class="count num">${sched.length}</span> <span class="sub">· su paso sale más adelante</span></summary><div class="rows">${sched.slice(0, 50).map((x) => fuRow(x, { button: false })).join('') || '<p class="empty">Ninguna.</p>'}</div></details>
@@ -1880,6 +1901,14 @@
       case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); render(); break;
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
       case 'reload': loadFollowup(); break;
+      case 'wa-sync': {
+        state.fu.waBusy = true; render();
+        const r = await fuOp('turnia', { op: 'whatsapp-sync' });
+        state.fu.waBusy = false;
+        if (r && r.whatsapp) toast(r.whatsapp.reused ? 'Se leyó hace menos de 10 minutos: es la última lectura.' : `Listo: ${int(r.whatsapp.totals.nuevas)} respuestas nuevas.`);
+        loadFollowup();
+        break;
+      }
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
       case 'next': await fuNext(); break;
       case 'back': state.fu.task = null; render(); loadFollowup({ quiet: true }); break;

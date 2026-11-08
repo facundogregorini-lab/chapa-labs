@@ -427,3 +427,27 @@ test('Follow-up: junta la cola de cada unidad y manda cada acción a su app a no
     delete process.env.HABITA_METRICS_SECRET;
   }
 });
+
+test('WhatsApp de Turnia: el cron diario pide la lectura sin sesión y solo devuelve los totales', async () => {
+  const realFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    calls.push({ url: String(url), method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
+    return { ok: true, status: 200, json: async () => ({ whatsapp: { totals: { conversaciones: 10, respondieron: 3 }, lines: [{ line: '0022', status: 'ok', chats: 40 }], pending: [{ name: 'Ana', text: 'hola' }] } }) };
+  };
+  try {
+    const none = await call('whatsapp-cron');
+    assert.equal(none.statusCode, 403);
+    assert.equal(calls.length, 0);
+    process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+    const r = await call('whatsapp-cron');
+    assert.equal(r.statusCode, 200, JSON.stringify(r.body));
+    assert.deepEqual(r.body, { ok: true, totals: { conversaciones: 10, respondieron: 3 }, lines: [{ line: '0022', status: 'ok' }] });
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /turniasalud/);
+    assert.deepEqual(calls[0].body, { by: 'Lectura diaria', followup: { op: 'whatsapp-sync' } });
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});

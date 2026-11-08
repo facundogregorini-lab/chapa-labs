@@ -91,3 +91,29 @@ test('versiones, reglas y resultados por quien ejecutó, con los números de cad
   const n = F.normalize({ habita, turnia }, NOW);
   assert.deepEqual(F.actorRows(n).map((r) => [r.unit, r.actor, r.executions]), [['habita', 'Facundo', 40], ['turnia', 'Facu', 3]]);
 });
+
+test('WhatsApp: la última lectura de Turnia, con cada pendiente vinculado a su tarea', () => {
+  const units = {
+    turnia: {
+      queue: [], scheduled: [], blocked: [{ id: 't1', code: 'ana-a1', name: 'Ana', stage: 'converso-sin-cuenta', blocked: 'Fuera de horario' }],
+      whatsapp: {
+        at: '2026-11-08T11:00:00Z', trigger: 'Lectura diaria',
+        lines: [{ line: '0022', status: 'ok', chats: 40, prospects: 12, read: 12, unread: 0 }, { line: '5483', status: 'sin_configurar' }, { line: '9999', status: 'error', problem: 'store' }],
+        totals: { conversaciones: 12, respondieron: 4, esperanRespuesta: 2, nuevas: 1, abiertas: 1 },
+        pending: [{ code: 'ana-a1', name: 'Ana', line: '0022', at: '2026-11-07 10:00', text: 'me interesa' }, { code: 'otro', name: 'Otro', line: '0022', at: '2026-11-07 11:00', text: 'x' }],
+      },
+    },
+    habita: { queue: [], scheduled: [], blocked: [] },
+  };
+  const n = F.normalize(units, NOW);
+  const w = F.whatsapp(n);
+  assert.equal(w.totals.respondieron, 4);
+  assert.deepEqual(w.lines.map((l) => [l.line, l.ok, l.text]), [
+    ['0022', true, '12 de la base con chat'],
+    ['5483', false, 'Sin conectar: falta su WAHA en Turnia'],
+    ['9999', false, 'store'],
+  ]);
+  assert.deepEqual(w.pending.map((p) => p.key), ['turnia:t1', null]);
+  assert.equal(F.whatsapp(n, 'habita'), null);
+  assert.equal(F.whatsapp(F.normalize({ turnia: { queue: [], whatsapp: null } }, NOW)).never, true);
+});

@@ -107,6 +107,7 @@ Chapa Labs es la pantalla comercial única de habita. y Turnia. **No guarda ni r
 - **Turnia** ya no depende de la planilla espejo: las filas salen de su base (`GET /api/prospeccion?vista=filas`); si eso falla, se lee la planilla como antes.
 - **API de Chapa**: `GET ?op=followup&unit=todas` y `POST ?op=task { unit, followup: { op, ... } }`. Cada app recibe `{ by, followup }` en su `/api/prospeccion` con la clave de siempre.
 - La cola se relee cada minuto mientras se mira.
+- **WhatsApp de Turnia** (en Hoy, con «Todas» o Turnia): la lectura diaria de los chats de sus dos líneas de WAHA (0022 y 5483). Muestra cuándo se leyó, el estado de cada línea, conversaciones, cuántos respondieron, cuántos esperan respuesta (el último mensaje es de ellos) y las respuestas nuevas, con la lista de a quién falta contestarle y «Abrir». La lee Turnia (no manda nada) y cada respuesta nueva pasa sola a «Respuestas para atender». El cron de Vercel (`vercel.json`, todos los días a las 8 de Argentina) llama `GET /api/prospecting?op=whatsapp-cron`, que no pide sesión, solo dispara la lectura y devuelve los totales; el botón «Leer WhatsApp ahora» hace lo mismo con `POST ?op=task { unit: "turnia", followup: { op: "whatsapp-sync" } }`. Turnia no repite una lectura de menos de 10 minutos.
 - **El panel sigue abierto sin contraseña** (decisión del 08/11): antes de compartir el link, poner `PROSPECTING_PASSWORD` en Vercel.
 
 ## Liquid glass

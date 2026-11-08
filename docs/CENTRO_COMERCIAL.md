@@ -104,8 +104,8 @@ Implementación:
 
 ## Cómo probar
 
-- **Chapa:** `npm test` (56 tests). Para mirarlo en el navegador sin tocar producción, se puede levantar un servidor local que cargue `api/prospecting.js` con `_google.js` simulado y `global.fetch` devolviendo colas de ejemplo. Así se hizo la verificación del 08/11; el servidor no quedó en el repo.
-- **Turnia:** levantar un Postgres local y correr `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npx vitest run` (540 tests). Las pruebas de la cola están en `src/test/followup-queue.integration.test.ts`. CI corre `npx next typegen` antes de `tsc`.
+- **Chapa:** `npm test` (58 tests). Para mirarlo en el navegador sin tocar producción, se puede levantar un servidor local que cargue `api/prospecting.js` con `_google.js` simulado y `global.fetch` devolviendo colas de ejemplo. Así se hizo la verificación del 08/11; el servidor no quedó en el repo.
+- **Turnia:** levantar un Postgres local y correr `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npx vitest run` (544 tests). Las pruebas de la cola están en `src/test/followup-queue.integration.test.ts` y las de la lectura de WhatsApp en `src/test/whatsapp-sync.integration.test.ts`. CI corre `npx next typegen` antes de `tsc`.
 - **habita.:** `npx vitest run` (1265 tests); las pruebas de este contrato están en `tests/followup-chapa.test.ts`.
 
 ## Estado al 08/11/2026
@@ -128,7 +128,9 @@ Implementación:
    - Mínimo: poner `PROSPECTING_PASSWORD` (12 caracteres o más) en Vercel; ver `api/_session.js`.
    - Mejor: una contraseña por persona o Google, así el nombre de quien opera no se puede inventar.
 3. **Crear una demo de habita. desde Chapa.** Falta una API segura en amoblaia; hoy «Su panel» abre el editor. Turnia no lo necesita: cada prospecto tiene su demo `/p/<código>` desde que se importa.
-4. **Respuestas automáticas.** En Turnia, leerlas desde WAHA; hoy se registran a mano con «Registrar una respuesta». habita. tiene la bandeja con clasificación (`followup_replies`), alimentada por su extensión.
+4. **Respuestas automáticas.**
+   - **Turnia: hecho (08/11) con la lectura diaria de WhatsApp.** Turnia lee una vez por día los chats de sus dos líneas de WAHA (0022 y 5483), cruza con la base y pasa cada respuesta nueva a «Respuestas para atender» (detalle en turniasalud `CENTRO_COMERCIAL.md`). Chapa la dispara con su cron a las 8 y muestra el resumen en Hoy. Falta mirar la primera lectura real: si una línea dice «sin conectar», falta `WAHA_PROSPECCION_5483` en Vercel de Turnia; si dice «store», hay que prender el historial de esa sesión en WAHA.
+   - **habita.:** no usa WAHA. Su extensión de Chrome, que trabaja sobre WhatsApp Web, registra las respuestas con clasificación (`followup_replies`). Lo que se responda sin pasar por la extensión hay que registrarlo a mano.
 5. **Retirar lo repetido**, después de dos semanas sin diferencias entre Chapa y los paneles de cada producto:
    - La pestaña «Mensajes» de Chapa, que usa la planilla.
    - La cola «Hoy» por unidad, que Chapa calcula sobre la planilla.
