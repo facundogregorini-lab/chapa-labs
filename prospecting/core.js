@@ -389,6 +389,29 @@
     };
   }
 
+  /**
+   * La demo personal por versión (unit.demoVersions, con `from`/`until` en hora local «AAAA-MM-DD HH:mm»):
+   * cada persona va a la versión de su primera apertura, la única que queda con fecha. Lo que se compara
+   * es «abrieron → hablaron con Sofi»; «empezaron» (tocar «Probar la demo» o la esfera) no significa lo
+   * mismo en todas las versiones.
+   */
+  function demoVersions(accounts, unit) {
+    const vs = (unit && unit.demoVersions) || [];
+    if (!vs.length) return null;
+    const base = accounts.filter((a) => counted(a, unit));
+    return vs.map((v) => {
+      const list = base.filter((a) => {
+        const o = a.demoOpened;
+        if (!o || o === 'sí') return false;
+        return (!v.from || o >= v.from) && (!v.until || o < v.until);
+      });
+      const abrieron = list.length;
+      const empezaron = list.filter((a) => Boolean(a.demoTried || a.demoClinic)).length;
+      const hablaron = list.filter((a) => Boolean(a.demoChat)).length;
+      return { key: v.key, label: v.label, when: v.when || '', steps: v.steps || '', abrieron, empezaron, hablaron, rate: abrieron ? hablaron / abrieron : null };
+    });
+  }
+
   // ─── Actividad por día ──────────────────────────────────────
   const CONTACT_TYPES = ['saludo', 'mensaje', 'llamada', 'visita'];
   function daily(events, accounts, unit, range) {
@@ -797,6 +820,6 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, parseBulk, planBulk, freshContacts, usedPhones, targetFunnel, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, parseBulk, planBulk, freshContacts, usedPhones, targetFunnel, demoVersions, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

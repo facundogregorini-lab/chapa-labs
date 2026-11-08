@@ -408,3 +408,20 @@ test('Turnia: la lista sale de «Fuente» y los que pagan anuncios (Google o Met
   assert.deepEqual(ids('ads'), ['b', 'c', 'e']);
   assert.deepEqual(ids('tandil'), ['a', 'e']);
 });
+
+test('Turnia: la demo por versión, por la fecha de la primera apertura', () => {
+  const a = (id, demoOpened, extra = {}) => ({ id, stage: 'contactado', phoneKind: 'celular', touches: 1, firstContact: '2026-11-01 10:00', demoOpened, ...extra });
+  const accounts = [
+    a('1', '2026-11-03 10:00', { demoTried: '2026-11-03 10:01', demoChat: '2026-11-03 10:02' }),
+    a('2', '2026-11-05 18:00', { demoTried: '2026-11-05 18:01' }),
+    a('3', '2026-11-07 12:29'), // un minuto antes del corte: todavía con «Probar la demo»
+    a('4', '2026-11-07 12:32', { demoTried: '2026-11-07 12:32', demoChat: '2026-11-08 07:07' }),
+    a('5', '2026-11-08 06:26'),
+    a('6', ''), // no la abrió
+    a('7', 'sí'), // abierta sin fecha: no se sabe la versión
+  ];
+  const v = C.demoVersions(accounts, turnia);
+  assert.deepEqual(v.map((x) => [x.key, x.abrieron, x.empezaron, x.hablaron]), [['con_probar', 3, 2, 1], ['esfera', 2, 1, 1]]);
+  assert.equal(v[0].rate, 1 / 3);
+  assert.equal(C.demoVersions(accounts, habita), null);
+});
