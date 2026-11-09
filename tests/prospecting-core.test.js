@@ -97,24 +97,48 @@ test('cola de Turnia: saludo primero, nada a fijos, meta del día', () => {
   ]), turnia);
   const q = C.queue(accounts, turnia, { todayDay: '2026-11-03' });
   assert.deepEqual(q.fresh.map((a) => a.id), ['b', 'a']);
-  assert.equal(C.nextTemplate(q.fresh[0], turnia).key, 'whatsapp_saludo');
+  assert.equal(C.nextTemplate(q.fresh[0], turnia).key, 'whatsapp_abridor');
   assert.equal(C.nextTemplate(q.fresh[0], turnia).kind, 'saludo');
+});
+
+test('Turnia: la secuencia a la recepción (Paso 1, Paso 2, Paso 3 o Seguimiento 1 y los Seguimientos 2 y 3)', () => {
+  const key = (a) => (C.nextTemplate(a, turnia) || {}).key || null;
+  const base = { stage: 'saludado', phone: '2231111111', phoneKind: 'celular', touches: 0, greetingSent: '2026-11-09 09:00' };
+  assert.equal(key({ ...base, stage: 'por_contactar', greetingSent: '' }), 'whatsapp_abridor');
+  assert.equal(key(base), 'whatsapp_permiso');
+  // Respondió el saludo (Turnia lo deja «Respondió»): sigue el Paso 2.
+  assert.equal(key({ ...base, stage: 'respondio', lastReply: '2026-11-09 09:30' }), 'whatsapp_permiso');
+  const asked = { ...base, permissionSent: '2026-11-09 10:00', lastReply: '2026-11-09 09:30' };
+  assert.equal(key(asked), 'whatsapp_sin_respuesta', 'la respuesta al saludo no cuenta: es anterior al Paso 2');
+  assert.equal(key({ ...asked, lastReply: '2026-11-09 10:05' }), 'whatsapp_entrega');
+  const linked = { ...base, stage: 'contactado', touches: 1, lastContact: '2026-11-09 10:06', lastReply: '2026-11-09 10:05' };
+  assert.equal(key(linked), 'whatsapp_seguimiento');
+  assert.equal(key({ ...linked, lastReply: '2026-11-09 11:00' }), null, 'respondió después del link: lo atiende una persona');
+  assert.equal(key({ ...linked, touches: 2 }), 'whatsapp_reenviable');
+  assert.equal(key({ ...linked, touches: 3 }), null);
+  // El Paso 2 y la última respuesta vienen de las columnas de Turnia.
+  const { accounts } = C.toAccounts([
+    ['ID', 'Nombre', 'Teléfono', 'Estado', 'Mensajes', 'Saludo enviado', 'Paso 2 enviado', 'Última respuesta'],
+    ['a', 'Ana', '2231111111', 'Contactado', '0', '2026-11-09 09:00', '2026-11-09 10:00', '2026-11-09 10:05'],
+  ], turnia);
+  assert.equal(accounts[0].permissionSent, '2026-11-09 10:00');
+  assert.equal(key(accounts[0]), 'whatsapp_entrega');
 });
 
 test('acciones: el saludo no cuenta como mensaje y la secuencia agenda el seguimiento', () => {
   const { accounts } = C.toAccounts(sheet([['a', 'Ana', '2231111111', 'celular', 'MdP', '1', '', '', '', '']]), turnia);
   let a = accounts[0];
   const now = '2026-11-02 09:10';
-  let r = C.applyAction(a, { type: 'sent', kind: 'saludo', channel: 'whatsapp', template: 'whatsapp_saludo' }, { unit: turnia, now, by: 'Axel' });
+  let r = C.applyAction(a, { type: 'sent', kind: 'saludo', channel: 'whatsapp', template: 'whatsapp_abridor' }, { unit: turnia, now, by: 'Axel' });
   assert.equal(r.patch.stage, 'saludado');
   assert.equal(r.patch.touches, undefined);
   assert.equal(r.patch.firstContact, now);
   assert.equal(r.events[0].type, 'saludo');
   a = { ...a, ...r.patch };
-  r = C.applyAction(a, { type: 'sent', kind: 'mensaje', channel: 'whatsapp', template: 'whatsapp_1' }, { unit: turnia, now: '2026-11-02 13:00', by: 'Axel' });
+  r = C.applyAction(a, { type: 'sent', kind: 'mensaje', channel: 'whatsapp', template: 'whatsapp_entrega' }, { unit: turnia, now: '2026-11-02 13:00', by: 'Axel' });
   assert.equal(r.patch.touches, 1);
   assert.equal(r.patch.stage, 'contactado');
-  assert.equal(r.patch.nextAt, '2026-11-04');
+  assert.equal(r.patch.nextAt, '2026-11-03', 'el Seguimiento 2, al día hábil siguiente');
   assert.equal(r.patch.firstContact, undefined, 'el primer contacto no se pisa');
   a = { ...a, ...r.patch };
   r = C.applyAction(a, { type: 'outcome', outcome: 'reunion', detail: 'Martes 10 h' }, { unit: turnia, now: '2026-11-03 10:00', by: 'Axel' });
@@ -166,8 +190,10 @@ test('deshacer anula el último contacto en la actividad por día', () => {
 
 test('plantillas y link de WhatsApp', () => {
   const a = { name: 'Laura Pérez', title: 'Dra.', greeting: 'Laura', org: 'Consultorio Pérez', demoUrl: 'https://x.test/p/abc', phone: '223 155-123456' };
-  assert.equal(C.renderTemplate(turnia.templates.whatsapp_saludo_consultorio.text, a, turnia), '¡Buenas! ¿Hablo con el consultorio de la Dra. Pérez?');
-  assert.match(C.renderTemplate(turnia.templates.whatsapp_1.text, a, turnia), /https:\/\/x\.test\/p\/abc/);
+  assert.equal(C.renderTemplate(turnia.templates.whatsapp_abridor.text, a, turnia), 'Buenas! Hablo con la recepción de la Dra. Pérez?');
+  assert.match(C.renderTemplate(turnia.templates.whatsapp_entrega.text, a, turnia), /^Acá tenés: https:\/\/x\.test\/p\/abc\n/);
+  assert.doesNotMatch(C.renderTemplate(turnia.templates.whatsapp_permiso.text, a, turnia), /https?:/);
+  assert.equal(C.renderTemplate(turnia.templates.whatsapp_reenviable.text, a, turnia).split('\n---\n').length, 2);
   assert.equal(C.waLink('2235123456', 'hola'), 'https://wa.me/5492235123456?text=hola');
   assert.equal(C.waLink('+54 9 223 512-3456', ''), 'https://wa.me/5492235123456');
 });
