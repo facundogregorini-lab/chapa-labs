@@ -393,6 +393,43 @@ test('Turnia: las filas salen de su base (?vista=filas); si su API no las tiene,
   }
 });
 
+test('Turnia: «Responder» trae lo último que escribió cada uno (whatsappInbox) y marca a quien solo le contestó un bot', async () => {
+  process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
+  book.tabs['Prospección'] = [['Código', 'Nombre', 'Estado', 'Mensajes'], ['ana-111', 'Ana', 'Por contactar', '0']];
+  const realFetch = global.fetch;
+  global.fetch = async (url) => {
+    if (String(url).includes('vista=filas')) {
+      return { ok: true, status: 200, json: async () => ({
+        header: ['Código', 'Nombre', 'Estado', 'Mensajes', 'Último contacto'],
+        rows: [['ana-111', 'Ana', 'Respondió', 1, '2026-11-08 10:00'], ['bot-333', 'Bot', 'Respondió', 0, '2026-11-08 10:00'], ['beto-222', 'Beto', 'Contactado', 1, '2026-11-08 10:00']],
+        events: [],
+        whatsappSenders: { options: ['0022', '5483'], byCode: { 'ana-111': ['0022'] } },
+        whatsappInbox: { readAt: '2026-11-09 08:00', byCode: {
+          'ana-111': { chats: [{ line: '0022', inAt: '2026-11-09 07:50', inText: '¿Cuánto sale?', outAt: '2026-11-08 10:00', lastFromMe: false, received: 1, sent: 1, automatic: false }], manual: null },
+          'bot-333': { chats: [{ line: '5483', inAt: '2026-11-09 07:40', inText: 'Gracias por comunicarte con Odontología Sur!', outAt: '2026-11-08 10:00', lastFromMe: false, received: 1, sent: 1, automatic: true }], manual: null },
+        } },
+      }) };
+    }
+    return { ok: true, status: 200, json: async () => ({ templates: [], clinics: [] }) };
+  };
+  try {
+    const data = await call('data', { query: { unit: 'turnia' }, cookie });
+    assert.equal(data.body.whatsappReadAt, '2026-11-09 08:00');
+    const by = Object.fromEntries(data.body.accounts.map((a) => [a.id, a]));
+    assert.equal(by['ana-111'].chats[0].inText, '¿Cuánto sale?');
+    assert.deepEqual(by['ana-111'].whatsappSenders, ['0022']);
+    assert.equal(by['ana-111'].botOnly, undefined);
+    assert.equal(by['bot-333'].botOnly, true);
+    assert.equal(by['beto-222'].chats, undefined);
+    // El bot no cuenta como «Respondieron» en el embudo.
+    const f = require('../prospecting/core').funnel(data.body.accounts, require('../prospecting/units').UNITS.turnia);
+    assert.equal(f.respondieron, 1);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.TURNIA_METRICS_SECRET;
+  }
+});
+
 test('Follow-up: junta la cola de cada unidad y manda cada acción a su app a nombre de quien opera', async () => {
   process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
   process.env.HABITA_METRICS_SECRET = 'h'.repeat(40);

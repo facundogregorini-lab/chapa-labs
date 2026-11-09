@@ -453,3 +453,100 @@ test('Turnia: la demo por versión, por la fecha de la primera apertura', () => 
   assert.equal(v[0].rate, 1 / 3);
   assert.equal(C.demoVersions(accounts, habita), null);
 });
+
+// ─── Responder ───────────────────────────────────────────────
+const acc = (o) => ({ id: o.id, name: o.name || o.id, org: '', phone: o.phone || '', stage: o.stage || 'respondio', touches: o.touches || 0, lastContact: o.lastContact || '2026-11-08 10:00', greetingSent: o.greetingSent || '', permissionSent: o.permissionSent || '', title: 'Dra.', demoUrl: `https://turniasalud.app/p/${o.id}`, ...o });
+const chat = (inText, extra = {}) => ({ line: '0022', inAt: '2026-11-09 08:00', inText, outAt: '2026-11-08 10:00', lastFromMe: false, received: 1, sent: 1, automatic: false, ...extra });
+
+test('respuestas automáticas: las cortas, las de bienvenida y el aviso de Meta; una persona no', () => {
+  for (const t of ['Gracias por comunicarte con Odontología Sur!', 'Esta empresa usa un servicio seguro de Meta para administrar este chat.', '¡Bienvenido a Odontología Integral Luro! ¿En qué podemos ayudarte?', 'Hola! Nuestro horario es de lunes a viernes de 9 a 18 hs.', '*Respuesta automática* En este momento no podemos atenderte.']) assert.equal(C.isAutomaticReply(t), true, t);
+  for (const t of ['Hola, sí, ¿es por un turno?', 'Gracias por escribir! Me interesa, ¿cuánto sale?', 'No estamos interesados. Gracias.', 'Bienvenido!', 'Dale, pasame el link']) assert.equal(C.isAutomaticReply(t), false, t);
+});
+
+test('Responder: quienes escribieron último, sin los bots, una vez por número y de la más vieja a la más nueva', () => {
+  const accounts = [
+    acc({ id: 'ana', phone: '223 500-0001', chats: [chat('¿Cuánto sale?', { inAt: '2026-11-09 09:00' })] }),
+    // Le contestamos desde el celular: la lectura dice que lo último es nuestro.
+    acc({ id: 'caro', phone: '223 500-0003', chats: [chat('Hola', { lastFromMe: true })] }),
+    // Le contestamos y quedó registrado en el panel después de su respuesta.
+    acc({ id: 'dani', phone: '223 500-0004', lastContact: '2026-11-09 08:30', chats: [chat('Hola')] }),
+    acc({ id: 'bot', phone: '223 500-0005', chats: [chat('Gracias por comunicarte con el consultorio!', { automatic: true })] }),
+    // Dos personas con el mismo número: una sola fila (la respuesta más nueva).
+    acc({ id: 'uno', name: 'Pérez Uno', phone: '223 000-0066', chats: [chat('Sí, ¿quién habla?', { inAt: '2026-11-09 07:00' })] }),
+    acc({ id: 'dos', name: 'Pérez Dos', phone: '2230000066', chats: [chat('¿Es por un turno?', { inAt: '2026-11-09 07:30' })] }),
+    // La línea que no se lee: la respuesta cargada a mano.
+    acc({ id: 'eva', phone: '223 500-0006', whatsappSenders: ['5483'], manualReply: { at: '2026-11-09 06:00', text: '¿Lo puede usar el Dr.?', by: 'Axel' } }),
+    acc({ id: 'baja', phone: '223 500-0007', stage: 'baja', optOut: '2026-11-01', chats: [chat('No me escriban')] }),
+  ];
+  const { rows, bots } = C.inbox(accounts, turnia);
+  assert.deepEqual(rows.map((r) => r.a.id), ['eva', 'dos', 'ana']);
+  assert.deepEqual(rows.find((r) => r.a.id === 'dos').shared, ['Pérez Uno']);
+  assert.deepEqual(rows.find((r) => r.a.id === 'eva').lines, ['5483']);
+  assert.equal(rows.find((r) => r.a.id === 'eva').inbound.source, 'manual');
+  assert.deepEqual(bots.map((r) => r.a.id), ['bot']);
+});
+
+test('Responder: la respuesta sugerida según lo que escribió (Turnia)', () => {
+  const plan = (a, text) => C.replyPlan(a, { text }, turnia);
+  const greeted = acc({ id: 'x', greetingSent: '2026-11-08 09:00' });
+  assert.equal(plan(greeted, 'Sí, ¿quién habla?').key, 'whatsapp_permiso');
+  assert.equal(plan(greeted, 'Hola, ¿es por un turno?').key, 'whatsapp_permiso_turno');
+  assert.deepEqual(plan(greeted, 'Hola, ¿es por un turno?').register, { type: 'sent', template: 'whatsapp_permiso_turno' });
+  assert.equal(plan({ ...greeted, permissionSent: '2026-11-08 10:00' }, 'Dale, pasame').key, 'whatsapp_entrega');
+  const no = plan(greeted, 'No, gracias');
+  assert.equal(no.key, 'whatsapp_feedback');
+  assert.equal(no.then.outcome, 'perdido');
+  const linked = acc({ id: 'y', touches: 1, greetingSent: '2026-11-01 09:00' });
+  assert.equal(plan(linked, '¿Cuánto sale por mes?').key, 'precio');
+  assert.equal(plan(linked, 'Me gustó, ¿cómo sigue?').key, 'interesado');
+  assert.equal(plan(linked, 'Te paso el WhatsApp de la Dra: 223 000-9999').key, 'derivacion');
+  assert.equal(plan(linked, 'Ok').key, 'default');
+  assert.deepEqual(plan(linked, 'Ok').register, { type: 'conversation', detail: 'Respuesta general' });
+  // habita.: la clasificación de su bandeja.
+  assert.equal(C.replyPlan(acc({ id: 'h' }), { text: '¿Cuánto sale por foto?' }, habita).reply.classification, 'pregunta_precios');
+  assert.equal(C.replyPlan(acc({ id: 'h' }), { text: 'No gracias, no estamos interesados' }, habita).reply.classification, 'rechazo');
+});
+
+test('la demo del mensaje tiene que ser la de esta cuenta', () => {
+  const a = acc({ id: 'ana-a1b', name: 'Consultorio Ana' });
+  const other = acc({ id: 'beto-c2d', name: 'Beto Ejemplo' });
+  assert.equal(C.demoCheck(a, turnia, [a, other], 'Acá tenés: https://turniasalud.app/p/ana-a1b').ok, true);
+  const bad = C.demoCheck(a, turnia, [a, other], 'Acá tenés: https://turniasalud.app/p/beto-c2d.');
+  assert.equal(bad.ok, false);
+  assert.equal(bad.owner.id, 'beto-c2d');
+  assert.match(bad.problem, /beto-c2d, que es de Beto Ejemplo/);
+  // El link guardado en la ficha no es el de su código.
+  assert.equal(C.demoCheck({ ...a, demoUrl: 'https://turniasalud.app/p/beto-c2d' }, turnia, [a, other], '').ok, false);
+});
+
+test('la cola no ofrece dos veces el mismo número, ni lo repite el día que ya se le escribió a otro con ese número', () => {
+  const t = '2026-11-09';
+  const base = { stage: 'contactado', touches: 1, firstContact: '2026-11-01 09:00', nextAt: '2026-11-08', phoneKind: 'celular' };
+  const uno = acc({ id: 'uno', phone: '223 000-0066', ...base, lastContact: '2026-11-05 09:00' });
+  const dos = acc({ id: 'dos', phone: '2230000066', ...base, touches: 2, lastContact: '2026-11-06 09:00' });
+  const sola = acc({ id: 'sola', phone: '223 500-0099', ...base, lastContact: '2026-11-05 09:00' });
+  const q = C.queue([uno, dos, sola], turnia, { todayDay: t });
+  assert.deepEqual(q.followUps.map((a) => a.id).sort(), ['dos', 'sola']);
+  // Si hoy ya salió un mensaje a Pérez Uno, el número de Pérez Dos no vuelve a la cola.
+  const q2 = C.queue([{ ...uno, stage: 'perdido', lastContact: `${t} 09:00` }, dos, sola], turnia, { todayDay: t });
+  assert.deepEqual(q2.followUps.map((a) => a.id), ['sola']);
+  assert.deepEqual(C.sharedWith(dos, [uno, dos, sola]).map((a) => a.id), ['uno']);
+});
+
+test('una respuesta a mano no suma mensajes y una derivación cambia el número sin crear otra ficha', () => {
+  const a = acc({ id: 'rita', phone: '223 500-0077', touches: 1, notes: '' });
+  const conv = C.applyAction(a, { type: 'conversation', channel: 'whatsapp', line: '5483' }, { unit: turnia, now: '2026-11-09 10:00', by: 'Axel' });
+  assert.equal(conv.patch.touches, undefined);
+  assert.equal(conv.patch.lastContact, '2026-11-09 10:00');
+  assert.match(conv.events[0].detail, /línea 5483/);
+  const ref = C.applyAction(a, { type: 'refer', phone: '223 500-0078', name: 'Dra. Rita' }, { unit: turnia, now: '2026-11-09 10:05', by: 'Axel' });
+  assert.equal(ref.patch.phone, '223 500-0078');
+  assert.equal(ref.patch.phoneKind, 'celular');
+  assert.match(ref.patch.notes, /Antes: 223 500-0077/);
+  assert.throws(() => C.applyAction(a, { type: 'refer', phone: '2235000077' }, { unit: turnia }), /mismo número/);
+  assert.throws(() => C.applyAction({ ...a, optOut: 'sí', stage: 'baja' }, { type: 'conversation' }, { unit: turnia }), /no recibir/);
+});
+
+test('«de el Dr.» queda «del Dr.» al armar el mensaje', () => {
+  assert.equal(C.renderTemplate('los datos de {destinatario}', { name: 'Juan Arias', title: 'Dr.' }, turnia), 'los datos del Dr. Arias');
+});

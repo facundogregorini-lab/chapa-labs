@@ -198,7 +198,7 @@
     $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
     const tabs = state.unit === 'todas'
       ? [['hoy', 'Hoy', fuCount('todas')], ['pipeline', 'Pipeline'], ['prospectos', 'Prospectos'], ['secuencias', 'Secuencias'], ['rendimiento', 'Rendimiento'], ['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['followup', 'Follow-up', fuCount(state.unit)], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
+      : [['hoy', 'Hoy', queueCount()], ['responder', 'Responder', replyCount(state.unit)], ['followup', 'Follow-up', fuCount(state.unit)], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
     $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
     document.body.dataset.unit = state.unit;
     const userBtn = $('#user');
@@ -238,7 +238,7 @@
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, responder: renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
@@ -613,23 +613,26 @@
     const folds = store(`folds-${id}`) || {};
     const ratio = Math.min(1, q.doneToday / q.goal);
     const R = 27; const circ = 2 * Math.PI * R;
-    const block = (key, title, sub, list, { open = true } = {}) => {
+    const block = (key, title, sub, list, { open = true, all = false } = {}) => {
       const isOpen = folds[key] === undefined ? open : folds[key];
+      const cap = all || state.more[key] ? list.length : 15;
       return `<section class="card glass block" data-open="${isOpen}" aria-label="${esc(title)}">
         <button type="button" class="block-head" data-fold="${key}" aria-expanded="${isOpen}"><div><h3>${esc(title)} <span class="count num" style="vertical-align:1px">${list.length}</span></h3><p class="sub">${sub}</p></div><span class="chev">${icon.chev}</span></button>
-        <div class="rows">${list.length ? list.slice(0, state.more[key] ? list.length : 15).map((a) => accountRow(a, u, key)).join('') + (list.length > 15 && !state.more[key] ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? (u.api && !u.api.rows ? `No quedan ${esc(u.entity.many)} nuevos con WhatsApp (los que faltan son fijos o comparten un número que ya usaste). Importá la próxima lista en <a href="${esc(u.appUrl)}/importar" target="_blank" rel="noopener">${esc(u.appName)} → Importar lista</a>.` : `No quedan ${esc(u.entity.many)} nuevos con canal (los que faltan no tienen WhatsApp verificado o comparten un número ya usado): sumá una lista a la planilla.`) : 'Nada por acá.'}</p>`}</div></section>`;
+        <div class="rows">${list.length ? list.slice(0, cap).map((a) => accountRow(a, u, key)).join('') + (list.length > cap ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="${key}">Ver los ${int(list.length - 15)} restantes</button></div>` : '') : `<p class="empty">${key === 'fresh' && q.freshTotal === 0 ? (u.api && !u.api.rows ? `No quedan ${esc(u.entity.many)} nuevos con WhatsApp (los que faltan son fijos o comparten un número que ya usaste). Importá la próxima lista en <a href="${esc(u.appUrl)}/importar" target="_blank" rel="noopener">${esc(u.appName)} → Importar lista</a>.` : `No quedan ${esc(u.entity.many)} nuevos con canal (los que faltan no tienen WhatsApp verificado o comparten un número ya usado): sumá una lista a la planilla.`) : 'Nada por acá.'}</p>`}</div></section>`;
     };
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Hoy</span><h1>${q.doneToday >= q.goal ? '¡Meta del día cumplida!' : `Te faltan ${int(q.goal - q.doneToday)} contactos nuevos`}</h1><p>${esc(u.hours)}</p></div>
         <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" style="--c0:${circ}" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">contactos nuevos hoy</div></div></div></section>
       ${crumbs(id)}
-      ${block('conversations', 'Conversaciones abiertas', 'Respondieron o están interesados: contestá primero.', q.conversations)}
+      ${replyCount(id) ? `<div class="notice glass" data-testid="hoy-responder"><span class="badge live">Responder</span><span>${int(replyCount(id))} ${replyCount(id) === 1 ? 'espera' : 'esperan'} respuesta: el último mensaje es de ellos. En Responder está lo que escribió cada uno y el texto para contestarle.</span><button class="btn small primary" type="button" data-view="responder">Abrir Responder</button></div>` : ''}
+      ${block('conversations', 'Conversaciones abiertas', 'Respondieron o están interesados: contestá primero.', q.conversations, { all: true })}
       ${u.greetingFirst ? block('greeted', 'Esperan la demo', 'Los saludaste. Si te respondieron, mandales la demo.', q.greeted, { open: false }) : ''}
       ${block('followUps', 'Seguimientos de hoy', 'Les escribiste y no respondieron. Arriba, quienes abrieron o probaron su demo.', q.followUps)}
       ${block('fresh', 'Nuevos para hoy', `Por prioridad hasta la meta del día. Quedan ${int(q.freshTotal)} con canal.`, q.fresh)}`;
   }
 
   function stagePill(a, u) {
+    if (a.botOnly) return '<span class="stage" title="Figura como «Respondió», pero lo único que llegó es la respuesta automática del consultorio">Solo respuesta automática</span>';
     const lvl = C.level(a);
     return `<span class="stage ${C.closed(a) ? 'closed' : ''}" style="--o:${0.35 + Math.max(0, lvl) * 0.13}">${esc(u.stageLabel(a.stage))}</span>`;
   }
@@ -644,17 +647,32 @@
   function accountRow(a, u, block) {
     const next = C.nextTemplate(a, u);
     const tpl = next && templatesOf(u.id)[next.key];
+    const text = next && tpl && next.channel === 'whatsapp' ? C.renderTemplate(tpl.text, a, u) : '';
     let action = '';
-    if (isReadOnly(u.id)) return accountRowHtml(a, u, `<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Panel</a>`);
-    if (block === 'conversations') action = a.phone ? `<button type="button" class="btn small" data-chat="${esc(a.id)}">${icon.wa} Abrir chat</button>` : '';
+    if (isReadOnly(u.id)) return accountRowHtml(a, u, `<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Panel</a>`, { block, text });
+    // «Ya lo mandé»: registra el envío hecho directo desde WhatsApp, sin pasar por la cola (dos toques).
+    const manual = (kind, key) => `<button type="button" class="btn small ghost" data-manual-sent="${esc(a.id)}" data-manual-kind="${kind}" data-key="${esc(key || '')}" data-arm="Confirmar: ya lo mandé" data-testid="manual-sent" title="Lo mandaste directo desde WhatsApp: registralo sin abrir nada">✓ Ya lo mandé</button>`;
+    if (block === 'conversations') action = a.phone ? `<button type="button" class="btn small" data-chat="${esc(a.id)}">${icon.wa} Abrir chat</button>${manual('conversation')}` : '';
     else if (next && tpl && (next.channel === 'whatsapp' || next.channel === 'email' || next.channel === 'instagram')) {
-      action = `<button type="button" class="btn small primary" data-testid="send-next" data-send="${esc(a.id)}" data-key="${esc(next.key)}">${next.channel === 'email' ? icon.mail : next.channel === 'instagram' ? icon.ig : icon.wa} ${esc(tpl.title)}</button>`;
+      action = `<button type="button" class="btn small primary" data-testid="send-next" data-send="${esc(a.id)}" data-key="${esc(next.key)}">${next.channel === 'email' ? icon.mail : next.channel === 'instagram' ? icon.ig : icon.wa} ${esc(tpl.title)}</button>${next.channel === 'whatsapp' ? manual('sent', next.key) : ''}`;
     }
-    return accountRowHtml(a, u, action);
+    return accountRowHtml(a, u, action, { block, text });
   }
-  function accountRowHtml(a, u, action) {
-    return `<div class="arow" data-testid="queue-item" data-account-id="${esc(a.id)}" data-open-account="${esc(a.id)}" tabindex="0" role="button" aria-label="Abrir la ficha de ${esc(a.name)}">
-      <div class="who"><strong>${esc(a.name)}</strong><div class="meta">${a.org && a.org !== a.name ? `<span>${esc(a.org)}</span>·` : ''}<span>${esc(a.zone || 'Sin zona')}</span>${a.priority && a.priority <= 5 ? `<span>· P${a.priority}</span>` : ''}${stagePill(a, u)}${a.touches ? `<span>${int(a.touches)} msj.</span>` : ''}${a.lastContact ? `<span>últ. ${esc(when(a.lastContact))}</span>` : ''}${signals(a)}</div></div>
+  /** Los datos de una cuenta para un agente, en atributos: así no hay que abrir la ficha para sacar el teléfono. */
+  function rowData(a, u, { state: st = '', text = '' } = {}) {
+    const digits = C.waDigits(a.phone);
+    const first = String(text || '').split(/\n[ \t]*-{3,}[ \t]*\n/)[0].trim();
+    return ` data-phone="${esc(digits)}" data-wa-url="${esc(digits ? C.waWebLink(a.phone, first) : '')}" data-demo-url="${esc((u.demoLink && u.demoLink(a)) || '')}" data-state="${esc(st)}" data-line="${esc((a.whatsappSenders || []).join(' '))}"`;
+  }
+  function sharedNote(a, u) {
+    const d = state.data[u.id];
+    const mates = d && d.accounts ? C.sharedWith(a, d.accounts) : [];
+    return mates.length ? `<span class="signal" data-testid="shared-phone" title="Es un solo chat: se le escribe una vez">Mismo número que ${esc(mates.map((x) => x.name).slice(0, 2).join(', '))}${mates.length > 2 ? '…' : ''}</span>` : '';
+  }
+  function accountRowHtml(a, u, action, { block = '', text = '' } = {}) {
+    const lines = a.whatsappSenders || [];
+    return `<div class="arow" data-testid="queue-item" data-account-id="${esc(a.id)}" data-open-account="${esc(a.id)}"${rowData(a, u, { state: block, text })} tabindex="0" role="button" aria-label="Abrir la ficha de ${esc(a.name)}">
+      <div class="who"><strong>${esc(a.name)}</strong><div class="meta">${a.org && a.org !== a.name ? `<span>${esc(a.org)}</span>·` : ''}<span>${esc(a.zone || 'Sin zona')}</span>${a.priority && a.priority <= 5 ? `<span>· P${a.priority}</span>` : ''}${stagePill(a, u)}${C.isContacted(a) ? `<span title="Mensajes de la secuencia usados">${int(a.touches || 0)}/${u.maxTouches || 3} msj.</span>` : ''}${lines.map((l) => `<span class="badge plain" title="Chat en la línea ${esc(l)}">${esc(l)}</span>`).join('')}${a.lastContact ? `<span>últ. ${esc(when(a.lastContact))}</span>` : ''}${signals(a)}${sharedNote(a, u)}</div></div>
       <div class="acts">${action}</div></div>`;
   }
 
@@ -692,8 +710,11 @@
         .map((a) => ({ a, step: a.permissionSent ? 'Paso 2 enviado' : 'Saludado', check: true })),
       ...q.fresh.filter(wa).map((a) => ({ a, step: 'Nuevo', fresh: true })),
     ].filter(({ a }) => sender === 'all' || (sender === 'unknown' ? !a.whatsappSenders?.length : a.whatsappSenders?.includes(sender)));
+    // Un número compartido, una sola vez en toda la sesión (no se le manda doble al mismo celular).
+    const phones = new Set();
+    const unique = items.filter(({ a }) => { const k = C.phoneKey(a.phone); if (!k) return true; if (phones.has(k)) return false; phones.add(k); return true; });
     const skipped = agentSkipped(id);
-    return { q, sender, senderOptions, items: [...items.filter((x) => !skipped.has(x.a.id)), ...items.filter((x) => skipped.has(x.a.id))] };
+    return { q, sender, senderOptions, items: [...unique.filter((x) => !skipped.has(x.a.id)), ...unique.filter((x) => skipped.has(x.a.id))] };
   }
 
   function agentInstructions(u) {
@@ -711,6 +732,13 @@
     ].join('\n');
   }
 
+  /** La demo del mensaje que le toca es la de esta cuenta (no la de otro consultorio). */
+  function demoOk(a, id) {
+    const u = unitOf(id);
+    const next = a && C.nextTemplate(a, u);
+    const tpl = next && templatesOf(id)[next.key];
+    return C.demoCheck(a, u, state.data[id].accounts, tpl ? C.renderTemplate(tpl.text, a, u) : '');
+  }
   function renderSend(id) {
     const u = unitOf(id);
     const { q, items, sender, senderOptions } = sendQueue(id);
@@ -729,6 +757,7 @@
         : q.freshTotal ? 'No queda nadie para hoy. Pará.' : `No queda nadie para hoy y no hay ${esc(u.entity.many)} nuevos con WhatsApp: hay que sumar otra lista. Pará.`;
     }
     else if (state.agent.fails >= 3) { phase = 'stopped'; status = 'Pará: tres envíos seguidos no salieron. Revisá WhatsApp (¿restricción, sesión cerrada?).'; }
+    else if (!demoOk(cur.a, id).ok) { phase = 'stopped'; status = `Pará: ${demoOk(cur.a, id).problem} Corregí el link en su ficha o tocá «Saltar».`; }
     else if (cur.fresh && q.doneToday >= q.goal) { phase = 'done'; status = `Meta del día cumplida (${int(q.doneToday)} de ${int(q.goal)}). Pará.`; }
     else if (!C.inSendWindow(u) && store(`override-${id}`) !== C.today()) { phase = 'paused'; status = `Fuera del horario de envío (${esc(u.hours)}). Próxima franja: ${esc(C.nextSendWindow(u))}.`; }
     else if (cur.check && state.agent.replied !== cur.a.id) {
@@ -753,6 +782,7 @@
     let actions = '';
     if (a && phase === 'check') actions = btn('agent-open-chat', `${icon.wa} Abrir chat`, `data-agent="chat"`) + btn('agent-replied', cur.a.permissionSent ? 'Mandar la demo' : 'Respondió: mandar el Paso 2', `data-agent="replied"`, 'primary') + btn('agent-skip', 'Todavía no', `data-agent="skip"`, 'ghost');
     else if (a && phase === 'opened') actions = btn('agent-confirm-sent', 'Sí, se envió', `data-agent="sent"`, 'primary') + btn('agent-not-sent', 'No salió', `data-agent="not-sent"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
+    else if (a && phase === 'stopped' && state.agent.fails < 3) actions = btn('agent-skip', 'Saltar', `data-agent="skip"`, 'ghost');
     else if (a && (phase === 'ready' || phase === 'wait' || phase === 'paused')) actions = btn('agent-open-whatsapp', `${icon.wa} Abrir WhatsApp`, `data-agent="open" ${phase === 'ready' ? '' : 'disabled'}`, 'primary') + btn('agent-skip', 'Saltar', `data-agent="skip"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
     const R = 27; const circ = 2 * Math.PI * R; const ratio = Math.min(1, q.doneToday / q.goal);
     return `
@@ -767,7 +797,7 @@
         </label>
         <p class="sub">${sender === 'all' || sender === 'unknown' ? 'Antes de enviar, verificá qué cuenta está abierta en WhatsApp.' : `Antes de enviar, verificá que esté abierta la cuenta terminada en ${esc(sender)}.`}</p>
       </section>` : ''}
-      <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, parts[0] || text) : '')}" aria-labelledby="agent-name">
+      <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-demo-url="${esc(a ? u.demoLink(a) || '' : '')}" data-line="${esc(a && a.whatsappSenders ? a.whatsappSenders.join(' ') : '')}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, parts[0] || text) : '')}" aria-labelledby="agent-name">
         <p class="agent-status ${phase}" role="status" aria-live="polite" data-testid="agent-status">${status}${phase === 'paused' && !ro && a ? ` <button type="button" class="btn small ghost" data-testid="agent-override-hours" data-agent="override" data-arm="Confirmar: mandar fuera de horario">Mandar igual</button>` : ''}</p>
         ${a ? `
         <div class="agent-grid">
@@ -778,6 +808,7 @@
             <dl class="facts">
               <dt>WhatsApp</dt><dd><strong data-testid="agent-phone">+${esc(digits)}</strong>${a.phoneKind ? ` <span class="sub">(${esc(kinds[a.phoneKind] || a.phoneKind)})</span>` : ''}</dd>
               ${senderOptions ? `<dt>Línea registrada</dt><dd>${esc(senderLabel)}</dd>` : ''}
+              ${C.sharedWith(a, state.data[id].accounts).length ? `<dt>Comparte el número</dt><dd data-testid="agent-shared">con ${esc(C.sharedWith(a, state.data[id].accounts).map((x) => x.name).join(', '))}: es un solo chat, se le escribe una vez</dd>` : ''}
               ${a.touches ? `<dt>Mensajes</dt><dd>${int(a.touches)} de ${u.maxTouches}</dd>` : ''}
               ${a.lastContact ? `<dt>Último</dt><dd>${esc(when(a.lastContact))}</dd>` : ''}
             </dl>
@@ -801,6 +832,295 @@
         <div class="rows">${items.slice(cur && items[0] && items[0].a.id === (a && a.id) ? 1 : 0, 9).map((x) => `<div class="arow" data-open-account="${esc(x.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(x.a.name)}</strong><div class="meta"><span>${esc(x.step)}</span>·<span>${esc(x.a.zone || '')}</span>${signals(x.a)}</div></div></div>`).join('') || '<p class="empty">Nadie más por ahora.</p>'}</div>
       </section>`;
   }
+
+  // ─── Responder (la bandeja: quienes escribieron último) ─────
+  // Las respuestas llegan cuando llegan y cada una necesita un texto distinto: cada fila trae lo que escribió,
+  // la respuesta sugerida ya armada y todo lo que hace falta para abrir el chat sin buscarlo a ciegas
+  // (data-phone, data-line, data-wa-url, data-demo-url, data-state). Se atiende en cualquier orden.
+  const lineName = (l) => (l === '0022' ? '0022 · Personal' : l === '5483' ? '5483 · Business' : l);
+  function lineOptions(id) { const d = state.data[id]; return (d && d.whatsappSenderOptions) || []; }
+  function openLine(id) { const v = store(`open-line-${id}`); return lineOptions(id).includes(v) ? v : ''; }
+
+  // habita.: las respuestas abiertas de su bandeja (Follow-up), por cuenta. En el ejemplo, las del fixture.
+  function bandejaReplies(id) {
+    const d = state.data[id];
+    const raw = state.demo ? d.inboxReplies || [] : (state.fu.raw && state.fu.raw.units && state.fu.raw.units[id] && state.fu.raw.units[id].inbox) || [];
+    const map = new Map();
+    const extra = [];
+    const key = (s) => C.norm(s).replace(/[^a-z0-9]+/g, ' ').trim();
+    for (const r of raw) {
+      const a = d.accounts.find((x) => x.id === r.agency_id)
+        || (r.phone && d.accounts.find((x) => C.phoneKey(x.phone) && C.phoneKey(x.phone) === C.phoneKey(r.phone)))
+        || (r.name && d.accounts.find((x) => key(x.org || x.name) === key(r.name) || key(x.name) === key(r.name)));
+      const item = { id: r.id, at: r.received_at, text: r.body, classification: r.classification || null };
+      const target = a || { id: `bandeja-${r.id}`, name: r.name || 'Sin nombre', phone: r.phone || '', stage: 'respondio', touches: 0, orphan: true };
+      if (!a) extra.push(target);
+      if (!map.has(target.id)) map.set(target.id, []);
+      map.get(target.id).push(item);
+    }
+    return { map, extra };
+  }
+  function inboxOf(id) {
+    const u = unitOf(id);
+    const d = state.data[id];
+    if (!d || !d.accounts) return { rows: [], bots: [] };
+    if (u.inbox === 'bandeja') {
+      const { map, extra } = bandejaReplies(id);
+      return C.inbox([...d.accounts, ...extra], u, { replies: map });
+    }
+    return C.inbox(d.accounts, u);
+  }
+  function replyCount(id) { try { return inboxOf(id).rows.length; } catch { return 0; } }
+
+  /** Las respuestas posibles para una fila: la sugerida primero, después los pasos de la secuencia y las demás. */
+  function replyOptions(row, id) {
+    const u = unitOf(id);
+    const tpls = templatesOf(id);
+    const a = row.a;
+    const out = [];
+    const add = (o) => { if (o && !out.some((x) => x.key === o.key)) out.push(o); };
+    const fromTemplate = (key, extra = {}) => tpls[key] && { key, title: tpls[key].title, text: C.renderTemplate(tpls[key].text, a, u), register: { type: 'sent', template: key }, ...extra };
+    const fromReply = (r) => {
+      if (!r) return null;
+      if (r.template) return fromTemplate(r.template, { title: r.title, register: { type: 'conversation', detail: r.title }, then: r.key === 'negativo' ? { type: 'outcome', outcome: 'perdido' } : null, classification: r.classification });
+      return { key: r.key, title: r.title, text: C.renderTemplate(r.text || '', a, u), register: { type: 'conversation', detail: r.title }, classification: r.classification || null, then: null };
+    };
+    const plan = C.replyPlan(a, row.inbound, u);
+    if (plan) {
+      const o = plan.template ? fromTemplate(plan.template) : fromReply(plan.reply);
+      if (o) { o.register = plan.register || o.register; o.then = plan.then || o.then || null; if (o.then && o.then.outcome === 'perdido' && !o.then.detail) o.then.detail = String(row.inbound.text || '').slice(0, 200); o.suggested = true; add(o); }
+    }
+    if (u.id === 'turnia' && !a.touches) ['whatsapp_permiso', 'whatsapp_permiso_turno', 'whatsapp_entrega'].forEach((k) => add(fromTemplate(k)));
+    for (const r of u.replies || []) add(fromReply(r));
+    if (u.id === 'turnia') add(fromTemplate('whatsapp_feedback', { register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: { type: 'outcome', outcome: 'perdido', detail: String(row.inbound.text || '').slice(0, 200) } }));
+    return out.filter((o) => o.text);
+  }
+
+  /** Todo lo de una fila, armado una vez: lo usan la vista, los botones y los atributos para el agente. */
+  function replyView(row, id) {
+    const u = unitOf(id);
+    const d = state.data[id];
+    const a = row.a;
+    const options = replyOptions(row, id);
+    state.replyPick = state.replyPick || {};
+    const picked = options.find((o) => o.key === state.replyPick[`${id}:${a.id}`]) || options[0] || null;
+    const text = picked ? picked.text : '';
+    const parts = text.split(/\n[ \t]*-{3,}[ \t]*\n/).map((s) => s.trim()).filter(Boolean);
+    const open = openLine(id);
+    const lineOk = !open || !row.lines.length || row.lines.includes(open);
+    const demo = C.demoCheck(a, u, d.accounts, text);
+    const digits = C.waDigits(a.phone);
+    return { row, a, options, picked, text, parts, open, lineOk, demo, digits, waUrl: digits ? C.waWebLink(a.phone, parts[0] || text) : '', demoUrl: (u.demoLink && u.demoLink(a)) || '' };
+  }
+
+  function renderResponder(id) {
+    const u = unitOf(id);
+    const d = state.data[id];
+    if (u.inbox === 'bandeja' && !state.demo && !state.fu.n && !state.fu.loading && !state.fu.error) setTimeout(() => loadFollowup({ quiet: true }), 0);
+    const { rows, bots } = inboxOf(id);
+    const opts = lineOptions(id);
+    const open = openLine(id);
+    const views = rows.map((r) => replyView(r, id));
+    // Primero los de la línea abierta en WhatsApp Web; adentro, de la que espera hace más a la más nueva.
+    views.sort((x, y) => Number(y.lineOk) - Number(x.lineOk));
+    const noText = rows.filter((r) => !r.inbound.text).length;
+    const other = views.filter((v) => !v.lineOk).length;
+    const ro = isReadOnly(id);
+    const waitingSince = rows[0] ? when(rows[0].inbound.at) : '';
+    const source = u.inbox === 'bandeja'
+      ? `Las respuestas abiertas en la bandeja de ${esc(u.appName)} (las registra su extensión de WhatsApp o el equipo).`
+      : `Lo que leyó la lectura de WhatsApp${d.whatsappReadAt ? ` (${esc(when(d.whatsappReadAt))})` : ''} y las respuestas cargadas a mano.`;
+    return `
+      <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Responder</span><h1>${rows.length ? `${int(rows.length)} ${rows.length === 1 ? 'espera' : 'esperan'} respuesta` : 'No hay nadie esperando respuesta'}</h1><p>Quienes escribieron último, en cualquier orden. ${source}${waitingSince ? ` La más vieja es de ${esc(waitingSince)}.` : ''}</p></div>
+        <div class="btns">${u.inbox !== 'bandeja' && !state.demo ? `<button class="btn" type="button" data-action="resp-sync" ${state.respSync ? 'disabled' : ''}>${state.respSync ? 'Leyendo los chats…' : 'Leer WhatsApp ahora'}</button>` : ''}${u.inbox === 'bandeja' && !state.demo ? `<button class="btn" type="button" data-action="resp-reload">Actualizar</button>` : ''}</div></section>
+      ${opts.length ? `<section class="card glass" aria-label="Línea abierta en WhatsApp Web">
+        <div class="toolbar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0"><span class="sub">Línea abierta en WhatsApp Web:</span>
+          <div class="seg" role="group" aria-label="Línea abierta">${[['', 'No sé'], ...opts.map((l) => [l, lineName(l)])].map(([v, l]) => `<button type="button" data-open-line="${esc(v)}" aria-pressed="${open === v}" data-testid="open-line-${esc(v || 'none')}">${esc(l)}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div>
+          ${open ? `<span class="sub">${other ? `${int(other)} están en la otra línea: van al final, marcadas.` : 'Todas son de esta línea.'}</span>` : '<span class="sub">Elegila y el panel marca qué chats no están en esa cuenta.</span>'}</div></section>` : ''}
+      <section class="card glass" aria-label="Resumen"><div class="kpis">
+        ${kpi('Esperan respuesta', int(rows.length), 'El último mensaje es de ellos')}
+        ${kpi('Respuestas automáticas', int(bots.length), 'Bots del consultorio: no cuentan')}
+        ${opts.length ? kpi('En la otra línea', open ? int(other) : '—', open ? `No están en la ${esc(open)}` : 'Elegí la línea abierta') : ''}
+        ${kpi('Sin texto', int(noText), u.inbox === 'bandeja' ? 'Sin el texto de la respuesta' : 'Respondieron por una línea que no se lee')}
+      </div></section>
+      <div class="replies" data-testid="reply-list">${views.map((v) => replyRowHtml(v, id)).join('') || '<section class="card glass"><p class="empty">Nadie espera respuesta. Las nuevas aparecen con la próxima lectura (o con «Leer WhatsApp ahora»).</p></section>'}</div>
+      ${bots.length ? `<details class="card glass" data-testid="reply-bots"><summary><strong>Respuestas automáticas</strong> <span class="count num">${bots.length}</span> <span class="sub">· el bot del consultorio contestó, no una persona: no cuentan como «Respondió» y no se contestan.</span></summary>
+        <div class="rows">${bots.map((r) => `<div class="arow" data-testid="reply-bot" data-account-id="${esc(r.a.id)}" data-state="bot" data-phone="${esc(C.waDigits(r.a.phone))}" data-line="${esc(r.lines.join(' '))}" data-open-account="${esc(r.a.orphan ? '' : r.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(r.a.name)}</strong><div class="meta"><span>${esc(when(r.inbound.at))}</span>${r.lines.map((l) => `<span class="badge plain">${esc(l)}</span>`).join('')}</div><div class="meta" style="white-space:pre-wrap">«${esc(r.inbound.text)}»</div></div></div>`).join('')}</div>
+        <p class="sub" style="margin:8px 0 0">${u.inbox === 'bandeja' ? 'Siguen en la bandeja de habita.: clasificalas ahí.' : 'La próxima lectura de WhatsApp las corrige sola en Turnia (vuelven a «Contactado» con su seguimiento).'}</p></details>` : ''}
+      <section class="card glass">
+        <details><summary><strong>Instrucciones para el agente de IA · Responder</strong> <span class="sub">· distintas de las de Enviar: acá se contesta en cualquier orden</span></summary>
+          <pre class="tpl" data-testid="reply-instructions" style="margin-top:10px">${esc(replyInstructions(u))}</pre>
+          <div class="btns"><button class="btn small" type="button" data-action="copy-reply-instructions">${icon.copy} Copiar instrucciones</button></div>
+        </details>
+      </section>`;
+  }
+
+  function replyRowHtml(v, id) {
+    const u = unitOf(id);
+    const { a, row } = v;
+    const inb = row.inbound;
+    const by = { whatsapp: `leído de WhatsApp${inb.line ? ` · ${inb.line}` : ''}`, manual: `cargado a mano${inb.by ? ` por ${inb.by}` : ''}`, bandeja: `bandeja de ${u.appName}`, panel: 'marcado en el panel' }[inb.source] || '';
+    const ro = isReadOnly(id) || a.orphan && u.inbox !== 'bandeja';
+    const k = `${id}:${a.id}`;
+    const max = u.maxTouches || 3;
+    return `<article class="card glass reply" data-testid="reply-item" data-unit="${esc(id)}" data-account-id="${esc(a.id)}" data-phone="${esc(v.digits)}" data-wa-url="${esc(v.waUrl)}" data-demo-url="${esc(v.demoUrl)}" data-state="${inb.text ? 'responder' : 'sin-texto'}" data-line="${esc(row.lines.join(' '))}" data-line-ok="${v.lineOk}" data-template="${esc(v.picked ? v.picked.key : '')}" data-demo-ok="${v.demo.ok}"${inb.replyId ? ` data-reply-id="${esc(inb.replyId)}"` : ''}>
+      <div class="reply-head">
+        <div class="who"><strong data-testid="reply-name">${esc(a.name)}</strong>${a.org && a.org !== a.name ? ` <span class="sub">${esc(a.org)}</span>` : ''}
+          <div class="meta"><strong class="num" data-testid="reply-phone">${v.digits ? `+${esc(v.digits)}` : 'Sin teléfono'}</strong>${row.lines.length ? row.lines.map((l) => `<span class="badge ${v.open && l === v.open ? 'live' : 'plain'}" title="Chat en la línea ${esc(lineName(l))}">${esc(l)}</span>`).join('') : (lineOptions(id).length ? '<span class="badge off" title="No sabemos en qué línea está el chat">Línea sin verificar</span>' : '')}${a.stage ? stagePill(a, u) : ''}<span title="Mensajes de la secuencia usados">${int(a.touches || 0)}/${max} msj.</span><span>escribió ${esc(when(inb.at))}</span></div></div>
+        <div class="acts">${a.orphan ? '' : `<button class="btn small ghost" type="button" data-open-account="${esc(a.id)}">Ficha</button>`}</div>
+      </div>
+      <blockquote class="said" data-testid="reply-last-message">${inb.text ? `«${esc(inb.text)}»` : `<span class="sub">${u.inbox === 'bandeja' ? 'Sin el texto de la respuesta.' : 'Sin texto: respondió por una línea que no se lee (mirá el chat antes de contestar).'}</span>`}</blockquote>
+      <p class="sub" style="margin:0">${esc(by)}</p>
+      ${row.shared && row.shared.length ? `<p class="notice-line" data-testid="reply-shared">Mismo número que ${esc(row.shared.join(', '))}: es un solo chat, contestá una vez.</p>` : ''}
+      ${!v.lineOk ? `<p class="notice-line" data-testid="reply-wrong-line">Este chat está en la ${esc(row.lines.join(' y '))}, no en la ${esc(v.open)} que tenés abierta: cambiá de cuenta en WhatsApp Web antes de contestar.</p>` : ''}
+      ${!v.demo.ok ? `<p class="notice-line bad" data-testid="reply-demo-problem">${esc(v.demo.problem)} No lo mandes así.</p>` : v.demo.slug && /\{link\}|https?:/.test(v.text) ? `<p class="sub" style="margin:0" data-testid="reply-demo-ok">✓ La demo del mensaje es la de esta cuenta${u.demoIsCode ? ` (/p/${esc(v.demo.slug)})` : ''}.</p>` : ''}
+      ${v.picked ? `<div class="reply-body">
+        <label class="field">${v.picked.suggested ? 'Respuesta sugerida (podés elegir otra)' : 'Respuesta'}<select data-reply-pick="${esc(k)}" data-testid="reply-pick">${v.options.map((o) => `<option value="${esc(o.key)}" ${o.key === v.picked.key ? 'selected' : ''}>${esc(o.title)}${o.suggested ? ' · sugerida' : ''}</option>`).join('')}</select></label>
+        ${v.parts.map((p, i) => `${v.parts.length > 1 ? `<span class="eyebrow">Mensaje ${i + 1} de ${v.parts.length}</span>` : ''}<pre class="tpl" data-testid="${i ? `reply-message-${i + 1}` : 'reply-message'}">${esc(p)}</pre>`).join('')}
+        <div class="btns">
+          ${v.parts.map((p, i) => `<button class="btn small" type="button" data-copy-text="${esc(p)}" data-testid="${i ? `reply-copy-${i + 1}` : 'reply-copy'}">${icon.copy} Copiar${v.parts.length > 1 ? ` el ${i + 1}` : ''}</button>`).join('')}
+          ${v.waUrl ? `<button class="btn small" type="button" data-reply-open="${esc(k)}" data-testid="reply-open">${icon.wa} Abrir chat</button>` : ''}
+          ${ro ? '' : `<button class="btn small primary" type="button" data-reply-sent="${esc(k)}" data-testid="reply-sent" data-arm="Confirmar: ya lo mandé" ${v.demo.ok ? '' : 'disabled'}>✓ Ya lo mandé</button>
+          <button class="btn small ghost" type="button" data-reply-refer="${esc(k)}" data-testid="reply-refer">Derivó a otro número</button>`}
+        </div>
+        ${state.referOpen === k ? `<form class="btns" data-refer-form="${esc(k)}" data-testid="reply-refer-form" style="align-items:flex-end"><label class="field" style="flex:1 1 150px">Número nuevo<input name="phone" required inputmode="tel" placeholder="223 555-1234" value="${esc((String(inb.text || '').match(/(\+?54\s?9?\s?)?\d{2,4}[\s-]?\d{3,4}[\s-]?\d{4}/) || [''])[0])}"></label><label class="field" style="flex:1 1 150px">De quién<input name="name" placeholder="Dra. Pérez (opcional)"></label><button class="btn small primary" type="submit">Guardar en esta cuenta</button></form><p class="sub" style="margin:0">Queda en la misma cuenta${u.demoIsCode ? ', con la misma demo' : ''}: no hace falta crear otra ficha.</p>` : ''}
+      </div>` : ''}
+    </article>`;
+  }
+
+  function replyInstructions(u) {
+    const lines = u.id === 'turnia';
+    return [
+      `Sos quien contesta por WhatsApp Web a los ${u.entity.many} de ${u.name} que respondieron. Trabajás con dos pestañas: este panel (${location.origin}/prospecting/${u.id}?vista=responder) y WhatsApp Web.`,
+      'Las respuestas llegan cuando llegan: no hay cola ni turno. Podés tomar cualquier fila de la lista (data-testid="reply-item"), en el orden que quieras, y el panel no te habilita la siguiente: cuando registrás una, desaparece.',
+      `Cada fila trae todo resuelto en sus atributos: data-phone (el número con 549, solo dígitos)${lines ? ', data-line (la línea donde está el chat: 0022 o 5483) y data-line-ok' : ''}, data-wa-url, data-demo-url, data-demo-ok, data-template y data-state. Lo que escribió la persona está en reply-last-message y el texto exacto para mandar, en reply-message.`,
+      'Para cada fila:',
+      lines ? '1. Línea. Elegí en el panel la «Línea abierta en WhatsApp Web» (la cuenta que ves en WhatsApp Web). Contestá solo las filas con data-line-ok="true". Las de la otra línea van al final: cuando termines, cambiá de cuenta en WhatsApp Web, cambiá la línea en el panel y seguí.' : '1. Mirá que WhatsApp Web tenga abierta la cuenta del equipo de prospección.',
+      '2. Abrí el chat con la búsqueda de WhatsApp Web (los clics simulados por código no funcionan: usá clics reales):',
+      '   a. Clic en el buscador de chats («Buscar un chat o iniciar uno nuevo», arriba a la izquierda).',
+      '   b. Escribí los últimos 10 números de data-phone (sin 549) y esperá el resultado.',
+      '   c. Clic en el resultado. Si no aparece, abrí data-wa-url en la pestaña de WhatsApp Web (abre el chat directo). No crees un chat nuevo con otro número.',
+      '3. Verificá antes de escribir:',
+      '   - El número del chat termina en los mismos 10 números que data-phone. Si el chat muestra un nombre, mirá el número en la info del contacto.',
+      '   - Lo último del chat es lo de reply-last-message. Si hay algo más nuevo, o si reply-last-message dice «Sin texto», leé el chat y elegí la respuesta que corresponda en «Respuesta» (reply-pick). Si ninguna corresponde, salteá la fila y avisá.',
+      '   - Si la fila dice «Mismo número que…» (reply-shared), es un solo chat: contestás una vez.',
+      '   - Si data-demo-ok="false" (reply-demo-problem), no lo mandes: el link es de otra cuenta. Avisá.',
+      '4. Escribí: tocá «Copiar» (reply-copy) en el panel, pegá en el cuadro del chat y comprobá que quedó igual a reply-message. Enviá una sola vez y esperá el tilde. Si hay dos mensajes (reply-message y reply-message-2), mandá cada uno aparte, en ese orden.',
+      '5. Registrá en el panel: «Ya lo mandé» (reply-sent) y otra vez para confirmar. Si pasaron el número de otra persona, después de contestar tocá «Derivó a otro número» (reply-refer), cargá el número y guardá.',
+      '6. Elegí otra fila y repetí.',
+      'Nunca: escribas sin verificar el número, cambies el texto a mano, contestes las «Respuestas automáticas» (son bots), mandes dos veces o registres algo que no salió.',
+      'Pará y avisá si: WhatsApp muestra un aviso de restricción o de cuenta bloqueada, el número no coincide, alguien pide que no le escriban más (marcalo en su ficha: «Pidió no recibir más») o aparece un error.',
+    ].join('\n');
+  }
+
+  /** Registrar una fila de Responder: el paso de la secuencia, la respuesta de conversación o, en habita., la clasificación. */
+  async function replySent(id, accountId) {
+    const u = unitOf(id);
+    const row = inboxOf(id).rows.find((r) => r.a.id === accountId);
+    if (!row) { toast('Esa respuesta ya no está en la lista.', true); render(); return; }
+    const v = replyView(row, id);
+    if (!v.picked) return;
+    if (!v.demo.ok) { toast(v.demo.problem, true); return; }
+    if (u.inbox === 'bandeja') {
+      if (state.demo) { toast('En el ejemplo no se cambia nada.', true); return; }
+      if (!row.inbound.replyId) { toast('No encontramos la respuesta en la bandeja.', true); return; }
+      const r = await fuOp(id, { op: 'reply', id: row.inbound.replyId, clasificacion: v.picked.classification || 'neutro' }, { label: `Listo: ${v.picked.title}` });
+      if (r) { await loadFollowup({ quiet: true }); render(); }
+      return;
+    }
+    const line = v.open || (row.lines.length === 1 ? row.lines[0] : '');
+    const reg = { ...v.picked.register, channel: 'whatsapp', ...(line ? { line } : {}) };
+    if (reg.type === 'sent') reg.kind = /abridor/.test(reg.template) ? 'saludo' : 'mensaje';
+    const res = await act(accountId, reg, { label: `Registrado: ${v.picked.title}` });
+    if (res && v.picked.then) await act(accountId, v.picked.then, { label: `Marcado: ${u.stageLabel(v.picked.then.outcome)}` });
+  }
+
+  /** «Ya lo mandé»: un envío hecho directo desde WhatsApp (sin abrir nada desde el panel), con la línea abierta. */
+  async function manualSent(accountId, kind, key) {
+    const id = state.unit;
+    const u = unitOf(id);
+    const a = findAccount(accountId);
+    if (!a) return;
+    const line = openLine(id) || ((a.whatsappSenders || []).length === 1 ? a.whatsappSenders[0] : '');
+    let action;
+    if (kind === 'conversation') {
+      action = u.inbox === 'bandeja' ? { type: 'note', text: 'Le respondimos por WhatsApp (a mano)' } : { type: 'conversation', channel: 'whatsapp', ...(line ? { line } : {}) };
+    } else {
+      const tpl = templatesOf(id)[key];
+      const check = C.demoCheck(a, u, state.data[id].accounts, tpl ? C.renderTemplate(tpl.text, a, u) : '');
+      if (!check.ok) { toast(check.problem, true); return; }
+      const next = C.nextTemplate(a, u);
+      action = { type: 'sent', channel: 'whatsapp', template: key, kind: /abridor/.test(key || '') ? 'saludo' : (next && next.key === key ? next.kind : 'mensaje'), ...(line ? { line } : {}) };
+    }
+    await act(accountId, action, { label: kind === 'conversation' ? 'Registrado: le respondiste' : `Registrado: ${(templatesOf(id)[key] || {}).title || 'mensaje'}`, undoable: kind !== 'conversation' && u.inbox !== 'bandeja' });
+  }
+
+  // ─── Buscador global (arriba): cualquier cuenta de cualquier unidad, esté o no en la cola del día ─
+  // Por nombre, consultorio o inmobiliaria, código (el slug de la demo, «perez-a1b») o teléfono (alcanzan los
+  // últimos 3 o más números, sin importar espacios ni el 549). Cada resultado abre su ficha.
+  function globalSearch(q) {
+    const text = C.norm(q).trim();
+    const digits = String(q || '').replace(/\D+/g, '');
+    if (text.length < 2 && digits.length < 3) return [];
+    const out = [];
+    for (const u of units()) {
+      const d = state.data[u.id];
+      if (!d || !d.accounts) continue;
+      for (const a of d.accounts) {
+        const slug = (u.demoSlug && u.demoSlug((u.demoLink && u.demoLink(a)) || '')) || '';
+        const phone = String(a.phone || '').replace(/\D+/g, '');
+        let score = 0;
+        if (text && (C.norm(a.id) === text || C.norm(slug) === text)) score = 4;
+        else if (digits.length >= 3 && phone && (phone.endsWith(digits) || (digits.length >= 6 && C.waDigits(a.phone).includes(digits.replace(/^0+/, ''))))) score = 3;
+        else if (text && C.norm(`${a.name} ${a.org}`).includes(text)) score = 2;
+        else if (text && C.norm(`${a.id} ${slug} ${a.zone} ${a.email} ${a.instagram}`).includes(text)) score = 1;
+        if (score) out.push({ u, a, slug, score });
+      }
+    }
+    return out.sort((x, y) => y.score - x.score || String(x.a.name).localeCompare(String(y.a.name))).slice(0, 12);
+  }
+  function renderGlobalResults() {
+    const box = $('#gresults');
+    const input = $('#gsearch');
+    if (!box || !input) return;
+    const q = input.value;
+    const res = globalSearch(q);
+    const loading = units().some((u) => !state.data[u.id] || state.data[u.id].loading);
+    if (!q.trim()) { box.hidden = true; input.setAttribute('aria-expanded', 'false'); return; }
+    box.innerHTML = res.length ? res.map(({ u, a, slug }, i) => `<button type="button" class="gresult" role="option" data-gresult="${esc(a.id)}" data-gunit="${esc(u.id)}" data-testid="global-result" data-account-id="${esc(a.id)}" data-phone="${esc(C.waDigits(a.phone))}" data-unit="${esc(u.id)}" ${i === 0 ? 'aria-selected="true"' : ''}>
+        <span class="dot" style="--c:${color(u)}"></span><span class="gr-main"><strong>${esc(a.name)}</strong><span class="sub">${esc([a.org !== a.name ? a.org : '', a.phone, u.demoIsCode && slug ? `/p/${slug}` : ''].filter(Boolean).join(' · '))}</span></span><span class="stage">${esc(u.stageLabel(a.stage))}</span></button>`).join('')
+      : `<p class="sub" style="margin:8px">${loading ? 'Cargando las cuentas…' : 'Nadie con ese nombre, teléfono o código.'}</p>`;
+    box.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+  function openFromSearch(unitId, accountId) {
+    const box = $('#gresults');
+    const input = $('#gsearch');
+    if (box) box.hidden = true;
+    if (input) { input.value = ''; input.setAttribute('aria-expanded', 'false'); }
+    if (state.unit !== unitId) go(unitId, UNIT_VIEWS.includes(state.view) ? state.view : 'cuentas');
+    openDrawer(accountId);
+  }
+  $('#gsearch').addEventListener('input', () => { clearTimeout(renderGlobalResults.t); renderGlobalResults.t = setTimeout(renderGlobalResults, 120); });
+  $('#gsearch').addEventListener('focus', () => { ensureLoaded(); if ($('#gsearch').value.trim()) renderGlobalResults(); });
+  $('#gsearch').addEventListener('keydown', (e) => {
+    const box = $('#gresults');
+    const items = [...box.querySelectorAll('[data-gresult]')];
+    const cur = items.findIndex((x) => x.getAttribute('aria-selected') === 'true');
+    if (e.key === 'Escape') { box.hidden = true; e.target.value = ''; return; }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
+      e.preventDefault();
+      const next = (cur + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+      items.forEach((x, i) => x.setAttribute('aria-selected', String(i === next)));
+      items[next].scrollIntoView({ block: 'nearest' });
+    }
+    if (e.key === 'Enter' && items.length) { e.preventDefault(); const it = items[Math.max(0, cur)]; openFromSearch(it.dataset.gunit, it.dataset.gresult); }
+  });
+  $('#gresults').addEventListener('click', (e) => {
+    const it = e.target.closest('[data-gresult]');
+    if (it) openFromSearch(it.dataset.gunit, it.dataset.gresult);
+  });
+  document.addEventListener('click', (e) => { if (!e.target.closest('.gsearch')) { const b = $('#gresults'); if (b) b.hidden = true; } });
 
   // ─── Onboarding (posventa: garantías del Programa Fundadores) ─
   // Cada cliente: desde que se cobró el setup, operativo en 14 días (si no, se devuelve el setup) y
@@ -1359,8 +1679,9 @@
             ${a.email && (t.channel === 'email' || !a.phone) ? `<button class="btn primary" type="button" data-send-drawer="email">${icon.mail} Abrir mail</button>` : ''}
             ${a.instagram ? `<button class="btn" type="button" data-send-drawer="instagram">${icon.ig} Copiar y abrir Instagram</button>` : ''}
             <button class="btn" type="button" data-action="copy">${icon.copy} Copiar</button>
+            ${a.phone && t.channel === 'whatsapp' ? `<button class="btn ghost" type="button" data-action="manual-drawer" data-arm="Confirmar: ya lo mandé" data-testid="drawer-manual-sent" title="Lo mandaste directo desde WhatsApp">✓ Ya lo mandé a mano</button>` : ''}
           </div>
-          <p class="sub" style="margin:0">Abrir el chat no cuenta como contacto: después te preguntamos si salió.</p></div>` : ''}
+          <p class="sub" style="margin:0">Abrir el chat no cuenta como contacto: después te preguntamos si salió. Si ya lo mandaste desde WhatsApp, «Ya lo mandé a mano» lo registra sin abrir nada.</p></div>` : ''}
         ${isReadOnly(state.unit) ? '' : `<div class="section"><h3>Qué pasó</h3>
           <div class="btns">
             ${a.phone ? `<button class="btn small" type="button" data-log="call">${icon.phone} Llamé</button>` : ''}
@@ -1378,6 +1699,9 @@
             ${C.closed(a) ? '<button class="btn small ghost" type="button" data-action="reopen">Reabrir</button>' : ''}
           </div>
           <label class="field">Detalle o evidencia (qué dijo, por qué)<input data-detail placeholder="Opcional, pero ayuda a medir bien"></label>
+          ${u.inbox !== 'bandeja' && a.phone ? `<details data-testid="drawer-refer"><summary class="sub" style="cursor:pointer">Derivó a otro número (pasaron el contacto del doctor)</summary>
+            <form class="btns" data-refer-drawer style="align-items:flex-end;margin-top:8px"><label class="field" style="flex:1 1 140px">Número nuevo<input name="phone" required inputmode="tel" placeholder="223 555-1234"></label><label class="field" style="flex:1 1 140px">De quién<input name="name" placeholder="Dra. Pérez (opcional)"></label><button class="btn small" type="submit">Guardar en esta cuenta</button></form>
+            <p class="sub" style="margin:4px 0 0">Reemplaza el número de esta cuenta${u.demoIsCode ? ' (misma demo)' : ''} y deja el anterior en las notas.</p></details>` : ''}
           ${undo ? `<button class="btn small ghost" type="button" data-action="undo">↶ Deshacer: ${esc(undo.label)}</button>` : ''}
         </div>
         <div class="section"><h3>Agendar</h3>
@@ -1607,7 +1931,7 @@
   const F = window.ProspectingFollowup;
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
-  const UNIT_VIEWS = ['hoy', 'followup', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_VIEWS = ['hoy', 'responder', 'followup', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0, f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
   const isFu = () => (state.unit === 'todas' ? FU_VIEWS.includes(state.view) : state.view === 'followup');
@@ -1895,7 +2219,7 @@
           ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
         </section>
         <section class="card glass"><h2>Mensaje</h2>
-          ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}
+          ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}${fuDemoWarning(t)}
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
             ${t.notes ? `<div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes)}</p></div>` : ''}`
           : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !it.blocked && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
@@ -1910,6 +2234,16 @@
           ${exec ? `<button class="btn ghost" type="button" data-fu="next-after">Siguiente pendiente →</button>` : ''}
         </section>
       </div>`;
+  }
+
+  /** El mensaje armado por la app lleva la demo de otra cuenta (por ejemplo, la de otro consultorio con el mismo número). */
+  function fuDemoWarning(t) {
+    const u = unitOf(t.unit);
+    const d = state.data[t.unit];
+    const acc = fuAccount(t.unit, t.item);
+    if (!u || !acc || !d || !d.accounts) return '';
+    const check = C.demoCheck(acc, u, d.accounts, (t.messages || []).join('\n'));
+    return check.ok ? '' : `<div class="notice glass" data-testid="fu-demo-problem"><span class="badge off">Demo equivocada</span><span>${esc(check.problem)} No lo mandes así.</span></div>`;
   }
 
   /** La cuenta de la planilla o de la app que corresponde a esta tarea (para abrir su ficha). */
@@ -2138,6 +2472,17 @@
       return;
     }
     if (ds.moreBlock) { state.more[ds.moreBlock] = true; render(); return; }
+    // Responder
+    const accOf = (k) => String(k || '').slice(String(k || '').indexOf(':') + 1);
+    if (ds.openLine !== undefined && t.closest('main')) { store(`open-line-${state.unit}`, ds.openLine); render(); return; }
+    if (ds.replyOpen) {
+      const row = inboxOf(state.unit).rows.find((r) => r.a.id === accOf(ds.replyOpen));
+      if (row) { const v = replyView(row, state.unit); openWhatsApp(row.a.phone, v.parts[0] || v.text); }
+      return;
+    }
+    if (ds.replySent) { await replySent(state.unit, accOf(ds.replySent)); return; }
+    if (ds.replyRefer) { state.referOpen = state.referOpen === ds.replyRefer ? null : ds.replyRefer; render(); const f = main.querySelector('[data-refer-form] input[name="phone"]'); if (f) f.focus(); return; }
+    if (ds.manualSent) { await manualSent(ds.manualSent, ds.manualKind, ds.key); return; }
     if (ds.stageFilter) { filt(state.unit).stage = ds.stageFilter; state.shown = 100; render(); return; }
     if (ds.send) { e.stopPropagation(); const a = findAccount(ds.send); const next = a && C.nextTemplate(a, unitOf(state.unit)); startSend(ds.send, next ? next.channel : 'whatsapp', ds.key); return; }
     if (ds.chat) { e.stopPropagation(); const a = findAccount(ds.chat); if (a) openWhatsApp(a.phone, ''); return; }
@@ -2281,6 +2626,26 @@
       case 'cancel-targets': state.editingTargets = null; render(); break;
       case 'reset-targets': await saveTargets({ reset: true }); break;
       case 'copy-instructions': copy(agentInstructions(unitOf(state.unit))); break;
+      case 'copy-reply-instructions': copy(replyInstructions(unitOf(state.unit))); break;
+      case 'manual-drawer': {
+        const key = $('#drawer').dataset.key;
+        await manualSent(state.drawer, key === 'libre' ? 'conversation' : 'sent', key);
+        break;
+      }
+      case 'resp-sync': {
+        if (state.respSync) break;
+        state.respSync = true; render();
+        try {
+          const { result } = await api('task', { method: 'POST', body: { unit: state.unit, followup: { op: 'whatsapp-sync' } } });
+          const w = result && result.whatsapp;
+          toast(w && w.reused ? 'Se leyó hace menos de 10 minutos: es la última lectura.' : `Listo: ${int(w && w.totals ? w.totals.nuevas : 0)} respuestas nuevas.`);
+        } catch (err) { toast(err.message, true); }
+        state.respSync = false;
+        await loadUnit(state.unit, { quiet: true, noSync: true });
+        render();
+        break;
+      }
+      case 'resp-reload': await loadFollowup({ quiet: true }); render(); break;
       case 'factory-tpl': {
         const t = templatesOf(state.unit)[state.editing.key];
         state.editing.text = t.factory;
@@ -2355,6 +2720,14 @@
       $('[data-send-whatsapp-line]')?.focus();
     }
     if (e.target.matches('[data-tpl]')) { $('#drawer').dataset.key = e.target.value; renderDrawer(); }
+    if (e.target.matches('[data-reply-pick]')) {
+      state.replyPick = state.replyPick || {};
+      state.replyPick[e.target.dataset.replyPick] = e.target.value;
+      const key = e.target.dataset.replyPick;
+      render();
+      const sel = main.querySelector(`[data-reply-pick="${CSS.escape(key)}"]`);
+      if (sel) sel.focus();
+    }
     if (e.target.matches('[data-bulk-pick]') && state.bulk) { state.bulk.picks[e.target.dataset.bulkPick] = e.target.value; render(); }
   });
   document.addEventListener('submit', async (e) => {
@@ -2411,6 +2784,26 @@
         btn.disabled = false;
         toast(err.message, true);
       }
+      return;
+    }
+    if (form.matches('[data-refer-form], [data-refer-drawer]')) {
+      const fd = new FormData(form);
+      const phone = String(fd.get('phone') || '').trim();
+      const name = String(fd.get('name') || '').trim();
+      const fromRow = form.matches('[data-refer-form]');
+      const key = form.dataset.referForm || '';
+      const accId = fromRow ? key.slice(key.indexOf(':') + 1) : state.drawer;
+      const u = unitOf(state.unit);
+      if (u.inbox === 'bandeja') {
+        const row = inboxOf(state.unit).rows.find((r) => r.a.id === accId);
+        if (state.demo) { toast('En el ejemplo no se cambia nada.', true); return; }
+        if (!row || !row.inbound.replyId) { toast('No encontramos la respuesta en la bandeja.', true); return; }
+        const r = await fuOp(state.unit, { op: 'reply', id: row.inbound.replyId, clasificacion: 'derivo', contactoNombre: name, contactoWhatsapp: phone }, { label: 'Derivación guardada: el contacto nuevo quedó en la inmobiliaria.' });
+        if (r) { state.referOpen = null; await loadFollowup({ quiet: true }); render(); }
+        return;
+      }
+      const res = await act(accId, { type: 'refer', phone, name }, { label: 'Número nuevo guardado en la cuenta (el anterior quedó en las notas)' });
+      if (res) { state.referOpen = null; render(); }
       return;
     }
     if (form.matches('[data-note]')) {

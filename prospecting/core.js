@@ -229,8 +229,9 @@
   const eventRow = (e) => [e.at, e.id, e.account, e.type, e.channel || '', e.template || '', e.detail || '', e.by || ''];
 
   // ─── Lectura de cada cuenta ─────────────────────────────────
+  // «Respondió» que solo tiene una respuesta automática (botOnly, lo marca la lectura de WhatsApp) no es una respuesta.
   const level = (a) => Math.max(
-    STAGES[a.stage] ? STAGES[a.stage].level : 0,
+    a.botOnly && a.stage === 'respondio' ? 1 : STAGES[a.stage] ? STAGES[a.stage].level : 0,
     a.firstContact ? 1 : 0,
     a.replied ? 2 : 0,
     a.interested ? 3 : 0,
@@ -500,12 +501,14 @@
     const live = accounts.filter((a) => !closed(a) && !a.optOut && counted(a, unit));
     const max = (unit && unit.maxTouches) || 3;
     const heat = (a) => (a.demoTried ? 2 : a.demoOpened ? 1 : 0);
-    const conversations = live.filter((a) => level(a) >= 2 && level(a) < 5 && due(a))
+    const conversations0 = live.filter((a) => level(a) >= 2 && level(a) < 5 && due(a))
       .sort((x, y) => level(y) - level(x) || String(x.nextAt).localeCompare(String(y.nextAt)));
-    const greeted = live.filter((a) => a.stage === 'saludado')
+    const greeted0 = live.filter((a) => a.stage === 'saludado')
       .sort((x, y) => String(x.lastContact).localeCompare(String(y.lastContact)));
-    const followUps = live.filter((a) => level(a) === 1 && a.stage !== 'saludado' && a.touches < max && due(a) && a.nextAt)
+    const followUps0 = live.filter((a) => level(a) === 1 && a.stage !== 'saludado' && a.touches < max && due(a) && a.nextAt)
       .sort((x, y) => heat(y) - heat(x) || String(x.nextAt).localeCompare(String(y.nextAt)));
+    // Un número compartido aparece una sola vez en toda la cola (no se le manda doble al mismo celular).
+    const [conversations, greeted, followUps] = dedupePhones([conversations0, greeted0, followUps0], accounts, t);
     const contactedToday = new Set(accounts.filter((a) => dayOf(a.firstContact) === t).map((a) => a.id));
     for (const e of events) if (dayOf(e.at) === t && (e.type === 'saludo' || e.type === 'mensaje')) contactedToday.add(e.id);
     const goal = (unit && unit.dailyGoal) || 40;
@@ -516,6 +519,159 @@
       freshTotal: fresh.length,
       goal, doneToday: contactedToday.size,
     };
+  }
+
+  // Un número compartido (dos profesionales del mismo consultorio) se escribe una sola vez: de cada número
+  // queda, entre todas las listas, la persona más avanzada (etapa, mensajes, la última con la que se habló).
+  // Si a otra persona con ese número ya se le escribió hoy, el número no vuelve a la cola ese día.
+  function sharedWith(a, accounts) {
+    const k = phoneKey(a.phone);
+    return k ? accounts.filter((x) => x.id !== a.id && phoneKey(x.phone) === k) : [];
+  }
+  function dedupePhones(lists, accounts, todayDay) {
+    const t = todayDay || today();
+    const rank = (a) => [level(a), a.touches || 0, String(a.lastContact || ''), a.greetingSent ? 1 : 0];
+    const better = (x, y) => { const rx = rank(x); const ry = rank(y); for (let i = 0; i < rx.length; i++) { if (rx[i] !== ry[i]) return rx[i] > ry[i]; } return false; };
+    const best = new Map();
+    for (const a of lists.flat()) {
+      const k = phoneKey(a.phone);
+      if (k && (!best.has(k) || better(a, best.get(k)))) best.set(k, a);
+    }
+    return lists.map((list) => list.filter((a) => {
+      const k = phoneKey(a.phone);
+      if (!k) return true;
+      if (best.get(k).id !== a.id) return false;
+      return !(dayOf(a.lastContact) !== t && sharedWith(a, accounts).some((x) => dayOf(x.lastContact) === t));
+    }));
+  }
+
+  // ─── Responder: a quién falta contestarle ───────────────────
+  // Las respuestas automáticas de WhatsApp Business y los avisos del sistema no son una persona. Copia de
+  // turniasalud src/lib/sales/whatsapp-sync.ts (isAutomaticReply): si cambia una, cambiar la otra.
+  const AUTOMATIC = /respuesta autom[aá]tica|mensaje autom[aá]tico|fuera (del|de) (nuestro )?horario|(este|[eé]ste|ese) momento no (podemos|nos es posible|estamos)|no (podemos|pudimos) (atender|responder|contestar)|(te|le|les) (responderemos|contestaremos|responderé|contestaré)|horarios? de atenci[oó]n|nuestros? horarios?\b|a la brevedad|lo antes posible|dej[aá](nos|me|n) (tu|su) (consulta|mensaje|nombre)|nos encontramos (fuera|cerrados)|para (pedir |solicitar )?turnos?,? (comunicate|comuníquese|llam)|gracias por (comunicar(te|se|nos)|contactar(te|se|nos)|escribir(nos)?) (con|a)\b|esta empresa (usa|utiliza|trabaja con)|servicio seguro de meta|nos (comunicaremos|pondremos en contacto)/i;
+  const AUTOMATIC_OPENER = /^\W*(hola\W+)?(muchas )?gracias por (tu |su )?(comunicar|escrib|contact|mensaje)/i;
+  const WELCOME = /^\W*(hola\W+)?bienvenid[oa]s?\b/i;
+  function isAutomaticReply(text) {
+    const s = String(text || '');
+    return AUTOMATIC.test(s) || (AUTOMATIC_OPENER.test(s) && s.length > 60) || (WELCOME.test(s) && s.length > 25);
+  }
+  // «No, gracias» y parecidos: la misma regla que Turnia usa para «Feedback de no interesados»
+  // (turniasalud NO_INTERESA_PATTERN en voice-outreach.ts).
+  const NEGATIVE = /(^|[^a-záéíóúñ])no(,| )+(me |nos |les? )?(interesa|interesad)|no (estoy|estamos) interesad|(^|[^a-záéíóúñ])no,? (muchas )?gracias|no por (ahora|el momento)|no (lo |la )?necesit|no es para (m[ií]|nosotros)/i;
+
+  // Fecha local «AAAA-MM-DD HH:MM» (Buenos Aires) de un ISO con zona; las locales quedan como están.
+  function localStamp(v) {
+    const s = String(v || '').trim();
+    if (!s) return '';
+    if (/T.*(Z|[+-]\d{2}:?\d{2})$/.test(s)) { const d = new Date(s); if (!Number.isNaN(d.getTime())) return nowLocal(d); }
+    return parseDate(s);
+  }
+
+  /**
+   * Lo último que escribió una persona, de lo que se sabe: los chats que leyó la lectura de WhatsApp
+   * (`a.chats`, Turnia), la respuesta cargada a mano (`a.manualReply`), las respuestas abiertas de la bandeja
+   * de su app (`replies`, habita.) o, sin texto, la fecha de «Última respuesta». null si nunca escribió.
+   */
+  function lastInbound(a, replies) {
+    const c = [];
+    for (const ch of a.chats || []) {
+      if (ch.inAt) c.push({ at: localStamp(ch.inAt), text: ch.inText || '', line: ch.line || '', source: 'whatsapp', automatic: Boolean(ch.automatic), lastFromMe: ch.lastFromMe, outAt: localStamp(ch.outAt) });
+    }
+    if (a.manualReply && a.manualReply.at) c.push({ at: localStamp(a.manualReply.at), text: a.manualReply.text || '', line: '', source: 'manual', by: a.manualReply.by || '' });
+    for (const r of replies || []) c.push({ at: localStamp(r.at), text: r.text || '', line: r.line || '', source: 'bandeja', replyId: r.id || null, classification: r.classification || null });
+    if (!c.length && a.lastReply && a.lastReply !== 'sí') c.push({ at: a.lastReply, text: '', line: '', source: 'panel' });
+    c.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+    return c[0] || null;
+  }
+
+  /** Las líneas de WhatsApp de una persona: con chat leído, confirmadas a mano o por donde escribió. */
+  function linesOf(a, inbound) {
+    const out = new Set();
+    if (inbound && inbound.line) out.add(inbound.line);
+    for (const ch of a.chats || []) if (ch.line && (ch.sent || ch.received)) out.add(ch.line);
+    for (const l of a.whatsappSenders || []) out.add(l);
+    return [...out];
+  }
+
+  /**
+   * «Responder»: todas las personas cuyo último mensaje es de ellas, una vez por número, de la que espera
+   * hace más a la más nueva. `replies` (habita.): las respuestas abiertas de su bandeja, por cuenta.
+   * Cada fila: { a, inbound, lines, bot, shared }. Las automáticas van aparte (`bots`) y no cuentan.
+   */
+  function inbox(accounts, unit, { replies } = {}) {
+    const rows = [];
+    const extra = replies || new Map();
+    for (const a of accounts) {
+      if (a.optOut || a.stage === 'baja' || a.stage === 'invalido' || a.stage === 'cliente') continue;
+      const inbound = lastInbound(a, extra.get(a.id));
+      if (!inbound || !inbound.at) continue;
+      // Quién escribió último: la lectura de WhatsApp lo sabe (también lo que salió a mano desde el celular);
+      // si no, lo registrado en el panel («Último contacto») contra cuándo escribió.
+      let waiting;
+      if (inbound.source === 'bandeja') waiting = true; // abierta en la bandeja de su app hasta que se procesa
+      else if (inbound.source === 'whatsapp') waiting = inbound.lastFromMe !== true && String(inbound.at) > String(a.lastContact || '');
+      else {
+        const out = [a.lastContact, ...(a.chats || []).map((ch) => localStamp(ch.outAt))].filter(Boolean).sort().pop() || '';
+        waiting = String(inbound.at) > out;
+      }
+      if (!waiting) continue;
+      // Quien dijo que no y ya está cerrado no espera nada (el feedback sale desde «Audios y mensajes» o acá antes de cerrar).
+      if (a.stage === 'perdido') continue;
+      const bot = Boolean(inbound.automatic) || isAutomaticReply(inbound.text);
+      rows.push({ a, inbound, lines: linesOf(a, inbound), bot });
+    }
+    rows.sort((x, y) => String(x.inbound.at).localeCompare(String(y.inbound.at)));
+    // Un número compartido, una sola fila: la de la respuesta más nueva; las otras personas van en «shared».
+    const seen = new Map();
+    const out = [];
+    for (const r of [...rows].sort((x, y) => String(y.inbound.at).localeCompare(String(x.inbound.at)))) {
+      const k = phoneKey(r.a.phone);
+      if (k && seen.has(k)) { const kept = seen.get(k); if (!kept.shared.includes(r.a.name)) kept.shared.push(r.a.name); continue; }
+      r.shared = accounts.filter((x) => x.id !== r.a.id && k && phoneKey(x.phone) === k).map((x) => x.name);
+      if (k) seen.set(k, r);
+      out.push(r);
+    }
+    out.sort((x, y) => String(x.inbound.at).localeCompare(String(y.inbound.at)));
+    return { rows: out.filter((r) => !r.bot), bots: out.filter((r) => r.bot) };
+  }
+
+  /**
+   * Qué contestarle a una fila de «Responder»: un mensaje de la secuencia (una plantilla) o una respuesta
+   * según lo que escribió (`unit.replies`). Devuelve { key, template?, reply?, register } donde `register` es
+   * lo que se registra al confirmar: el paso de la secuencia, una respuesta de conversación o el cierre.
+   */
+  function replyPlan(a, inbound, unit) {
+    const text = String((inbound && inbound.text) || '');
+    const replies = (unit && unit.replies) || [];
+    const pick = (key) => replies.find((r) => r.key === key);
+    const intent = replies.find((r) => r.test && r.test.test(text)) || pick('default') || null;
+    if (unit && unit.replyPlan) {
+      const custom = unit.replyPlan(a, inbound, { intent, pick, negative: NEGATIVE.test(text) });
+      if (custom) return custom;
+    }
+    if (NEGATIVE.test(text) && pick('negativo')) return { key: 'negativo', reply: pick('negativo'), register: { type: 'conversation', detail: 'Cierre: dijo que no' }, then: { type: 'outcome', outcome: 'perdido', detail: text.slice(0, 200) } };
+    return intent ? { key: intent.key, reply: intent, register: { type: 'conversation', detail: intent.title } } : null;
+  }
+
+  /**
+   * La demo que lleva un mensaje es la de esta cuenta. `unit.demoSlug(url)` saca el identificador de una
+   * URL de demo. Devuelve { ok, slug, problem, owner } (owner: la cuenta dueña del link equivocado).
+   */
+  function demoCheck(a, unit, accounts, text) {
+    const slugOf = unit && unit.demoSlug ? unit.demoSlug : () => null;
+    const own = slugOf((unit && unit.demoLink ? unit.demoLink(a) : a.demoUrl) || '');
+    const out = { ok: true, slug: own || '', problem: '', owner: null };
+    if (own && unit && unit.demoIsCode && own !== a.id) { out.ok = false; out.problem = `El link de su demo (/p/${own}) no es el de su código (${a.id}).`; }
+    const urls = String(text || '').match(/https?:\/\/[^\s<>"')]+/g) || [];
+    for (const url of urls) {
+      const s = slugOf(url.replace(/[.,;:!?]+$/, ''));
+      if (!s || s === own) continue;
+      out.ok = false;
+      out.owner = (accounts || []).find((x) => x.id !== a.id && slugOf((unit.demoLink ? unit.demoLink(x) : x.demoUrl) || '') === s) || null;
+      out.problem = `El mensaje lleva la demo /p/${s}${out.owner ? `, que es de ${out.owner.name}` : ''}, y la de esta cuenta es ${own ? `/p/${own}` : 'otra'}.`;
+      break;
+    }
+    return out;
   }
 
   // ─── Envíos hechos fuera del panel, en lote ─────────────────
@@ -606,7 +762,8 @@
       link: (unit && unit.demoLink ? unit.demoLink(a) : a.demoUrl) || '',
       remitente: (unit && unit.sender) || '',
     }, unit && unit.vars ? unit.vars(a) : {});
-    return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)).replace(/\n{3,}/g, '\n\n').trim();
+    // «de el Dr. Arias» → «del Dr. Arias»; «a el Dr.» → «al Dr.» (como Turnia en su renderTemplate).
+    return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in vars ? vars[k] : m)).replace(/\b([Aa]|[Dd]e) el (Dr\.)/g, '$1l $2').replace(/\n{3,}/g, '\n\n').trim();
   }
 
   function nextTemplate(a, unit) {
@@ -713,6 +870,27 @@
           patch.nextStep = 'Esperar respuesta';
         }
         ev(greeting ? 'saludo' : 'mensaje', { channel: patch.lastChannel, template: action.template || '', detail: action.detail || '' });
+        break;
+      }
+      case 'conversation': {
+        // Le contestamos a mano dentro de una conversación: no es un paso de la secuencia ni suma mensajes.
+        if (a.optOut || a.stage === 'baja') throw new Error('Pidió no recibir más mensajes.');
+        patch.lastContact = at;
+        patch.lastChannel = action.channel || 'whatsapp';
+        ev('nota', { channel: patch.lastChannel, detail: `Le respondimos por WhatsApp${action.line ? ` (línea ${action.line})` : ''}${action.detail ? `: ${action.detail}` : ''}` });
+        break;
+      }
+      case 'refer': {
+        // Una derivación: el número nuevo queda en la misma cuenta (misma demo) y el anterior, en las notas.
+        const phone = String(action.phone || '').trim();
+        if (phoneKey(phone).length < 10) throw new Error('Revisá el número nuevo: con el código de área.');
+        if (phoneKey(phone) === phoneKey(a.phone)) throw new Error('Es el mismo número que ya tiene.');
+        patch.phone = phone;
+        patch.phoneKind = 'celular';
+        const who = String(action.name || '').trim();
+        const text = `Derivación: pasaron el WhatsApp de ${who || 'otra persona'} (${phone}). Antes: ${a.phone || 'sin número'}.`;
+        patch.notes = [a.notes, `${day}: ${text}`].filter(Boolean).join('\n');
+        ev('nota', { detail: text });
         break;
       }
       case 'call':
@@ -823,6 +1001,7 @@
     TZ, FIELDS, LABEL, WRITABLE, EDITABLE, STAGES, STAGE_KEYS, FUNNEL, ACTIVITY_TAB, ACTIVITY_HEAD, CONTACT_TYPES,
     norm, slug, mapHeaders, parseDate, dayOf, nowLocal, today, addDays, addBusinessDays, daysBetween,
     stageFromText, toAccounts, toEvents, eventRow, level, isContacted, closed, canMessage, counted, inRange,
-    funnel, funnelSteps, breakdown, daily, parseBulk, planBulk, freshContacts, usedPhones, targetFunnel, demoVersions, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
+    funnel, funnelSteps, breakdown, daily, parseBulk, planBulk, freshContacts, usedPhones, phoneKey, sharedWith, dedupePhones,
+    isAutomaticReply, NEGATIVE, localStamp, lastInbound, linesOf, inbox, replyPlan, demoCheck, targetFunnel, demoVersions, periodWeeks, waDigits, waWebLink, inSendWindow, nextSendWindow, isReplay, templateStats, queue, renderTemplate, nextTemplate, waLink, applyAction, cellValue, firstName,
   };
 });

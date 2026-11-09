@@ -637,3 +637,35 @@ button.chip:hover { background: var(--glass-strong); }
 .voice-dialog .voice-rules form, .voice-dialog .voice-rules fieldset { display: grid; gap: 12px; }
 .voice-dialog .voice-rules fieldset { padding: 0; border: 0; margin: 0; }
 .voice-dialog .voice-rules [data-rules-details] { margin-top: 10px; }
+
+/* Buscador global (arriba): cualquier cuenta de cualquier unidad, por nombre, teléfono o código. */
+.gsearch { position: relative; flex: 0 1 260px; min-width: 180px; }
+.gsearch .input { width: 100%; }
+.gresults {
+  position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: min(420px, calc(100vw - 32px));
+  max-height: min(420px, 70vh); overflow: auto; padding: 6px; border-radius: 18px; display: grid; gap: 2px;
+}
+.gresult {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; text-align: left;
+  border: 0; background: none; cursor: pointer; padding: 8px 10px; border-radius: 12px; color: var(--ink); font: inherit;
+}
+.gresult:hover, .gresult[aria-selected="true"] { background: var(--glass-soft); }
+.gresult .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--s1)); }
+.gresult .gr-main { display: grid; min-width: 0; }
+.gresult .gr-main strong, .gresult .gr-main .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gresult .gr-main .sub { margin: 0; font-size: 12px; }
+@media (max-width: 640px) { .gsearch { order: 4; flex: 1 1 100%; } .gresults { left: 0; right: auto; width: 100%; } }
+
+/* Responder: una tarjeta por persona que espera respuesta. */
+.replies { display: grid; gap: 12px; }
+.reply { display: grid; gap: 8px; }
+.reply-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.reply-head .who strong { font-size: 17px; }
+.reply-head .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.reply-head .meta strong { font-size: 14px; color: var(--ink); }
+.said { margin: 0; padding: 10px 14px; border-radius: 14px; font-size: 15px; white-space: pre-wrap; background: var(--glass-soft); box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px var(--glass-line); }
+.reply-body { display: grid; gap: 8px; margin-top: 4px; }
+.reply-body .field select { max-width: 100%; }
+.reply[data-line-ok="false"] { opacity: 0.86; }
+.notice-line { margin: 0; padding: 6px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--warning) 22%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warning) 45%, transparent); }
+.notice-line.bad { background: color-mix(in srgb, var(--bad-text) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad-text) 40%, transparent); }

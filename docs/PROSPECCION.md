@@ -92,6 +92,50 @@ Quién respondió lo dice la lectura de WhatsApp (a las 8, o con **«Leer las re
 
 Las etapas y los pasos están en `prospecting/agencies.js` (`TURNIA`), junto a los de habita. (`HABITA`).
 
+## Responder (`?vista=responder`, 09/11)
+
+La bandeja de quienes escribieron último, en las dos unidades. **Enviar** trabaja una cola en orden; **Responder** no. Las respuestas llegan cuando llegan y cada una necesita un texto distinto, así que se atienden en cualquier orden. Con esto, contestar la bandeja deja de ser cruzar el panel contra WhatsApp Web contacto por contacto.
+
+- **Quiénes aparecen:** todos los que escribieron último. No aparecen los que pidieron la baja, no tienen WhatsApp, son clientes o dijeron que no y ya están cerrados.
+  - **Turnia:** sale de la lectura de WhatsApp (`whatsappInbox` de `?vista=filas`: lo último que escribió cada uno en cada línea, nuestro último mensaje y quién escribió último) y de las respuestas cargadas a mano. La línea que no se lee aparece como «Sin texto».
+  - **habita.:** salen las respuestas abiertas de su bandeja de Follow-up (las registra su extensión o el equipo).
+- **Cada fila muestra:**
+  - nombre, teléfono con 549 y la línea (0022 / 5483);
+  - etapa, mensajes usados (x/3) y cuándo escribió;
+  - **su último mensaje, textual**;
+  - la **respuesta sugerida ya armada**, con «Copiar», «Abrir chat», «Ya lo mandé» (dos toques) y «Derivó a otro número».
+  - En «Respuesta» se puede elegir otra.
+- **La respuesta sugerida** (`replyPlan` en `core.js`, las respuestas en `units.js` → `replies`):
+  - **Turnia, antes del link**, manda la secuencia:
+    - el Paso 2;
+    - su variante `whatsapp_permiso_turno` si creyeron que era un paciente («¿es por un turno?»);
+    - el Paso 3 si respondieron el Paso 2;
+    - el feedback si dijeron que no (después queda «No le interesa»).
+  - **Turnia, después del link**, la respuesta depende de lo que escribieron: precio, ya tienen secretaria, usan otra agenda, encontró un error, más adelante, le gustó, derivación o general.
+  - **habita.:** igual. «Ya lo mandé» cierra la respuesta en su bandeja con la clasificación (`pregunta_precios`, `interesado`, `rechazo`, `derivo`…).
+- **Qué registra «Ya lo mandé» (Turnia):**
+  - un paso de la secuencia se registra como siempre;
+  - una respuesta de conversación va como `conversation`: no cuenta como uno de los tres mensajes, pero mueve «Último contacto» y la fila sale de la lista.
+  - En los dos casos, con la línea abierta: queda como la línea confirmada de esa persona.
+- **Respuestas automáticas:** «Gracias por comunicarte con…», «Bienvenido a…», «Nuestro horario…» y «Esta empresa usa un servicio seguro de Meta…» van aparte, en «Respuestas automáticas», y no se contestan.
+  - Tampoco cuentan en «Respondieron»: si alguien figura «Respondió» y lo único que llegó es eso, la etapa dice «Solo respuesta automática».
+  - Turnia lo corrige solo en la próxima lectura.
+  - La regla es una copia de la de Turnia (`isAutomaticReply`): si cambia una, cambiar la otra.
+- **Línea abierta:** se elige la cuenta abierta en WhatsApp Web («Línea abierta en WhatsApp Web»). Las filas de la otra línea van al final, con el aviso de cambiar de cuenta, y llevan `data-line-ok="false"`.
+- **Número compartido:** dos personas con el mismo celular (dos profesionales del mismo consultorio) son una sola fila, con «Mismo número que…». La cola de Hoy y la de Enviar tampoco los ofrecen dos veces. Si a uno se le escribió hoy, el otro no vuelve a la cola ese día.
+- **Demo equivocada:** antes de mandar se controla que el link `/p/<código>` del mensaje sea el de esa cuenta. Si es de otra, la fila (y la tarjeta de Enviar, y la tarea de Follow-up) avisa de quién es y no deja registrar el envío.
+- **Derivación:** cuando la recepción pasa el WhatsApp del doctor, «Derivó a otro número» lo guarda en la misma cuenta. Queda el mismo código y la misma demo, y el número anterior va a las notas (`refer` en Turnia; en habita. suma el contacto a la inmobiliaria). Hay que contestarle primero a la recepción y después cargar el número.
+- **Para un agente:** cada fila (`data-testid="reply-item"`) tiene `data-phone`, `data-line`, `data-line-ok`, `data-wa-url`, `data-demo-url`, `data-demo-ok`, `data-template` y `data-state`, además de:
+  - `reply-last-message`, `reply-message` (y `reply-message-2` si son dos);
+  - `reply-copy`, `reply-open`, `reply-sent`, `reply-refer`, `reply-pick`.
+  - En la vista hay un bloque propio, **«Instrucciones para el agente de IA · Responder»**. Explica cómo abrir el chat con la búsqueda nativa por teléfono (WhatsApp Web ignora los clics simulados), cómo verificar que es el chat correcto antes de escribir y cómo registrar el envío.
+
+**En todo el panel (09/11):**
+- **Buscador global**, arriba: por nombre, consultorio o inmobiliaria, código (el de la demo, `perez-a1b`) o teléfono (alcanzan los últimos 3 números). Encuentra a cualquiera, esté o no en la cola del día, y abre su ficha.
+- **Las filas de Hoy** llevan `data-phone`, `data-wa-url` (con el mensaje que le toca), `data-demo-url`, `data-state` y `data-line`. Muestran los mensajes usados (x/3), la línea y si comparten el número.
+- **«Ya lo mandé»** en cada fila de Hoy y en la ficha («Ya lo mandé a mano»): registra un envío hecho directo desde WhatsApp, sin pasar por la cola.
+- **Conversaciones abiertas** se muestra completa (antes cortaba en 15).
+
 ## Enviar con un agente de IA (`?vista=enviar`)
 
 Una sola tarjeta en un lugar fijo, para una persona o para un agente con computer use (por ejemplo, Claude en Chrome, que alterna entre este panel y la pestaña de WhatsApp Web). En la vista están las **instrucciones para el agente**, listas para copiar.

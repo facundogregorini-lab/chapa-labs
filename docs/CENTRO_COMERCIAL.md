@@ -147,6 +147,13 @@ Implementación:
   - **Turnia:** 0 listas, porque era domingo y la regla de horario las bloquea; 331 bloqueadas y 64 programadas.
 - **No probado en vivo:** tomar y confirmar una tarea real (se evitó escribirle a prospectos reales). Está cubierto por tests con base real y por un recorrido en Chromium con APIs simuladas.
 
+## Responder (09/11)
+
+La vista **Responder** (`/prospecting/<unidad>?vista=responder`) es la bandeja de quienes escribieron último, con su mensaje textual y la respuesta armada. Está detallada en `PROSPECCION.md` → «Responder».
+
+- **Turnia:** los datos salen de `GET ?vista=filas` → `whatsappInbox` (turniasalud#162). Registra con las acciones `sent` (con `line`), `conversation` y `refer`.
+- **habita.:** salen de la bandeja de su Follow-up (`inbox`). Registra con `op: "reply"` sobre la respuesta, con su clasificación. La derivación va con `contactoNombre` y `contactoWhatsapp`.
+
 ## Pendientes, en orden
 
 1. **Primera tanda real**, 10 por producto. Facu y Axel en paralelo: tomar, abrir WhatsApp, confirmar.

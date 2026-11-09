@@ -32,6 +32,8 @@
     api: { urlEnv: 'TURNIA_PROSPECTING_API_URL', url: 'https://turniasalud.app/api/prospeccion', secretEnvs: ['TURNIA_PROSPECTING_SECRET', 'TURNIA_METRICS_SECRET'], rowsQuery: { vista: 'filas' } },
     appUrl: 'https://turniasalud.app/panel/prospeccion',
     appName: 'el panel de Turnia',
+    // «Responder»: lo último que escribió cada uno sale de la lectura de WhatsApp de Turnia (?vista=filas → whatsappInbox).
+    inbox: 'whatsapp',
     // La vista «Odontólogos»: la lista con el embudo de demos de habita. (de Facu), armada con estas cuentas.
     agencies: 'accounts',
     // Para cuando el panel escriba en una planilla propia: trae las señales de la app.
@@ -89,6 +91,9 @@
     counted: (a) => a.phoneKind !== 'fijo' || Boolean(a.replied || a.demoOpened || a.demoTried),
     canMessage: (a) => Boolean(a.phone) && a.phoneKind !== 'fijo' && a.phoneKind !== 'revisar',
     demoLink: (a) => a.demoUrl || '',
+    // La demo de cada persona es /p/<su código>: un mensaje con otro /p/… es la demo de otro consultorio.
+    demoSlug: (url) => (/\/p\/([a-z0-9-]+)/i.exec(String(url || '')) || [])[1] || null,
+    demoIsCode: true,
     vars: (a) => {
       const t = String(a.title || '').trim();
       return { destinatario: t ? `${/a\.?$/i.test(t) ? 'la' : 'el'} ${t} ${lastName(a.name)}` : a.name };
@@ -122,6 +127,10 @@
         title: 'Paso 2 · El gancho de permiso', hint: 'Cuando responden el Paso 1. Sin link; tampoco cuenta como uno de los tres.', channel: 'whatsapp',
         text: 'Qué tal! Soy Axel. Sé que en recepción viven a mil con el WhatsApp, así que les armé gratis una ayudante virtual cargada con los datos de {destinatario}.\n\nSirve para que conteste sola las preguntas repetidas de obras sociales, precios y horarios fuera de hora, así no llegan el lunes a la mañana con 100 mensajes atrasados.\n\nSeguro tiene algún error porque la armé rápido con la info que encontré en internet. ¿Te paso el link por acá y la probás 20 segundos como paciente a ver si le pifié en algo?',
       },
+      whatsapp_permiso_turno: {
+        title: 'Paso 2 · Si creen que sos un paciente', hint: 'Cuando contestan el Paso 1 como a un paciente («¿Es por un turno?»). Aclara que no y sigue como el Paso 2. Sin link; no cuenta.', channel: 'whatsapp',
+        text: 'No, tranqui, no es por un turno! Soy Axel. Sé que en recepción viven a mil con el WhatsApp, así que les armé gratis una ayudante virtual cargada con los datos de {destinatario}.\n\nContesta sola las preguntas repetidas de obras sociales, precios y horarios, también fuera de hora, así no llegan el lunes a la mañana con 100 mensajes atrasados.\n\nSeguro tiene algún error porque la armé rápido con la info que encontré en internet. ¿Te paso el link por acá y la probás 20 segundos como paciente a ver si le pifié en algo?',
+      },
       whatsapp_entrega: {
         title: 'Paso 3 · La entrega y el puente al médico', hint: 'Cuando dicen «Dale, pasame». Lleva el link de su demo.', channel: 'whatsapp',
         text: 'Acá tenés: {link}\n\nMandale un audio o escribile haciéndole alguna pregunta difícil como si fueras un paciente real!\n\nSi ves que responde bien, reenviale el link a los doctores: además de sacarte preguntas repetidas a vos, a ellos les rellena solos los huecos de turnos que se cancelan sobre la hora. Avisame si le encontraste algún error!',
@@ -144,6 +153,43 @@
       },
       instagram: { title: 'Instagram', hint: 'Sin link: los pedidos de mensaje con links se filtran.', channel: 'instagram', text: 'Hola {saludo}! Soy Axel, de Turnia. Armé una demo de Sofi con tu consultorio: contesta el WhatsApp cuando estás atendiendo o fuera de horario y da los turnos sola. ¿Te paso el link para probarla? Es un minuto.' },
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
+    },
+    // «Responder»: qué contestarle según lo que escribió (el orden importa: gana la primera que coincide).
+    // Antes del link manda la secuencia (replyPlan); después, una de estas. Son sugerencias: se pueden cambiar.
+    replies: [
+      { key: 'derivacion', title: 'Pasó el número de otra persona', test: /(n[uú]mero|cel(u|ular)?|whats?app|contacto|wsp)\b[^.?!]*\b(dr|dra|doc|doctor|doctora|odont[oó]log[oa])\b|\b(dr|dra|doctor|doctora)\b[^.?!]*\b(n[uú]mero|cel(u|ular)?|whats?app|contacto)|\b(\+?54)?\s?9?\s?\d{2,4}[\s-]?\d{3,4}[\s-]?\d{4}\b/i,
+        text: '¡Mil gracias! Le escribo directo así no te robo más tiempo.' },
+      { key: 'error', title: 'Encontró un error en la demo', test: /se equivoc|est[aá] mal|no es as[ií]|dijo mal|no atendemos|no trabajamos con|error/i,
+        text: '¡Gracias por avisarme! Decime qué dato estaba mal y lo corrijo hoy mismo. Lo que no sabe, Sofi lo deja como tarea para una persona del consultorio.' },
+      { key: 'precio', title: 'Pregunta el precio', test: /cu[aá]nto (sale|cuesta|cobr|vale)|precio|costo|tarifa|abono|\$/i,
+        text: 'Depende de cuántos mensajes y turnos manejan. Primero probala; si les sirve, en 15 minutos te armo la propuesta con {destinatario}. ¿Le pudiste pasar el link?' },
+      { key: 'secretaria', title: 'Ya tienen secretaria', test: /secretari|recepcionista|ya (tenemos|tengo) (a )?alguien|lo hacemos nosotr/i,
+        text: 'No la reemplaza: cubre la noche, el fin de semana y los picos, y le deja los turnos dados. Justamente les saca de encima las preguntas repetidas.' },
+      { key: 'software', title: 'Usan otra agenda', test: /doctoralia|dentalink|agenda (online|web)|sistema de turnos|ya usamos/i,
+        text: 'La integración todavía no está: en el piloto Sofi da turnos en los horarios que le reserven, y ustedes los pasan a su agenda. Si les sirve, lo vemos en 15 minutos.' },
+      { key: 'mas_adelante', title: 'Más adelante', test: /m[aá]s adelante|despu[eé]s (lo|te)|ahora no|otro momento|lo vemos|lo charlo|lo consulto|le (digo|comento|paso) al? (dr|doc)/i,
+        text: 'Dale, ningún problema. Si mientras tanto la quieren probar, el link queda acá: {link}' },
+      { key: 'interesado', title: 'Le gustó', test: /me gust|est[aá] (buen|genial|b[aá]rbar)|interesante|interesad|c[oó]mo (sigue|seguimos|funciona)|quiero|nos (sirve|interesa)|muy bien|excelente|copado/i,
+        text: '¡Qué bueno! ¿Te parece si coordinamos 15 minutos con {destinatario} para armarla con su agenda? ¿Qué día y horario les queda cómodo?' },
+      { key: 'negativo', title: 'Dijo que no', test: null, template: 'whatsapp_feedback' },
+      { key: 'default', title: 'Respuesta general', test: null,
+        text: '¡Gracias por responder! ¿Pudieron probarla haciéndole una pregunta como paciente? Si les sirve, en 15 minutos te muestro cómo quedaría con su agenda.' },
+    ],
+    // Antes del link manda la secuencia: el Paso 2 (o su variante si creyeron que eras un paciente) y, si respondió
+    // el Paso 2, el Paso 3 con la demo. Un «no, gracias» va al feedback y cierra. Después del link, `replies`.
+    replyPlan(a, inbound, { pick, negative }) {
+      const text = String((inbound && inbound.text) || '');
+      if (negative) return { key: 'whatsapp_feedback', template: 'whatsapp_feedback', register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: { type: 'outcome', outcome: 'perdido', detail: text.slice(0, 200) } };
+      if (a.touches) return null;
+      const deriv = pick('derivacion');
+      if (deriv && deriv.test.test(text)) return { key: 'derivacion', reply: deriv, register: { type: 'conversation', detail: deriv.title } };
+      if (a.greetingSent && !a.permissionSent) {
+        const patient = /\bturnos?\b|paciente|para cu[aá]ndo|qu[eé] (d[ií]a|fecha|horario)|obra social|primera vez|consulta (de|por|para)|una urgencia/i.test(text);
+        const key = patient ? 'whatsapp_permiso_turno' : 'whatsapp_permiso';
+        return { key, template: key, register: { type: 'sent', template: key } };
+      }
+      if (a.permissionSent) return { key: 'whatsapp_entrega', template: 'whatsapp_entrega', register: { type: 'sent', template: 'whatsapp_entrega' } };
+      return null;
     },
     // Embudo con metas: la base es por semana; cada paso, la conversión esperada del anterior.
     // Modelo comercial de Turnia (Programa Fundadores): nadie compra sin una llamada de 15 minutos y el
@@ -194,6 +240,8 @@
     api: { urlEnv: 'HABITA_PROSPECTING_API_URL', url: 'https://www.habitaia.app/api/prospeccion', secretEnvs: ['HABITA_PROSPECTING_SECRET', 'HABITA_METRICS_SECRET'], rows: true, sync: true, templates: false, targets: false, fallback: 'sheet' },
     appUrl: 'https://www.habitaia.app/admin/prospeccion',
     appName: 'el panel de habita.',
+    // «Responder»: las respuestas abiertas de su bandeja de Follow-up (las registra su extensión de WhatsApp o el equipo).
+    inbox: 'bandeja',
     // La lista «Inmobiliarias» de su equipo (/admin/inmobiliarias), tal cual, en la vista Inmobiliarias.
     agencies: true,
     // La sincronización de la planilla con habita. (scripts/prospeccion-sync.gs) lee «Fecha envío» solo como día.
@@ -233,6 +281,26 @@
     },
     canMessage: (a) => (Boolean(a.phone) && !['revisar', 'fijo'].includes(a.phoneKind)) || Boolean(a.email),
     demoLink: (a) => a.demoUrl || '',
+    // Cualquier link a una demo de habita.: el mensaje solo puede llevar la de esta inmobiliaria.
+    demoSlug: (url) => (/habitaia\.app\/[^\s?#]*demo[^\s?#]*/i.exec(String(url || '')) || [])[0] || null,
+    // «Responder»: la respuesta abierta en la bandeja de habita. se cierra con su clasificación (la de su
+    // Follow-up: confirmo_numero, interesado, neutro, pregunta_precios, mas_adelante, derivo, rechazo).
+    replies: [
+      { key: 'derivacion', title: 'Pasó el contacto de otra persona', classification: 'derivo', test: /(n[uú]mero|cel(u|ular)?|whats?app|contacto|wsp|escribile|hablá con)\b[^.?!]*\b(dueñ|socio|encargad|martiller|corredor|gerente)|\b(\+?54)?\s?9?\s?\d{2,4}[\s-]?\d{3,4}[\s-]?\d{4}\b/i,
+        text: '¡Mil gracias! Le escribo directo.' },
+      { key: 'negativo', title: 'Dijo que no', classification: 'rechazo', test: null,
+        text: 'Gracias por contestarme, {saludo}. No te escribo más. Si me decís en una línea por qué no te sirve, me ayudás un montón.' },
+      { key: 'precio', title: 'Pregunta el precio', classification: 'pregunta_precios', test: /cu[aá]nto (sale|cuesta|cobr|vale)|precio|costo|tarifa|abono|\$/i,
+        text: 'Se paga por foto con créditos, sin abono fijo. Para verlo con tus números, ¿te muestro la demo con tus propiedades en 10 minutos esta semana?' },
+      { key: 'mas_adelante', title: 'Más adelante', classification: 'mas_adelante', test: /m[aá]s adelante|despu[eé]s (lo|te)|ahora no|otro momento|lo vemos/i,
+        text: 'Perfecto, {saludo}. Te escribo más adelante. Si mientras tanto la querés ver, la demo con tus propiedades está acá: {link}' },
+      { key: 'interesado', title: 'Le interesa', classification: 'interesado', test: /me gust|est[aá] (buen|genial|b[aá]rbar)|interesante|interesad|c[oó]mo (sigue|seguimos|funciona)|quiero|nos (sirve|interesa)|muy bien|excelente|copado/i,
+        text: '¡Genial, {saludo}! ¿Te muestro en 10 minutos cómo hacerlo con toda tu cartera? Decime qué día y horario te queda cómodo.' },
+      { key: 'confirmo', title: 'Confirmó el número', classification: 'confirmo_numero', test: /^\W*(s[ií]|hola|buenas|buen d[ií]a|qu[eé] tal|con qui[eé]n)\b.{0,40}$/i,
+        text: '¡Hola, {saludo}! Te escribo de habita.: tomamos algunas propiedades de {inmobiliaria} y las amoblamos con IA para que veas cómo quedarían los avisos: {link}' },
+      { key: 'default', title: 'Respuesta general', classification: 'neutro', test: null,
+        text: '¡Gracias por responder, {saludo}! ¿Pudiste ver la demo con tus propiedades? Si querés, te muestro en 10 minutos cómo hacerlo con toda tu cartera.' },
+    ],
     nextTemplate(a) {
       const channel = a.phone && !['revisar', 'fijo'].includes(a.phoneKind) ? 'whatsapp' : a.email ? 'email' : null;
       if (!channel || a.stage === 'respondio' || (a.stage !== 'por_contactar' && a.stage !== 'contactado')) return null;

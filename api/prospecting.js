@@ -400,6 +400,18 @@ async function doAction(req, res, user) {
   res.status(200).json({ account: updated, events: result.events });
 }
 
+// Los chats de una persona (Turnia, ?vista=filas → whatsappInbox) pegados a su cuenta. «botOnly»: figura como
+// «Respondió» pero lo único que escribió es una respuesta automática (una lectura vieja no la distinguía): no
+// cuenta como respuesta hasta que la próxima lectura de Turnia lo corrija sola.
+function withInbox(a, entry) {
+  if (!entry) return a;
+  const chats = Array.isArray(entry.chats) ? entry.chats.slice(0, 4) : [];
+  const out = { ...a, chats, manualReply: entry.manual || null };
+  const bot = (ch) => Boolean(ch.automatic) || core.isAutomaticReply(ch.inText || '');
+  if (a.stage === 'respondio' && !entry.manual && chats.some((ch) => ch.inText && bot(ch)) && chats.every((ch) => !ch.inText || bot(ch))) out.botOnly = true;
+  return out;
+}
+
 async function doSetup(req, res, user) {
   const unit = UNITS[(req.body || {}).unit];
   const sheet = unit && sheetOf(unit);
@@ -535,6 +547,7 @@ module.exports = async (req, res) => {
       let events = data.events;
       let rowsFromApi = false;
       let whatsappSenderOptions;
+      let whatsappReadAt;
       if (unit.api && apiOf(unit)) {
         try {
           const out = await callApi(unit);
@@ -555,6 +568,11 @@ module.exports = async (req, res) => {
                 if (Array.isArray(rows.whatsappSenders?.options)) {
                   whatsappSenderOptions = rows.whatsappSenders.options;
                   accounts = accounts.map((a) => ({ ...a, whatsappSenders: rows.whatsappSenders.byCode?.[a.id] ?? [] }));
+                }
+                // «Responder»: por código, lo último que escribió en cada línea y la respuesta cargada a mano.
+                if (rows.whatsappInbox && rows.whatsappInbox.byCode) {
+                  whatsappReadAt = rows.whatsappInbox.readAt || null;
+                  accounts = accounts.map((a) => withInbox(a, rows.whatsappInbox.byCode[a.id]));
                 }
                 if (Array.isArray(rows.events)) events = rows.events;
                 rowsFromApi = true;
@@ -579,6 +597,7 @@ module.exports = async (req, res) => {
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: unit.api && unit.api.rows && apiOf(unit) ? [] : missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts,
         whatsappSenderOptions,
+        whatsappReadAt,
         events: events.slice(-8000),
         // habita.: cuándo entró la planilla por última vez a su base (el panel la sincroniza si pasó una hora).
         sync: unit.api && unit.api.sync && apiOf(unit) ? { lastImport: lastImport ? lastImport.at : null } : undefined,

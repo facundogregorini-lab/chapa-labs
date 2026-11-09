@@ -114,10 +114,46 @@
         if (i === 1) { a.operationalAt = C.addDays(t, -2) + ' 09:00'; a.firstMonth = 2; a.accountActive = C.nowLocal(); }
       });
     }
+    // «Responder»: respuestas de ejemplo, sin tocar el azar del resto (todo ficticio).
+    let lineOptions = null;
+    let inboxReplies = null;
+    const ago = (h) => C.nowLocal(new Date(Date.now() - h * 3600000));
+    if (unit.id === 'turnia') {
+      lineOptions = ['0022', '5483'];
+      const said = (a, i, text, extra = {}) => {
+        const inAt = ago(Math.max(1, 10 - i));
+        // Lo nuestro, antes de su respuesta (si el ejemplo lo había puesto más tarde, se corre).
+        if (!a.lastContact || a.lastContact >= inAt) { a.lastContact = ago(30 + i); if (!a.firstContact || a.firstContact > a.lastContact) a.firstContact = a.lastContact; }
+        a.lastReply = inAt;
+        if (a.stage === 'saludado' || a.stage === 'contactado') a.stage = 'respondio';
+        a.whatsappSenders = [lineOptions[i % 2]];
+        a.chats = [{ line: lineOptions[i % 2], inAt, inText: text, outAt: a.lastContact || a.firstContact, lastFromMe: false, received: 1, sent: Math.max(1, a.touches), automatic: false, ...extra }];
+      };
+      const greeted = accounts.filter((a) => a.stage === 'saludado').slice(0, 5);
+      greeted.forEach((a) => { a.greetingSent = a.firstContact; a.lastContact = a.lastContact || a.firstContact; });
+      [['Hola, sí, ¿es por un turno?'], ['Sí, es la recepción. ¿Quién habla?'], ['Buenas, ¿para cuándo sería el turno?'], ['Gracias por comunicarte con el consultorio!', { automatic: true }]].forEach(([text, extra], i) => greeted[i] && said(greeted[i], i, text, extra));
+      if (greeted[3]) greeted[3].botOnly = true;
+      // Respondió el Paso 2.
+      if (greeted[4]) { greeted[4].permissionSent = ago(40); greeted[4].lastContact = greeted[4].permissionSent; said(greeted[4], 4, 'Dale, pasame el link'); }
+      const linked = accounts.filter((a) => a.stage === 'contactado' && a.touches >= 1 && a.phoneKind !== 'fijo').slice(0, 5);
+      ['¿Cuánto sale por mes?', 'Me gustó, ¿cómo sigue?', 'No, gracias. Por ahora no.', 'Te paso el WhatsApp de la Dra: 223 000-9999'].forEach((text, i) => linked[i] && said(linked[i], i + 5, text));
+      // Una respuesta cargada a mano (la línea 5483 todavía no se lee).
+      if (linked[4]) { linked[4].stage = 'respondio'; linked[4].whatsappSenders = ['5483']; linked[4].manualReply = { at: ago(5), text: '¿Esto lo puede usar el Dr. también?', by: 'Axel' }; linked[4].lastReply = linked[4].manualReply.at; }
+      // Dos profesionales con el mismo número: una sola fila.
+      if (greeted[1] && linked[0]) linked[0].phone = greeted[1].phone;
+    } else {
+      const sent = accounts.filter((a) => a.stage === 'contactado' && a.phoneKind === 'celular').slice(0, 4);
+      inboxReplies = ['¿Cuánto sale por foto?', 'Me interesa, ¿cómo sigue?', 'No gracias, no estamos interesados', 'Hablá con el dueño, te paso su número: 11 0000-1234']
+        .map((text, i) => sent[i] && ({ id: `ej-reply-${i}`, agency_id: sent[i].id, body: text, received_at: new Date(Date.now() - (20 - i * 3) * 3600000).toISOString(), classification: null, name: sent[i].name, phone: sent[i].phone }))
+        .filter(Boolean);
+    }
     for (const a of accounts) a.updated = C.nowLocal();
     events.sort((x, y) => x.at.localeCompare(y.at));
     return {
       accounts, events, templates: {},
+      whatsappSenderOptions: lineOptions || undefined,
+      whatsappReadAt: lineOptions ? ago(2) : undefined,
+      inboxReplies: inboxReplies || undefined,
       sheet: { title: 'Datos de ejemplo', tab: unit.tab, url: '', missingColumns: [] },
       readAt: new Date().toISOString(),
       signals: unit.id === 'turnia' ? { matched: accounts.filter((a) => a.demoOpened).length, total: accounts.length } : null,
