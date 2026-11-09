@@ -430,6 +430,7 @@
     ...(db.states||[]).filter(x=>x.commercial_stage===key).map(x=>({...x,base:false,removed:false}))
   ]:bases.map(([id,label])=>({key:id,label,base:true,removed:false}));
   const active=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
+  const allowedClassifications=db.canonical||bases.map(([key,label])=>({key,label}));
   const current=active?.create?{key:'',label:'',description:'',examples:'',base:false,source:'whatsapp',maps_to:'neutro',active:true}:rows.find(x=>x.key===active?.key&&x.base===active?.base);
   const canEdit=habita&&db.available===true&&!state.session?.open;
   const stageForm=canEdit&&state.fu.newStage?`<form class="section" data-fu-stage-form>
@@ -443,8 +444,8 @@
     <label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80" value="${esc(current.label||'')}"></label>
     <label class="field"><span>Descripción</span><textarea class="input" name="description" rows="2" maxlength="800">${esc(current.description||'')}</textarea></label>
     <label class="field"><span>Ejemplos</span><textarea class="input" name="examples" rows="2" maxlength="2000">${esc(current.examples||'')}</textarea></label>
-    ${current.base?'':`<label class="field"><span>Equivalencia canónica</span><select class="input" name="maps_to">${bases.map(([id,label])=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
-    <label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
+    ${current.base?'':`<label class="field"><span>Equivalencia canónica</span><select class="input" name="maps_to">${allowedClassifications.map(({key:id,label})=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
+    <label class="field"><span>Origen</span><select class="input" name="source"><option value="whatsapp" ${current.source==='whatsapp'?'selected':''}>WhatsApp</option><option value="manual" ${current.source==='manual'?'selected':''}>Manual</option></select></label><label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
     <div class="os-unit-actions"><button type="submit" class="btn primary">GUARDAR SITUACIÓN</button>${!active.create?`<button type="button" class="btn" data-fu="state-delete" data-fu-key="${esc(current.key)}" data-fu-base="${current.base?'1':'0'}" data-fu-commercial="${esc(key)}" data-arm="CONFIRMAR ELIMINACIÓN">ELIMINAR</button>`:''}</div></form>`:'';
   const techMap={'no-contactado':'prospectado','no-responde':'contactado','sin-demo':'interesado','sin-enviar':'interesado','no-abrio':'demo-enviada','sin-interaccion':'demo-enviada','sin-cuenta':'demo-enviada','sin-uso':'cuenta-creada','sin-suscripcion':'cuenta-activa'};
   const customStage=(db.stages||[]).find(s=>s.key===key);
@@ -479,7 +480,7 @@
     const values={key:isNew?`custom_${Date.now().toString(36)}`:form.dataset.fuKey,
       commercial_stage:form.dataset.fuCommercial,base:isBase,create:isNew,
       label:String(fd.get('label')||''),description:String(fd.get('description')||''),
-      examples:String(fd.get('examples')||''),source:'whatsapp',maps_to:isBase?null:fd.get('maps_to'),
+      examples:String(fd.get('examples')||''),source:String(fd.get('source')||'whatsapp'),maps_to:isBase?null:fd.get('maps_to'),
       active:isBase?true:fd.has('active')};
     if(await fuOp('habita',{op:'state-save',valores:values},{label:'Situación guardada en Habita.'})){
       state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();
@@ -2335,7 +2336,7 @@
       <label class="field"><span>Horario hasta</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></label>
     </div>
     <h3 style="margin-top:14px">Situaciones que disparan la regla</h3>
-    <div class="os-quick-links" style="margin-top:8px">${Object.entries(snap.labels?.situations||{}).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
+    <div class="os-quick-links" style="margin-top:8px">${Object.entries(snap.labels?.situations||{}).filter(([key])=>{ const x=snap.catalog?.canonical?.find(x=>x.key===key);return !x||!x.permanent_stop||key==='rechazo'; }).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''}>Regla activa</label>
     <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">GUARDAR CAMBIOS</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
   </form>`;
