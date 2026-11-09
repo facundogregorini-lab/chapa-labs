@@ -410,21 +410,81 @@
       <div class="rows" style="margin-top:12px">${today.map(x=>fuRow(x)).join('')||'<p class="empty">No hay tareas listas ahora.</p>'}</div></section>`;
 }
 
-  function fuCatalog() {
-  const snap=state.fu.n.units[state.unit];
-  if(!snap)return '<section class="card glass"><p>No hay catálogo disponible.</p></section>';
-  const stages=snap.stages||[];
-  const sit=Object.entries(snap.labels?.situations||{});
-  const selected=stages.find(s=>s.key===state.fu.catalogStage)||stages[0];
-  const own=F.ruleRows(state.unit,snap).filter(r=>r.stage===selected?.key);
-  const remote=state.unit==='habita'?'https://www.habitaia.app/admin/follow-up?vista=etapas':'https://turniasalud.app/panel/prospeccion';
-  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(state.unit).toUpperCase())} / CATÁLOGO</span><h1>Etapas y situaciones.</h1><p>Consultá las etapas y las situaciones que devuelve cada producto. Las operaciones de alta, edición y baja avanzadas siguen en su panel hasta completar la sincronización de APIs.</p></div></section>
-    <div class="os-catalog-grid"><section class="card glass"><div class="os-section-heading"><h2>Etapas del embudo</h2><span class="os-tag">${stages.length}</span></div><div class="os-catalog-list" style="margin-top:14px">${stages.map(s=>`<button type="button" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${selected?.key===s.key}"><span>${esc(s.title)}</span><span>${int(s.waiting||0)}</span></button>`).join('')}</div></section>
-    <section class="card glass"><div class="os-section-heading"><h2>${esc(selected?.title||'Situaciones')}</h2><span class="os-tag">${own.length} REGLAS</span></div><p class="os-view-caption">El catálogo de situaciones depende de cada producto. No se asignan situaciones a una etapa sin datos específicos de esa relación.</p>
-      <h3 style="margin:16px 0 8px">Reglas de esta etapa</h3>${own.map(r=>`<div class="os-detail-row"><span><strong>${esc(r.action)}</strong><small class="sub" style="display:block">${esc(r.when)}</small></span><span class="badge ${r.enabled?'live':'off'}">${r.enabled?'ACTIVA':'APAGADA'}</span></div>`).join('')||'<p class="sub">No hay reglas configuradas.</p>'}
-      <h3 style="margin:19px 0 8px">Situaciones disponibles</h3><div class="os-quick-links">${sit.map(([key,label])=>`<span class="os-tag" title="${esc(key)}">${esc(label)}</span>`).join('')||'<p class="sub">No disponibles en la respuesta de la API.</p>'}</div>
-      <p class="os-warn-note" style="margin-top:18px">Para no perder configuraciones, la edición avanzada se realiza por ahora en el panel original. Chapa no crea ni elimina situaciones localmente.</p>
-      <a class="btn primary" href="${remote}" rel="noopener" target="_blank" style="margin-top:12px">ABRIR EDITOR COMPLETO ↗</a></section></div>`;
+  function fuCatalog(){
+  const unit=state.unit,snap=state.fu.n.units[unit];
+  if(!snap)return '<section class="card glass"><p>Catálogo no disponible.</p></section>';
+  const habita=unit==='habita',db=snap.catalog||{},bases=Object.entries(snap.labels?.situations||{});
+  const baseStages=[
+    ['prospectado','Prospectado'],['contactado','Contactado'],['interesado','Interesado'],
+    ['demo-enviada','Demo enviada'],['cuenta-creada','Cuenta creada'],['cuenta-activa','Cuenta activa'],['cliente','Cliente']
+  ];
+  const steps=habita?[...baseStages.map(([key,label])=>({key,label})),...(db.stages||[])]: (snap.stages||[]).map(s=>({key:s.key,label:s.title}));
+  const selected=steps.find(s=>s.key===state.fu.catalogStage)||steps[0];
+  const key=selected?.key||'';
+  const over=(db.overrides||[]).filter(o=>o.commercial_stage===key);
+  const rows=habita?[
+    ...bases.map(([id,label])=>{
+      const edit=over.find(o=>o.key===id);
+      return {key:id,label:edit?.label||label,description:edit?.description||'',examples:edit?.examples||'',base:true,removed:Boolean(edit?.removed)};
+    }),
+    ...(db.states||[]).filter(x=>x.commercial_stage===key).map(x=>({...x,base:false,removed:false}))
+  ]:bases.map(([id,label])=>({key:id,label,base:true,removed:false}));
+  const active=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
+  const current=active?.create?{key:'',label:'',description:'',examples:'',base:false,source:'whatsapp',maps_to:'neutro',active:true}:rows.find(x=>x.key===active?.key&&x.base===active?.base);
+  const canEdit=habita&&db.available===true;
+  const stageForm=canEdit&&state.fu.newStage?`<form class="section" data-fu-stage-form>
+    <h3>Crear etapa</h3><label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80"></label>
+    <label class="field"><span>Paso técnico de origen</span><select class="input" name="technical_stage">${(snap.stages||[]).map(s=>`<option value="${esc(s.key)}">${esc(s.title)}</option>`).join('')}</select></label>
+    <label class="field"><span>Situación de entrada</span><select class="input" name="entry_situation">${bases.map(([v,l])=>`<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select></label>
+    <p class="os-view-caption">Agrupa leads sin cambiar la lógica del embudo existente.</p>
+    <div class="os-unit-actions"><button class="btn primary" type="submit">CREAR ETAPA</button><button class="btn" type="button" data-fu="new-stage">CANCELAR</button></div></form>`:'';
+  const stateForm=canEdit&&current?`<form class="section" data-fu-state-form data-fu-key="${esc(current.key)}" data-fu-base="${current.base?'1':'0'}" data-fu-commercial="${esc(key)}" data-fu-create="${active.create?'1':'0'}">
+    <div class="os-section-heading"><h3>${active.create?'Nueva situación':'Editar situación'}</h3><button type="button" class="btn small" data-fu="catalog-cancel">CERRAR</button></div>
+    <label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80" value="${esc(current.label||'')}"></label>
+    <label class="field"><span>Descripción</span><textarea class="input" name="description" rows="2" maxlength="800">${esc(current.description||'')}</textarea></label>
+    <label class="field"><span>Ejemplos</span><textarea class="input" name="examples" rows="2" maxlength="2000">${esc(current.examples||'')}</textarea></label>
+    ${current.base?'':`<label class="field"><span>Equivalencia canónica</span><select class="input" name="maps_to">${bases.map(([id,label])=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
+    <label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
+    <div class="os-unit-actions"><button type="submit" class="btn primary">GUARDAR SITUACIÓN</button>${!active.create?`<button type="button" class="btn" data-fu="state-delete" data-fu-key="${esc(current.key)}" data-fu-base="${current.base?'1':'0'}" data-fu-commercial="${esc(key)}" data-arm="CONFIRMAR ELIMINACIÓN">ELIMINAR</button>`:''}</div></form>`:'';
+  const techMap={'no-contactado':'prospectado','no-responde':'contactado','sin-demo':'interesado','sin-enviar':'interesado','no-abrio':'demo-enviada','sin-interaccion':'demo-enviada','sin-cuenta':'demo-enviada','sin-uso':'cuenta-creada','sin-suscripcion':'cuenta-activa'};
+  const customStage=(db.stages||[]).find(s=>s.key===key);
+  const ruleList=F.ruleRows(unit,snap).filter(r=>habita?(customStage?r.stage===customStage.technical_stage:techMap[r.stage]===key):r.stage===key);
+  const href=habita?'https://www.habitaia.app/admin/follow-up?vista=etapas':'https://turniasalud.app/panel/prospeccion';
+  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / CONFIGURACIÓN</span><h1>Etapas y situaciones.</h1><p>Los disparadores y clasificaciones pertenecen a cada producto. Cualquier cambio se valida y guarda en su base original.</p></div></section>
+    ${habita&&!canEdit?'<p class="os-warn-note">Catálogo de Habita no disponible en la API: sigue accesible desde su panel original.</p>':''}
+    <div class="os-catalog-grid"><section class="card glass"><div class="os-section-heading"><h2>Etapas comerciales</h2><span class="os-tag">${steps.length} ETAPAS</span></div>
+      <div class="os-catalog-list" style="margin-top:14px">${steps.map(s=>`<button type="button" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${key===s.key}"><span>${esc(s.label)}</span><span>›</span></button>`).join('')}</div>
+      ${canEdit?`<button class="btn small" type="button" data-fu="new-stage" style="margin-top:13px">+ NUEVA ETAPA</button>`:''}${stageForm}</section>
+    <section class="card glass"><div class="os-section-heading"><div><span class="os-kicker">${esc(selected?.label||'')}</span><h2>Situaciones de la etapa</h2></div>${canEdit?'<button class="btn primary" type="button" data-fu="new-situation">+ NUEVA SITUACIÓN</button>':''}</div>
+      <p class="os-view-caption">Las situaciones predeterminadas pueden editarse por etapa. Las personalizadas se vinculan a una clasificación canónica antes de afectar las reglas.</p>
+      <div style="margin-top:12px">${rows.map(x=>`<div class="os-detail-row"><div><strong>${esc(x.label)}</strong>${x.description?`<small class="sub" style="display:block">${esc(x.description)}</small>`:''}</div><div class="os-unit-actions"><span class="badge ${x.removed?'off':'live'}">${x.removed?'OCULTA':x.base?'BASE':'PERSONALIZADA'}</span>
+      ${canEdit?`<button type="button" class="btn small" data-fu="${x.removed?'state-restore':'edit-situation'}" data-fu-key="${esc(x.key)}" data-fu-base="${x.base?'1':'0'}">${x.removed?'RESTAURAR':'EDITAR'}</button>`:''}</div></div>`).join('')}</div>
+      ${stateForm}
+      <h3 style="margin:22px 0 10px">Reglas vinculadas</h3>${ruleList.map(r=>`<div class="os-detail-row"><span><strong>${esc(r.action)}</strong><small class="sub" style="display:block">${esc(r.when)}</small></span><span class="badge ${r.enabled?'live':'off'}">${r.enabled?'ACTIVA':'APAGADA'}</span></div>`).join('')||'<p class="sub">Sin reglas vinculadas.</p>'}
+      ${!canEdit?'<p class="os-warn-note" style="margin-top:16px">La edición completa de estas situaciones sigue en el panel del producto hasta confirmar soporte por API.</p>':''}
+      <a class="btn" href="${href}" target="_blank" rel="noopener" style="margin-top:15px">ABRIR PANEL DEL PRODUCTO ↗</a>
+    </section></div>`;
+}
+
+  async function submitCatalog(form) {
+  if(state.unit!=='habita')return;
+  const fd=new FormData(form);
+  if(form.matches('[data-fu-stage-form]')){
+    const values={label:String(fd.get('label')||''),technical_stage:fd.get('technical_stage'),entry_situation:fd.get('entry_situation')};
+    if(await fuOp('habita',{op:'stage-create',valores:values},{label:'Etapa creada en Habita.'})){
+      state.fu.newStage=false;await loadFollowup({quiet:true});render();
+    }
+  } else if(form.matches('[data-fu-state-form]')){
+    const isNew=form.dataset.fuCreate==='1',isBase=form.dataset.fuBase==='1';
+    const values={key:isNew?`custom_${Date.now().toString(36)}`:form.dataset.fuKey,
+      commercial_stage:form.dataset.fuCommercial,base:isBase,create:isNew,
+      label:String(fd.get('label')||''),description:String(fd.get('description')||''),
+      examples:String(fd.get('examples')||''),source:'whatsapp',maps_to:isBase?null:fd.get('maps_to'),
+      active:isBase?true:fd.has('active')};
+    if(await fuOp('habita',{op:'state-save',valores:values},{label:'Situación guardada en Habita.'})){
+      state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();
+    }
+  }
 }
 
   function renderOverview() {
@@ -2469,7 +2529,21 @@
       case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); go(state.unit, state.fu.sub); break;
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
-      case 'catalog-stage': state.fu.catalogStage = ds.fuStage; render(); break;
+      case 'catalog-stage': state.fu.catalogStage=ds.fuStage;state.fu.catalogEdit=null;state.fu.newStage=false;render();break;
+      case 'new-stage': state.fu.newStage=!state.fu.newStage;state.fu.catalogEdit=null;render();break;
+      case 'new-situation': state.fu.catalogEdit={key:null,base:false,create:true,commercial_stage:state.fu.catalogStage||'prospectado'};render();break;
+      case 'edit-situation': state.fu.catalogEdit={key:ds.fuKey,base:ds.fuBase==='1',create:false,commercial_stage:state.fu.catalogStage||'prospectado'};render();break;
+      case 'catalog-cancel': state.fu.catalogEdit=null;render();break;
+      case 'state-restore': {
+        const canonical=state.fu.n.units.habita?.labels?.situations||{};
+        if(await fuOp('habita',{op:'state-save',valores:{base:true,key:ds.fuKey,label:canonical[ds.fuKey],commercial_stage:state.fu.catalogStage||'prospectado',description:'',examples:''}},{label:'Situación restaurada.'})){await loadFollowup({quiet:true});render();}
+        break;
+      }
+      case 'state-delete': {
+        if(ds.armed!=='1')break;
+        if(await fuOp('habita',{op:'state-delete',valores:{key:ds.fuKey,base:ds.fuBase==='1',commercial_stage:ds.fuCommercial}},{label:'Situación quitada de esta etapa.'})){state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();}
+        break;
+      }
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
       case 'reload': loadFollowup(); break;
       case 'wa-sync': {
@@ -2518,10 +2592,11 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form]')) return;
+    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
+    if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
     const fd = Object.fromEntries(new FormData(form));
     const task = state.fu.task;
     const it = task && task.item;
