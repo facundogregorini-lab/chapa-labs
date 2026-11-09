@@ -4,36 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Prospección · Chapa Labs</title>
+<title>Commercial OS · Chapa Labs</title>
 <meta name="description" content="Panel de prospección de Chapa Labs: la operación comercial de Turnia y habita. sobre un mismo motor, sincronizada con la planilla de cada una.">
-<meta name="theme-color" content="#eceef1">
+<meta name="theme-color" content="#f7f9f6">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%231baf7a'/%3E%3Cpath d='M7 9h18l-7 8v6l-4 2v-8z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/prospecting/glass.css">
+<link rel="stylesheet" href="/prospecting/commercial-os.css">
 </head>
 <body data-unit="todas">
 <div class="ambient" aria-hidden="true"><div class="photo"></div><i></i><i></i><i></i></div>
 
-<header class="top glass" id="top" data-liquid="40" data-liquid-bezel="26" data-liquid-blur="5">
-  <div class="top-row">
-    <a class="brand" href="/prospecting">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span><strong>Prospección</strong><small>Chapa Labs · operación comercial</small></span>
+<div class="os-shell">
+  <aside class="os-sidebar" aria-label="Centro de operaciones comerciales">
+    <a class="os-brand" href="/prospecting?vista=resumen" aria-label="Chapa Labs · Inicio">
+      <span class="os-brand-icon" aria-hidden="true">C<span>•</span></span>
+      <span><strong>CHAPA LABS</strong><small>COMMERCIAL OS</small></span>
     </a>
-    <div class="seg" id="units" role="group" aria-label="Unidad de negocio"></div>
-    <div class="gsearch" role="search">
-      <input class="input" id="gsearch" type="search" placeholder="Buscar nombre, teléfono o código" aria-label="Buscar una cuenta en todo el panel" aria-controls="gresults" aria-expanded="false" autocomplete="off" data-testid="global-search">
-      <div class="gresults glass strong" id="gresults" role="listbox" aria-label="Resultados" hidden></div>
+    <div class="os-section-label">ESPACIOS DE TRABAJO</div>
+    <div class="os-business-list" id="units" role="group" aria-label="Unidad de negocio"></div>
+    <div class="os-section-label">NAVEGACIÓN</div>
+    <nav class="os-nav" id="tabs" role="tablist" aria-label="Vistas comerciales"></nav>
+    <div class="os-section-label os-legacy-title">HERRAMIENTAS DEL PRODUCTO</div>
+    <nav class="os-nav os-legacy-nav" id="legacy-tabs" aria-label="Herramientas adicionales"></nav>
+    <div class="os-sidebar-footer">
+      <a href="/" class="os-return">↗ &nbsp; TABLERO CHAPA</a>
+      <span>UN WORKSPACE. DOS NEGOCIOS.</span>
     </div>
-    <div class="top-actions">
-      <a class="btn ghost small" href="/" title="Volver al tablero de seguimiento">Tablero</a>
-      <button class="btn icon ghost" id="theme" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
-      <button class="btn icon ghost" id="user" type="button" hidden></button>
-    </div>
+  </aside>
+  <div class="os-workspace">
+    <header class="top os-top" id="top">
+      <div class="os-breadcrumb">
+        <span>OPERACIÓN COMERCIAL</span>
+        <strong id="os-place">GENERAL</strong>
+      </div>
+      <div class="os-top-actions">
+        <div class="gsearch" role="search">
+          <input class="input" id="gsearch" type="search" placeholder="Buscar nombre, teléfono o código" aria-label="Buscar una cuenta en todo el panel" aria-controls="gresults" aria-expanded="false" autocomplete="off" data-testid="global-search">
+          <div class="gresults glass strong" id="gresults" role="listbox" aria-label="Resultados" hidden></div>
+        </div>
+        <button class="btn icon ghost" id="theme" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
+        <button class="btn icon os-user" id="user" type="button" hidden></button>
+      </div>
+    </header>
+    <main id="main" tabindex="-1"><div class="skeleton"></div><div class="skeleton"></div></main>
   </div>
-  <nav class="tabs" id="tabs" role="tablist" aria-label="Vistas"></nav>
-</header>
-
-<main id="main" tabindex="-1"><div class="skeleton"></div><div class="skeleton"></div></main>
+</div>
 
 <div class="scrim" id="scrim" hidden></div>
 <aside class="drawer glass strong" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden data-liquid="28" data-liquid-bezel="30" data-liquid-blur="18"></aside>
