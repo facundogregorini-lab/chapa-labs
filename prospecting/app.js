@@ -431,7 +431,7 @@
   ]:bases.map(([id,label])=>({key:id,label,base:true,removed:false}));
   const active=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
   const current=active?.create?{key:'',label:'',description:'',examples:'',base:false,source:'whatsapp',maps_to:'neutro',active:true}:rows.find(x=>x.key===active?.key&&x.base===active?.base);
-  const canEdit=habita&&db.available===true;
+  const canEdit=habita&&db.available===true&&!state.session?.open;
   const stageForm=canEdit&&state.fu.newStage?`<form class="section" data-fu-stage-form>
     <h3>Crear etapa</h3><label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80"></label>
     <label class="field"><span>Paso técnico de origen</span><select class="input" name="technical_stage">${(snap.stages||[]).map(s=>`<option value="${esc(s.key)}">${esc(s.title)}</option>`).join('')}</select></label>
@@ -451,7 +451,7 @@
   const ruleList=F.ruleRows(unit,snap).filter(r=>habita?(customStage?r.stage===customStage.technical_stage:techMap[r.stage]===key):r.stage===key);
   const href=habita?'https://www.habitaia.app/admin/follow-up?vista=etapas':'https://turniasalud.app/panel/prospeccion';
   return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / CONFIGURACIÓN</span><h1>Etapas y situaciones.</h1><p>Los disparadores y clasificaciones pertenecen a cada producto. Cualquier cambio se valida y guarda en su base original.</p></div></section>
-    ${habita&&!canEdit?'<p class="os-warn-note">Catálogo de Habita no disponible en la API: sigue accesible desde su panel original.</p>':''}
+    ${habita&&!canEdit?`<p class="os-warn-note">${state.session?.open?'Para editar etapas y situaciones, primero protegé Chapa con PROSPECTING_PASSWORD.':'El catálogo de Habita no está disponible en la API o falta la migración.'} El panel original sigue disponible.</p>`:''}
     <div class="os-catalog-grid"><section class="card glass"><div class="os-section-heading"><h2>Etapas comerciales</h2><span class="os-tag">${steps.length} ETAPAS</span></div>
       <div class="os-catalog-list" style="margin-top:14px">${steps.map(s=>`<button type="button" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${key===s.key}"><span>${esc(s.label)}</span><span>›</span></button>`).join('')}</div>
       ${canEdit?`<button class="btn small" type="button" data-fu="new-stage" style="margin-top:13px">+ NUEVA ETAPA</button>`:''}${stageForm}</section>
@@ -2379,7 +2379,7 @@
 
   function fuSecuencias() {
     const n = state.fu.n;
-    return `<section class="hero"><div><span class="eyebrow">Secuencias y mensajes</span><h1>Qué se manda en cada etapa</h1><p>Las reglas y los mensajes son los de cada producto. Una versión nueva se mide aparte; «Probar 50/50» la manda a la mitad de la etapa, siempre la misma mitad.</p></div></section>
+    return `<section class="hero"><div><span class="eyebrow">REGLAS Y MENSAJES</span><h1>Las conversaciones, diseñadas.</h1><p>Cada producto mantiene su motor. Las versiones nuevas se miden por separado y las reglas se aplican respetando su orden y condiciones.</p></div></section>${state.session?.open?'<p class="os-warn-note">La sesión abierta no autoriza cambios sensibles de reglas o mensajes. Configurá PROSPECTING_PASSWORD en Vercel para habilitar su edición.</p>':''}
       ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
       ${fuUnits().filter((u) => n.units[u.id]).map((u) => {
         const snap = n.units[u.id];
@@ -2388,7 +2388,7 @@
         const stages = snap.stages || [];
         return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Reglas de ${esc(u.name)}</h2><p class="sub">${u.id === 'habita' ? 'Se editan sin deploy: gana la primera regla (por orden) que corresponde a la situación.' : 'Siguen la cadencia de Prospección de Turnia (días hábiles, tres mensajes como máximo).'}</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Cuándo</th><th>Acción</th><th>Espera</th>${u.id === 'habita' ? '<th>Horario</th><th></th>' : '<th>Sale cuando</th>'}</tr></thead><tbody>
-          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button> <button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="${esc(r.key)}">EDITAR</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
+          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable && !state.session?.open ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button> <button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="${esc(r.key)}">EDITAR</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
           </tbody></table></div></section>
           ${fuRuleEditor(u.id,snap)}
           ${stages.map((s) => {
@@ -2396,7 +2396,7 @@
             return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
               ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
                 ${v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
-                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
+                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' && !state.session?.open ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
               ${fuVersionEditor(u.id,snap,s.key)}
               <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns"><select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit">Guardar versión</button></div></form>
             </details>`;
