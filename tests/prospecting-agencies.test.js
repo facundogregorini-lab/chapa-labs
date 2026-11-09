@@ -75,19 +75,29 @@ test('Turnia: las filas desde sus cuentas, con el paso de su demo y la etapa', (
   ];
   const rows = A.fromAccounts(accounts, { closed: C.closed });
   assert.deepEqual(rows.map((r) => [r.id, r.stage, r.step]), [
-    ['a', 'prospect', 0], ['b', 'contacted', 0], ['c', 'demo_sent', 1], ['d', 'interacted', 3], ['e', 'call', 4], ['f', 'closed', 1], ['g', 'client', 5],
+    ['a', 'prospect', 0], ['b', 'contacted', 0], ['c', 'demo_sent', 2], ['d', 'interacted', 4], ['e', 'call', 5], ['f', 'closed', 2], ['g', 'client', 6],
   ]);
   assert.equal(rows[3].lastActivity.text, 'Habló con Sofi');
   assert.equal(A.accountState(rows[6]), 'active');
   const v = A.view(rows, A.filtersFrom(new URLSearchParams('etapa=cerrados'), A.TURNIA), A.TURNIA);
-  assert.deepEqual(v.funnel.map((x) => x.count), [6, 5, 3, 3, 2, 1]); // a no fue saludado: no entra al embudo
+  // a no fue saludado: no entra al embudo. Quien recibió la demo también cuenta como que respondió el saludo.
+  assert.deepEqual(v.funnel.map((x) => x.count), [6, 5, 5, 3, 3, 2, 1]);
   assert.deepEqual(v.items.map((r) => r.id), ['f']);
   // «Se quedaron» en Enviadas: les mandamos la demo y no la abrieron.
-  const stayed = A.view(rows, A.filtersFrom(new URLSearchParams('paso=1&quedo=1'), A.TURNIA), A.TURNIA);
+  const stayed = A.view(rows, A.filtersFrom(new URLSearchParams('paso=2&quedo=1'), A.TURNIA), A.TURNIA);
   assert.deepEqual(stayed.items.map((r) => r.id).sort(), ['c', 'f']);
   // Sin enviar, la demo cuenta solo en «Todo».
   const week = A.view(rows, { ...A.filtersFrom(new URLSearchParams(''), A.TURNIA), period: { key: '7', from: '2026-10-30', to: '2026-11-05' } }, A.TURNIA);
-  assert.deepEqual(week.funnel.map((x) => x.count), [3, 2, 1, 1, 0, 0]);
+  assert.deepEqual(week.funnel.map((x) => x.count), [3, 2, 2, 1, 1, 0, 0]);
+  // Respondió el saludo (lo leyó la lectura de WhatsApp) o ya le mandamos el Paso 2: está en «Respondieron el saludo».
+  const replied = A.fromAccounts([
+    { id: 'h', name: 'Hugo', stage: 'saludado', touches: 0, greetingSent: '2026-11-09 09:00', lastReply: '2026-11-09 09:30' },
+    { id: 'i', name: 'Inés', stage: 'saludado', touches: 0, greetingSent: '2026-11-09 09:00', permissionSent: '2026-11-09 10:00' },
+    { id: 'j', name: 'Juan', stage: 'saludado', touches: 0, greetingSent: '2026-11-09 09:00', lastReply: '2026-11-01 09:30' },
+  ], { closed: C.closed });
+  assert.deepEqual(replied.map((r) => r.step), [1, 1, 0], 'una respuesta anterior al saludo no cuenta');
+  const greeted = A.view(replied, A.filtersFrom(new URLSearchParams('paso=1&quedo=1'), A.TURNIA), A.TURNIA);
+  assert.deepEqual(greeted.items.map((r) => r.id).sort(), ['h', 'i']);
 });
 
 test('Turnia: el embudo de Odontólogos cuenta lo mismo que el Embudo contra la meta', () => {

@@ -11,6 +11,9 @@
   'use strict';
 
   const lastName = (name) => String(name || '').trim().split(/\s+/).slice(-1)[0] || '';
+  /** Turnia: respondió el saludo (Paso 1). Las fechas son «AAAA-MM-DD HH:MM» de Buenos Aires: se comparan como texto. */
+  const respondedGreeting = (a) => Boolean(a.permissionSent || a.replied) || ['respondio', 'interesado'].includes(a.stage)
+    || Boolean(a.lastReply && a.lastReply > (a.greetingSent || a.firstContact || ''));
 
   // ─── Turnia ─────────────────────────────────────────────────
   const turnia = {
@@ -146,9 +149,14 @@
     // Modelo comercial de Turnia (Programa Fundadores): nadie compra sin una llamada de 15 minutos y el
     // setup se cobra 100% antes de implementar. Por eso el embudo termina en «setup cobrado»; crear la
     // cuenta y que opere es posventa (vista Onboarding, con las garantías).
+    // «Respondieron el saludo» (09/11): con la secuencia a la recepción, el Paso 1 busca una respuesta y recién
+    // ahí va el Paso 2. Cuenta la respuesta que leyó la lectura de WhatsApp («Última respuesta» después del
+    // saludo), el estado «Respondió» y el Paso 2 enviado. Las metas de fábrica (20 % y 75 %) dejan igual la
+    // de demos enviadas (15 % de los saludos); se cambian en Embudo.
     targets: [
       { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
-      { key: 'demos', label: 'Demos enviadas', rate: 0.15, sheet: (a) => a.touches >= 1 },
+      { key: 'respondieron', label: 'Respondieron el saludo', hint: 'Contestaron el Paso 1 (lo leyó la lectura de WhatsApp o se marcó «Respondió»)', rate: 0.2, sheet: respondedGreeting },
+      { key: 'demos', label: 'Demos enviadas', hint: 'El link: Paso 3 o Seguimiento 1', rate: 0.75, sheet: (a) => a.touches >= 1 },
       { key: 'visitadas', label: 'Visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
       { key: 'interaccion', label: 'Hablaron con Sofi', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
       { key: 'llamadas', label: 'Llamadas agendadas', hint: 'Reunión de 15 minutos («Reunión» en Turnia)', rate: 0.45, sheet: (a) => Boolean(a.meeting) || a.stage === 'reunion' },

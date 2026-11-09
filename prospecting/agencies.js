@@ -222,12 +222,12 @@
     stageTab: { prospect: 'Por contactar', contacted: 'Saludados', demo_sent: 'Demo enviada', interacted: 'Interactuaron', call: 'Llamada agendada', client: 'Clientes', closed: 'Cerrados' },
     stageParam: { prospect: 'por-contactar', contacted: 'saludados', demo_sent: 'demo-enviada', interacted: 'interactuaron', call: 'llamada', client: 'clientes', closed: 'cerrados' },
     // Los mismos pasos y definiciones que el «Embudo contra la meta» (units.js → targets): empieza en el saludo.
-    steps: ['Saludos enviados', 'Demos enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
-    stepLabel: ['Saludado', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
-    stayed: ['Esperan la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
-    ofPrevious: ['', 'de los saludados', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
+    steps: ['Saludos enviados', 'Respondieron el saludo', 'Demos enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
+    stepLabel: ['Saludado', 'Respondió', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
+    stayed: ['No respondieron el saludo', 'Respondieron, sin la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
+    ofPrevious: ['', 'de los saludados', 'de los que respondieron', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
     lastNote: 'Setup y mes 1 cobrados', periodBy: 'Primer contacto', withDemoTab: 'Contactados', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
-    note: 'Los mismos pasos que el Embudo contra la meta: «Abrieron la demo» es que entraron a su /p/… (o la empezaron); «Hablaron con Sofi», que le escribieron o le hablaron (no alcanza con tocar «Probar la demo» o la esfera). Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
+    note: 'Los mismos pasos que el Embudo contra la meta: «Respondieron el saludo» es que contestaron el Paso 1 (lo leyó la lectura de WhatsApp o se marcó «Respondió»). Quien ya recibió la demo también cuenta, y hasta el 09/11 la demo salía sin esperar respuesta: para ver la secuencia nueva, filtrá desde el 09/11; «Abrieron la demo» es que entraron a su /p/… (o la empezaron); «Hablaron con Sofi», que le escribieron o le hablaron (no alcanza con tocar «Probar la demo» o la esfera). Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
   };
 
   /** «AAAA-MM-DD HH:mm» (hora de Buenos Aires, como las guarda el panel) a ISO. */
@@ -242,6 +242,7 @@
     return accounts.filter((a) => !counted || counted(a)).map((a) => {
       // Las mismas definiciones que los pasos del Embudo (units.js → targets de Turnia).
       const greeted = Boolean(a.greetingSent || a.firstContact);
+      const replied = Boolean(a.permissionSent || a.replied || ['respondio', 'interesado'].includes(a.stage) || (a.lastReply && a.lastReply > (a.greetingSent || a.firstContact || '')));
       const sent = (a.touches || 0) >= 1;
       const opened = Boolean(a.demoOpened || a.demoTried || a.demoClinic || a.demoChat);
       const chat = Boolean(a.demoChat);
@@ -249,7 +250,7 @@
       const client = Boolean(a.customer) || a.stage === 'cliente';
       // El paso es el más alto que cumple, con las funciones de los pasos del Embudo contra la meta
       // (units.js → targets): así los dos cuentan exactamente lo mismo. -1: todavía no se le escribió.
-      let step = client ? 5 : call ? 4 : chat ? 3 : opened ? 2 : sent ? 1 : greeted ? 0 : -1;
+      let step = client ? 6 : call ? 5 : chat ? 4 : opened ? 3 : sent ? 2 : replied ? 1 : greeted ? 0 : -1;
       if (targets && targets.length) { step = -1; targets.forEach((t, i) => { if (t.sheet && t.sheet(a)) step = i; }); }
       const isClosed = closed ? closed(a) : false;
       const stage = client ? 'client' : isClosed ? 'closed' : call ? 'call' : chat || opened || a.replied ? 'interacted' : sent ? 'demo_sent' : a.greetingSent || a.firstContact ? 'contacted' : 'prospect';
