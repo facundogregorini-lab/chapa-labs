@@ -136,26 +136,27 @@
     const m = location.pathname.match(/^\/prospecting\/?(turnia|habita|todas)?/);
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
-    state.view = state.unit === 'todas' ? (TODAS_VIEWS.includes(v) ? v : 'hoy') : UNIT_VIEWS.includes(v) ? v : 'hoy';
+    state.view = state.unit === 'todas' ? (TODAS_VIEWS.includes(v) ? v : 'resumen') : v === 'followup' ? 'hoy' : UNIT_VIEWS.includes(v) ? v : 'hoy';
     if (v === 'odontologos' && state.unit === 'turnia') state.view = 'inmobiliarias';
     if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
   function go(unit, view, { replace } = {}) {
-    // Los filtros de la lista son de cada unidad: al cambiar de unidad, vuelven a cero.
-    if (unit !== state.unit && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
+    if (unit !== state.unit && window.ProspectingAgencies && unit !== 'todas')
+      state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
     state.unit = unit;
-    // La bandeja comercial: en «Todas», cada vista es una pestaña; en una unidad, «Follow-up» con sus vistas.
-    if (unit === 'todas') state.view = view === 'followup' ? state.fu.sub : TODAS_VIEWS.includes(view) ? view : 'hoy';
-    else if (UNIT_VIEWS.includes(view)) state.view = view;
-    else if (FU_VIEWS.includes(view)) { state.fu.sub = view; state.view = 'followup'; }
-    else state.view = 'hoy';
+    if (unit === 'todas') state.view = TODAS_VIEWS.includes(view) ? view : 'resumen';
+    else state.view = view === 'followup' ? 'hoy' : UNIT_VIEWS.includes(view) ? view : 'hoy';
+    if (UNIT_FU_VIEWS.includes(state.view)) state.fu.sub = state.view;
     state.shown = 100;
-    const url = state.view === 'inmobiliarias' ? agUrl() : `/prospecting${unit === 'todas' ? '' : `/${unit}`}${state.view !== 'hoy' ? `?vista=${state.view}` : ''}${state.demo ? (state.view !== 'hoy' ? '&' : '?') + 'ejemplo=1' : ''}`;
-    history[replace ? 'replaceState' : 'pushState']({}, '', url);
+    const path = state.view === 'inmobiliarias' ? agUrl() :
+      `/prospecting${unit === 'todas' ? '' : `/${unit}`}${state.view !== 'hoy' ? `?vista=${state.view}` : ''}${state.demo ? (state.view !== 'hoy' ? '&' : '?') + 'ejemplo=1' : ''}`;
+    history[replace ? 'replaceState' : 'pushState']({}, '', path);
     render();
     main.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  
+
   window.addEventListener('popstate', () => { readRoute(); render(); });
 
   // ─── Período ────────────────────────────────────────────────
@@ -194,21 +195,39 @@
 
   // ─── Marco ──────────────────────────────────────────────────
   function renderTop() {
-    const segs = [['todas', 'Todas', 's1'], ...units().map((u) => [u.id, u.name, u.color])];
-    $('#units').innerHTML = segs.map(([id, name, c]) => `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${c})"></span>${esc(name)}</button>`).join('') + '<span class="seg-thumb" aria-hidden="true" data-liquid="18" data-liquid-bezel="14" data-liquid-blur="0.6"></span>';
-    const tabs = state.unit === 'todas'
-      ? [['hoy', 'Hoy', fuCount('todas')], ['pipeline', 'Pipeline'], ['prospectos', 'Prospectos'], ['secuencias', 'Secuencias'], ['rendimiento', 'Rendimiento'], ['resumen', 'Resumen']]
-      : [['hoy', 'Hoy', queueCount()], ['responder', 'Responder', replyCount(state.unit)], ['followup', 'Follow-up', fuCount(state.unit)], ['enviar', 'Enviar'], ['embudo', 'Embudo'], ['cuentas', 'Cuentas'], ...(unitOf(state.unit).agencies ? [['inmobiliarias', cfgOf(state.unit).title]] : []), ...(unitOf(state.unit).onboarding ? [['onboarding', 'Onboarding', onboardingAlerts()]] : []), ['mensajes', 'Mensajes'], ['playbook', 'Playbook']];
-    $('#tabs').innerHTML = tabs.map(([k, l, n]) => `<button type="button" role="tab" data-view="${k}" aria-selected="${state.view === k}">${l}${n ? ` <span class="count num">${n}</span>` : ''}</button>`).join('');
-    document.body.dataset.unit = state.unit;
-    const userBtn = $('#user');
-    const user = state.session && state.session.user;
-    userBtn.hidden = !user && !state.demo;
-    userBtn.textContent = state.demo ? 'Ej.' : user ? user.name.slice(0, 2).toUpperCase() : '';
-    userBtn.title = state.demo ? 'Salir del modo de ejemplo' : user ? `${user.name} · cerrar sesión` : '';
-    userBtn.setAttribute('aria-label', userBtn.title);
-    requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb));
-  }
+  const segs = [['todas', 'General', 's1'], ...units().map(u => [u.id, u.name, u.color])];
+  $('#units').innerHTML = segs.map(([id, name, color]) =>
+    `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
+  ).join('');
+  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙']];
+  const tabs = state.unit === 'todas'
+    ? [['resumen','RESUMEN','▦'],['hoy','COLA DE EJECUCIÓN','☷',fuCount('todas')],['pipeline','EMBUDOS','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥']]
+    : common;
+  $('#tabs').innerHTML = tabs.map(([key,label,glyph,num]) =>
+    `<button type="button" role="tab" data-view="${key}" aria-selected="${state.view === key}"><span class="os-icon" aria-hidden="true">${glyph}</span>${label}${num ? `<span class="count num">${num}</span>` : ''}</button>`
+  ).join('');
+  const legacy = state.unit === 'todas' ? [] : [
+    ['adquisicion','ADQUISICIÓN ANTERIOR'],
+    ['embudo','EMBUDO DE PRODUCTO'],
+    ['cuentas','FICHAS DE CUENTAS'],
+    ['enviar','ENVÍOS Y AUDIOS'],
+    ...(unitOf(state.unit).agencies ? [['inmobiliarias',cfgOf(state.unit).title.toUpperCase()]] : []),
+    ...(unitOf(state.unit).onboarding ? [['onboarding','ONBOARDING']] : []),
+    ['mensajes','PLANTILLAS ANTERIORES'],
+    ['playbook','PLAYBOOK']
+  ];
+  $('#legacy-tabs').innerHTML = legacy.map(([key,label]) =>
+    `<button type="button" data-view="${key}" aria-current="${state.view === key ? 'page' : 'false'}">${esc(label)}</button>`
+  ).join('');
+  document.body.dataset.unit = state.unit;
+  $('#os-place').textContent = state.unit === 'todas' ? 'GENERAL' : (unitOf(state.unit)?.name || state.unit).toUpperCase();
+  const userBtn = $('#user'), user = state.session && state.session.user;
+  userBtn.hidden = !user && !state.demo;
+  userBtn.textContent = state.demo ? 'Ej.' : user ? user.name.slice(0,2).toUpperCase() : '';
+  userBtn.title = state.demo ? 'Salir del ejemplo' : user ? `${user.name} · cerrar sesión` : '';
+  userBtn.setAttribute('aria-label', userBtn.title);
+  requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb));
+}
 
   function moveThumb(seg) {
     const thumb = seg.querySelector('.seg-thumb');
@@ -232,13 +251,13 @@
     if (!state.demo && !s.google) { main.innerHTML = setupScreen(); return after(); }
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
     if (isFu() && !state.demo && !state.fu.n && !state.fu.loading && !state.fu.error) setTimeout(() => loadFollowup(), 0);
-    if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderOverview() : renderFu();
-    else if (state.view === 'followup') main.innerHTML = renderFu();
+    if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
+    else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup') main.innerHTML = renderFu();
     else {
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, responder: renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
@@ -354,6 +373,59 @@
   }
 
   // ─── Resumen general (todas las unidades) ───────────────────
+  function renderCommercialOverview() {
+  if (!state.fu.n) return state.fu.error
+    ? `<section class="card glass"><h2>No se pudo cargar la operación comercial</h2><p>${esc(state.fu.error)}</p><button class="btn primary" type="button" data-fu="reload">Reintentar</button></section>`
+    : '<div class="skeleton"></div><div class="skeleton"></div>';
+  const s = F.summary(state.fu.n, 'todas');
+  const entries = units().map(u => {
+    const snap = state.fu.n.units[u.id];
+    const sum = F.summary(state.fu.n,u.id);
+    return `<button type="button" class="os-business-card" data-business="${u.id}" data-goto="${u.id}" data-view-to="hoy">
+      <div class="os-business-head"><span class="eyebrow">${u.id === 'habita' ? '● INMOBILIARIAS · VIRTUAL STAGING' : '● SALUD · ASISTENTE DE TURNOS'}</span><span class="badge ${snap?'live':'off'}">${snap?'CONECTADO':'SIN DATOS'}</span></div>
+      <h2>${esc(u.name)}</h2><p>${esc(u.icp || '')}</p>
+      <div class="os-business-metrics">
+        <div><strong>${int(sum.ready)}</strong><small>Listas</small></div>
+        <div><strong>${int(sum.replies)}</strong><small>Respuestas</small></div>
+        <div><strong>${int(sum.doneToday)}</strong><small>Hechas hoy</small></div>
+      </div></button>`;
+  }).join('');
+  const today=state.fu.n.queue.slice(0,8);
+  const errors=Object.entries(state.fu.n.errors).map(([u,e])=>`<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span>${esc(e)}</div>`).join('');
+  return `<section class="hero"><div><span class="eyebrow">CHAPA LABS / GENERAL</span><h1>Tu centro de operaciones comerciales.</h1><p>Dos negocios, una sola ejecución. Priorizá el trabajo del día, entendé dónde se frena el avance y entrá a cada equipo sin cambiar de herramienta.</p></div><span class="os-tag">VISTA CONSOLIDADA</span></section>
+    ${errors}
+    <section class="card glass"><div class="os-section-heading"><div><span class="os-kicker">ACTIVIDAD DE HOY</span><h2>El pulso comercial</h2></div><button class="btn small" type="button" data-view="rendimiento">Ver resultados →</button></div>
+    <div class="kpis" style="margin-top:15px">
+      ${kpi('Acciones listas', int(s.ready),'Ejecutables ahora')}
+      ${kpi('Respuestas', int(s.replies),'Esperan respuesta')}
+      ${kpi('Demos pendientes', int(s.demos),'Por crear o enviar')}
+      ${kpi('Enviadas hoy', int(s.doneToday),'Confirmadas')}
+      ${kpi('Programadas', int(s.scheduled),'Pendientes futuras')}
+      ${kpi('Bloqueadas', int(s.blocked),'Con motivo registrado')}
+    </div></section>
+    <section><div class="os-section-heading" style="margin-bottom:13px"><div><span class="os-kicker">WORKSPACES</span><h2>Elegí dónde enfocarte</h2></div></div><div class="os-business-cards">${entries}</div></section>
+    <section class="os-action-banner"><div><strong>${int(s.ready)} acciones esperan al equipo</strong><p>Empezá con respuestas y demos pendientes; el motor de cada producto determina qué puede ejecutarse.</p></div><button class="btn" data-view="hoy" type="button">IR A LA COLA UNIFICADA →</button></section>
+    <section class="card glass"><div class="os-section-heading"><div><span class="os-kicker">PRIORIDAD</span><h2>Próximas acciones</h2></div><button class="btn small" data-view="hoy" type="button">Ver toda la cola</button></div>
+      <div class="rows" style="margin-top:12px">${today.map(x=>fuRow(x)).join('')||'<p class="empty">No hay tareas listas ahora.</p>'}</div></section>`;
+}
+
+  function fuCatalog() {
+  const snap=state.fu.n.units[state.unit];
+  if(!snap)return '<section class="card glass"><p>No hay catálogo disponible.</p></section>';
+  const stages=snap.stages||[];
+  const sit=Object.entries(snap.labels?.situations||{});
+  const selected=stages.find(s=>s.key===state.fu.catalogStage)||stages[0];
+  const own=F.ruleRows(state.unit,snap).filter(r=>r.stage===selected?.key);
+  const remote=state.unit==='habita'?'https://www.habitaia.app/admin/follow-up?vista=etapas':'https://turniasalud.app/panel/prospeccion';
+  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(state.unit).toUpperCase())} / CATÁLOGO</span><h1>Etapas y situaciones.</h1><p>Consultá las etapas y las situaciones que devuelve cada producto. Las operaciones de alta, edición y baja avanzadas siguen en su panel hasta completar la sincronización de APIs.</p></div></section>
+    <div class="os-catalog-grid"><section class="card glass"><div class="os-section-heading"><h2>Etapas del embudo</h2><span class="os-tag">${stages.length}</span></div><div class="os-catalog-list" style="margin-top:14px">${stages.map(s=>`<button type="button" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${selected?.key===s.key}"><span>${esc(s.title)}</span><span>${int(s.waiting||0)}</span></button>`).join('')}</div></section>
+    <section class="card glass"><div class="os-section-heading"><h2>${esc(selected?.title||'Situaciones')}</h2><span class="os-tag">${own.length} REGLAS</span></div><p class="os-view-caption">El catálogo de situaciones depende de cada producto. No se asignan situaciones a una etapa sin datos específicos de esa relación.</p>
+      <h3 style="margin:16px 0 8px">Reglas de esta etapa</h3>${own.map(r=>`<div class="os-detail-row"><span><strong>${esc(r.action)}</strong><small class="sub" style="display:block">${esc(r.when)}</small></span><span class="badge ${r.enabled?'live':'off'}">${r.enabled?'ACTIVA':'APAGADA'}</span></div>`).join('')||'<p class="sub">No hay reglas configuradas.</p>'}
+      <h3 style="margin:19px 0 8px">Situaciones disponibles</h3><div class="os-quick-links">${sit.map(([key,label])=>`<span class="os-tag" title="${esc(key)}">${esc(label)}</span>`).join('')||'<p class="sub">No disponibles en la respuesta de la API.</p>'}</div>
+      <p class="os-warn-note" style="margin-top:18px">Para no perder configuraciones, la edición avanzada se realiza por ahora en el panel original. Chapa no crea ni elimina situaciones localmente.</p>
+      <a class="btn primary" href="${remote}" rel="noopener" target="_blank" style="margin-top:12px">ABRIR EDITOR COMPLETO ↗</a></section></div>`;
+}
+
   function renderOverview() {
     const range = periodRange();
     const loaded = units().filter((u) => state.data[u.id] && state.data[u.id].accounts);
@@ -1931,11 +2003,12 @@
   const F = window.ProspectingFollowup;
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
-  const UNIT_VIEWS = ['hoy', 'responder', 'followup', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
+  const UNIT_VIEWS = ['hoy', 'responder', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0, f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
-  const isFu = () => (state.unit === 'todas' ? FU_VIEWS.includes(state.view) : state.view === 'followup');
-  const fuView = () => (state.unit === 'todas' ? state.view : state.fu.sub);
+  const isFu = () => (state.unit === 'todas' ? [...FU_VIEWS,'resumen'].includes(state.view) : UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup');
+  const fuView = () => state.view === 'followup' ? (state.fu.sub || 'hoy') : state.view;
   const fuScope = () => (state.unit === 'todas' ? state.fu.f.unit || 'todas' : state.unit);
   const fuUnits = () => units().filter((u) => fuScope() === 'todas' || u.id === fuScope());
   const fuName = (id) => (unitOf(id) || { name: id }).name;
@@ -2023,16 +2096,18 @@
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
     if (state.fu.task) return renderFuTask(state.fu.task);
     const v = fuView();
-    const sub = state.unit === 'todas' ? '' : `<div class="toolbar" style="margin-bottom:4px"><div class="seg" role="tablist" aria-label="Follow-up de ${esc(fuName(state.unit))}">${FU_VIEWS.map((k) => `<button type="button" role="tab" data-fu="sub" data-fu-sub="${k}" aria-selected="${v === k}">${esc(FU_LABEL[k])}</button>`).join('')}<span class="seg-thumb" aria-hidden="true"></span></div></div>`;
+    const sub = '';
     if (!state.fu.n) {
       if (state.fu.error) return `${sub}<div class="notice glass"><span class="badge off">Sin conexión</span><span>${esc(state.fu.error)}</span><button class="btn small" type="button" data-fu="reload">Reintentar</button></div>`;
       return `${sub}<div class="skeleton"></div><div class="skeleton"></div>`;
     }
     const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
       .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('');
-    const body = { hoy: fuHoy, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento }[v] || fuHoy;
+    const body = { hoy: fuHoy, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
     return sub + errors + body();
   }
+
+  
 
   function fuToolbar({ search = true, groups = true, filters = true } = {}) {
     const f = state.fu.f;
@@ -2115,25 +2190,63 @@
   }
 
   function fuPipeline() {
-    const n = state.fu.n;
-    const cards = fuUnits().filter((u) => n.units[u.id]).map((u) => {
-      const snap = n.units[u.id];
-      const all = [...n.queue, ...n.scheduled, ...n.blocked].filter((x) => x.unit === u.id);
-      const max = Math.max(1, ...(snap.funnel || []).map((s) => s.reached));
-      const rows = (snap.funnel || []).map((s) => {
-        const here = all.filter((x) => x.stage === s.key);
-        const stuck = here.filter((x) => x.blocked).length;
-        return `<tr><td><strong>${esc(s.title)}</strong><div class="sub">→ ${esc(s.goal)}</div></td>
-          <td style="width:34%"><div style="height:10px;border-radius:6px;background:var(--glass-soft)"><div style="height:10px;border-radius:6px;width:${Math.round((s.reached / max) * 100)}%;background:${color(u)}"></div></div><div class="sub num">${int(s.reached)} llegaron</div></td>
-          <td class="num">${int(s.waiting)}</td><td class="num">${pct(s.rate)}</td><td class="num">${stuck ? `<span style="color:var(--bad-text)">${int(stuck)}</span>` : '—'}</td></tr>`;
-      }).join('');
-      const timing = (snap.timing || []).filter((t) => t.medianHours !== null && t.medianHours !== undefined);
-      return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Embudo de ${esc(u.name)}</h2><p class="sub">Con las etapas y las definiciones de ${esc(u.name)}: los números son los de su panel.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Llegaron</th><th>Esperan</th><th>Pasan a la siguiente</th><th>Bloqueadas</th></tr></thead><tbody>${rows}</tbody></table></div>
-        ${timing.length ? `<p class="sub" style="margin:10px 0 0">Tiempo mediano: ${timing.map((t) => `${esc(t.from)} → ${esc(t.to)}: ${t.medianHours < 48 ? `${Math.round(t.medianHours)} h` : `${Math.round(t.medianHours / 24)} d`}`).join(' · ')}</p>` : ''}</section>`;
+  const n=state.fu.n;
+  if(state.unit==='todas') {
+    const parts=units().filter(u=>n.units[u.id]).map(u=>{
+      const snap=n.units[u.id];
+      const steps=snap.funnel||[];
+      const ready=F.summary(n,u.id).ready;
+      return `<button type="button" class="os-business-card" data-business="${u.id}" data-goto="${u.id}" data-view-to="pipeline">
+        <div class="os-business-head"><span class="eyebrow">EMBUDO ${esc(u.name.toUpperCase())}</span><span class="badge live">${int(ready)} ACCIONES LISTAS</span></div>
+        <h2>${esc(u.name)}</h2><p>${steps.length} pasos técnicos · se respetan las definiciones del producto.</p>
+        <div class="os-business-metrics"><div><strong>${int(steps[0]?.reached || 0)}</strong><small>Alcanzaron inicio</small></div><div><strong>${int(steps.reduce((s,x)=>s+(x.waiting||0),0))}</strong><small>En etapas</small></div><div><strong>${int(n.blocked.filter(x=>x.unit===u.id).length)}</strong><small>Bloqueadas</small></div></div>
+      </button>`;
     }).join('');
-    return `<section class="hero"><div><span class="eyebrow">Pipeline</span><h1>El embudo de cada producto</h1><p>Cada producto mide con sus propias etapas: no se suman etapas distintas. «Bloqueadas» son las que esperan algo (horario, número, texto) para avanzar.</p></div></section>${fuToolbar({ search: false, groups: false, filters: false })}${cards || '<section class="card glass"><p class="empty">Sin datos de los productos.</p></section>'}`;
+    return `<section class="hero"><div><span class="eyebrow">GENERAL / EMBUDOS</span><h1>Dos recorridos. Una sola operación.</h1><p>Compará las etapas y prioridades por negocio. Las conversiones no se suman entre productos porque sus eventos son diferentes.</p></div></section><div class="os-business-cards">${parts}</div>${fuToolbar({search:false,groups:false,filters:false})}`;
   }
+  const unit=state.unit,snap=n.units[unit];
+  if(!snap)return `<section class="card glass"><p>No hay datos de ${esc(fuName(unit))}.</p></section>`;
+  const raw=snap.funnel||[];
+  const stages=snap.stages||[];
+  const sourceGroups=unit==='habita' ? [
+    ['prospectado','PROSPECTADO',['no-contactado']],
+    ['contactado','CONTACTADO',['no-responde']],
+    ['interesado','INTERESADO',['sin-demo','sin-enviar']],
+    ['demo-enviada','DEMO ENVIADA',['no-abrio','sin-interaccion','sin-cuenta']],
+    ['cuenta-creada','CUENTA CREADA',['sin-uso']],
+    ['cuenta-activa','CUENTA ACTIVA',['sin-suscripcion']],
+    ['cliente','CLIENTE',[]],
+  ] : stages.map(s=>[s.key,s.title.toUpperCase(),[s.key]]);
+  const all=[...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===unit);
+  const groups=sourceGroups.map(([key,title,keys])=>{
+    const steps=keys.map(k=>raw.find(s=>s.key===k)).filter(Boolean);
+    const waiting=keys.length?steps.reduce((sum,s)=>sum+(Number(s.waiting)||0),0):Math.max(0,Number(raw.at(-1)?.reached||0)*Number(raw.at(-1)?.rate||0));
+    const reached=steps[0]?.reached||0;
+    const rate=steps.at(-1)?.rate??null;
+    return {key,title,keys,waiting,reached,rate};
+  });
+  const selected=groups.find(g=>g.key===state.fu.pipelineStage)||groups[0];
+  const stage=selected.keys.includes(state.fu.technicalStage)?state.fu.technicalStage:null;
+  const matched=all.filter(x=>selected.keys.includes(x.stage) && (!stage||x.stage===stage));
+  const filtered=F.filter(matched,{...state.fu.f,unit});
+  const selectedTechnical=stage||selected.keys[0];
+  const currentStep=raw.find(s=>s.key===selectedTechnical);
+  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / EMBUDO</span><h1>El recorrido de cada oportunidad.</h1><p>Clic en una etapa para revisar sus situaciones, acciones y contactos. Los conteos de etapas provienen del motor de ${esc(fuName(unit))}; la tabla muestra contactos con seguimiento vigente.</p></div></section>
+    <section class="card glass"><div class="os-section-heading"><div><span class="os-kicker">ETAPAS COMERCIALES</span><h2>Pipeline de ${esc(fuName(unit))}</h2></div><span class="os-tag">${groups.length} ETAPAS</span></div>
+      <div class="os-stage-rail" data-testid="commercial-pipeline-stages">${groups.map(g=>`<button type="button" class="os-stage-tile" data-fu="pipeline-stage" data-fu-stage="${esc(g.key)}" aria-pressed="${selected.key===g.key}">
+        <span>${esc(g.title)}</span><strong>${int(g.waiting)}</strong><small>${g.rate==null?'Etapa final':`${pct(g.rate)} pasa al siguiente paso`}</small></button>`).join('')}</div>
+      <div class="os-stage-details">${selected.keys.length>1?selected.keys.map(k=>{const s=raw.find(x=>x.key===k);return `<button type="button" class="btn small ${stage===k?'primary':''}" data-fu="pipeline-technical" data-fu-stage="${esc(k)}">${esc(s?.title||k)} · ${int(s?.waiting||0)}</button>`}).join('')+`<button type="button" class="btn small ${!stage?'primary':''}" data-fu="pipeline-technical" data-fu-stage="">TODAS</button>`:''}
+        <span class="os-tag">${int(selected.waiting)} EN LA ETAPA</span>
+        <button class="btn small" type="button" data-view="secuencias">REGLAS Y MENSAJES →</button></div>
+    </section>
+    <section class="card glass"><div class="os-funnel-title"><div><span class="os-kicker">DETALLE DE ETAPA</span><h2>${esc(selected.title)}</h2></div><span class="badge live">${int(filtered.length)} EN SEGUIMIENTO</span></div>
+      ${currentStep?`<p class="os-view-caption">Objetivo: avanzar a <strong>${esc(currentStep.goal)}</strong>. ${int(currentStep.reached||0)} llegaron a este paso.</p>`:''}
+      ${fuToolbar()}
+      <div class="table-wrap"><table><thead><tr><th>Prospecto</th><th>Situación</th><th>Próxima acción</th><th>Prioridad</th><th>Último contacto</th><th>Estado</th></tr></thead><tbody>
+      ${filtered.slice(0,100).map(x=>`<tr data-fu-open="${esc(x.key)}" tabindex="0" style="cursor:pointer"><td><strong>${esc(x.name)}</strong>${x.zone?`<div class="sub">${esc(x.zone)}</div>`:''}</td><td>${esc(x.situationLabel||'—')}</td><td>${esc(x.action||x.actionReason||'—')}</td><td>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</td><td>${esc(ago(x.since)||'—')}</td><td>${x.claim?`Lo tiene ${esc(x.claim.by)}`:x.blocked?`<span style="color:var(--bad-text)">${esc(x.blocked)}</span>`:x.dueAt?`Programado ${esc(dayTime(x.dueAt))}`:'Lista'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No hay contactos con acciones vigentes en esta selección.</td></tr>'}
+      </tbody></table></div>${filtered.length>100?`<p class="os-view-caption">Se muestran los primeros 100 de ${int(filtered.length)}. Para ver todos, usá Prospectos.</p>`:''}
+    </section>`;
+}
 
   function fuProspectos() {
     const n = state.fu.n;
@@ -2294,7 +2407,10 @@
     const it = task && task.item;
     const fields = () => ({ ...F.taskFields(it), ...(task.versionId ? { version: task.versionId } : {}), ...(task.actionKey ? { tarea: task.actionKey } : {}), ...(task.stage ? { etapa: task.stage } : {}) });
     switch (ds.fu) {
-      case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); render(); break;
+      case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); go(state.unit, state.fu.sub); break;
+      case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; render(); break;
+      case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
+      case 'catalog-stage': state.fu.catalogStage = ds.fuStage; render(); break;
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
       case 'reload': loadFollowup(); break;
       case 'wa-sync': {
@@ -2403,9 +2519,9 @@
       setTimeout(() => { if (t.isConnected && ds.armed === '1') { ds.armed = ''; t.innerHTML = ds.label; t.classList.remove('armed'); } }, 5000);
       return;
     }
-    if (ds.unit && t.closest('#units')) { go(ds.unit, state.view === 'resumen' ? 'hoy' : state.view); ensureLoaded(); return; }
+    if (ds.unit && t.closest('#units')) { go(ds.unit, ds.unit === 'todas' ? 'resumen' : 'hoy'); ensureLoaded(); return; }
     if (ds.view) { go(state.unit, ds.view); return; }
-    if (ds.goto) { go(ds.goto, ds.viewTo || 'hoy'); return; }
+    if (ds.goto) { go(ds.goto, ds.viewTo || 'hoy'); ensureLoaded(); return; }
     if (ds.period) { state.period = ds.period; render(); loadMetrics().then(render); return; }
     if (ds.fold) {
       const folds = store(`folds-${state.unit}`) || {};
