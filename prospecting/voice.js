@@ -130,7 +130,6 @@
   let connectionTimer;
   let connectionBusy = false;
   let connectionTried = false;
-  const unavailable = new Set();
 
   function message(text) { el('status').textContent = text; }
 
@@ -288,14 +287,14 @@
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.value = row.id;
-      const noWhatsApp = unavailable.has(`${emitter.value}:${row.id}:${row.last4}`);
+      const noWhatsApp = row.whatsappUnavailable;
       box.disabled = row.sent || noWhatsApp || !info.ready || (needsSender && !row.senders.includes(info.sender));
       const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : needsSender ? 'Sin verificar' : '';
       const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && (note.value ? 'Audio ya registrado o reservado' : 'Mensaje de esta etapa ya enviado');
       const suggestion = suggested.has(row.id) && !row.senders.includes(info.sender) && 'Chat encontrado, pendiente de confirmar';
       const reply = row.reply && `respondió «${row.reply}»`;
       const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, reply, suggestion, delivery,
-        noWhatsApp && 'Omitido: WAHA no encontró WhatsApp para este número'].filter(Boolean).join(' · ');
+        noWhatsApp && 'Pausado: WAHA no encontró WhatsApp para este número en las últimas 24 h'].filter(Boolean).join(' · ');
       label.append(box, document.createTextNode(detail));
       line.append(label);
       if (!needsSender) return line;
@@ -317,8 +316,9 @@
       return line;
     }));
     const available = el('people').querySelectorAll('input:not(:disabled)').length;
+    const unavailable = rows.filter((row) => row.whatsappUnavailable).length;
     el('count').textContent = info.ready
-      ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}`
+      ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}${unavailable ? ` · ${unavailable} pausados sin WhatsApp` : ''}`
       : `${rows.length} en esta vista`;
     if (!rows.length) el('people').textContent = needsSender ? 'No hay contactos de esta etapa con ese emisor.' : 'No hay nadie por saludar.';
     controls();
@@ -711,10 +711,12 @@
     paused = false;
     controls();
     let sent = 0;
-    let skipped = 0;
+    let noWhatsApp = 0;
+    let ineligible = 0;
     let failures = 0;
     let lastError = '';
     for (const [i, box] of boxes.entries()) {
+      let outdated = false;
       while (!paused && token && dialog.open) {
         message(`Enviando ${i + 1} de ${boxes.length} desde el ${base.sender}…`);
         try {
@@ -727,9 +729,10 @@
             continue;
           }
           if (error.code === 'recipient_unavailable') {
-            const row = info?.people.find((person) => person.id === box.value);
-            if (row) unavailable.add(`${base.sender}:${row.id}:${row.last4}`);
-            skipped += 1;
+            noWhatsApp += 1;
+          } else if (error.code === 'recipient_ineligible') {
+            ineligible += 1;
+            outdated = true;
           } else {
             failures += 1;
             lastError = error.message;
@@ -738,12 +741,18 @@
         break;
       }
       if (paused || failures >= 2 || i === boxes.length - 1 || !token || !dialog.open) break;
+      if (outdated) continue;
       await waitForNext((rules.pauseMinMinutes * 60) + Math.floor(Math.random() * ((rules.pauseMaxMinutes - rules.pauseMinMinutes) * 60 + 1)),
-        `${sent} aceptados por WAHA · ${skipped} omitidos sin WhatsApp.`);
+        `${sent} aceptados por WAHA · ${noWhatsApp + ineligible} omitidos.`);
     }
     running = false;
     if (token && dialog.open) await load();
-    message(`${paused || failures >= 2 ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.${skipped ? ` ${skipped} omitidos porque WAHA no encontró WhatsApp.` : ''}${lastError ? ' ' + lastError : ''}`);
+    message([
+      `${paused || failures >= 2 ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.`,
+      noWhatsApp ? `Omitidos sin WhatsApp: ${noWhatsApp}.` : '',
+      ineligible ? `Omitidos porque cambiaron de etapa o ya estaban gestionados: ${ineligible}.` : '',
+      lastError,
+    ].filter(Boolean).join(' '));
     controls();
     if (adjustAfterSend && dialog.open) { adjustAfterSend = false; focusRules(); }
     if (sent) window.dispatchEvent(new Event('turnia-voice-sent'));
