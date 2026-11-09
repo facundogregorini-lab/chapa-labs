@@ -2260,6 +2260,62 @@
       </tbody></table></div>${all.length > shown ? `<div style="text-align:center;padding:8px"><button class="btn small" type="button" data-more-block="fu-prospectos">Ver los ${int(all.length - shown)} restantes</button></div>` : ''}</section>`;
   }
 
+  function fuRuleEditor(unit, snap) {
+  if(unit!=='habita' || !state.fu.ruleEdit)return '';
+  const r=(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
+  if(!r)return '';
+  return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key)}" data-fu-unit-id="${unit}">
+    <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE HABITA</span><h2>Editar regla</h2></div><button type="button" class="btn small" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
+    <p class="os-view-caption">Guardás en el motor original, sin alterar los envíos históricos ni las otras etapas.</p>
+    <div class="grid cols-2" style="margin-top:12px">
+      <label class="field"><span>Nombre</span><input class="input" name="name" maxlength="120" value="${esc(r.name||'')}"></label>
+      <label class="field"><span>Horas de espera</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${r.after_hours??0}" required></label>
+      <label class="field"><span>Horario desde</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required></label>
+      <label class="field"><span>Horario hasta</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></label>
+    </div>
+    <h3 style="margin-top:14px">Situaciones que disparan la regla</h3>
+    <div class="os-quick-links" style="margin-top:8px">${Object.entries(snap.labels?.situations||{}).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''}>Regla activa</label>
+    <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">GUARDAR CAMBIOS</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
+  </form>`;
+}
+
+  function fuVersionEditor(unit, snap, stageKey) {
+  if(unit!=='habita'||!state.fu.versionEdit)return '';
+  const version=(snap.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===state.fu.versionEdit&&v.stage===stageKey);
+  if(!version)return '';
+  return `<form class="section" data-fu-version-edit-form data-fu-unit-id="${unit}" data-fu-version="${esc(version.id)}" style="margin-top:12px">
+    <div class="os-section-heading"><h3>EDITAR V${version.version}</h3><button type="button" class="btn small" data-fu="version-edit" data-fu-version="">CERRAR</button></div>
+    <p class="os-warn-note">Editar el texto de una versión mezcla métricas del texto anterior y el nuevo. Para A/B creá otra versión.</p>
+    <label class="field"><span>Mensaje</span><textarea class="input" name="body" rows="6" required>${esc(version.body||'')}</textarea></label>
+    <label class="field"><span>Observaciones</span><textarea class="input" name="notes" rows="3">${esc(version.notes||'')}</textarea></label>
+    <button class="btn primary" type="submit">GUARDAR VERSIÓN</button>
+  </form>`;
+}
+
+  async function handleFuEditorSubmit(form) {
+  const unit=form.dataset.fuUnitId, snap=state.fu.n?.units[unit], fd=new FormData(form);
+  if(form.matches('[data-fu-rule-form]')){
+    const rule=(snap?.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
+    if(!rule)return;
+    const values={...rule,name:String(fd.get('name')||''),situations:fd.getAll('sit').map(String),
+      after_hours:Number(fd.get('after_hours')),hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),enabled:fd.has('enabled')};
+    if(await fuOp(unit,{op:'rule-save',key:rule.key,valores:values},{label:'Regla actualizada en Habita.'})){
+      state.fu.ruleEdit=null; await loadFollowup({quiet:true});render();
+    }
+    return;
+  }
+  if(form.matches('[data-fu-version-edit-form]')){
+    const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===form.dataset.fuVersion);
+    if(!version)return;
+    const values={channel:version.channel||'whatsapp',trigger:version.trigger_label||'',
+      body:String(fd.get('body')||''),ctas:version.ctas||[],notes:String(fd.get('notes')||'')};
+    if(await fuOp(unit,{op:'version-update',id:version.id,valores:values},{label:'Versión actualizada en Habita.'})){
+      state.fu.versionEdit=null;await loadFollowup({quiet:true});render();
+    }
+  }
+}
+
   function fuSecuencias() {
     const n = state.fu.n;
     return `<section class="hero"><div><span class="eyebrow">Secuencias y mensajes</span><h1>Qué se manda en cada etapa</h1><p>Las reglas y los mensajes son los de cada producto. Una versión nueva se mide aparte; «Probar 50/50» la manda a la mitad de la etapa, siempre la misma mitad.</p></div></section>
@@ -2271,14 +2327,16 @@
         const stages = snap.stages || [];
         return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Reglas de ${esc(u.name)}</h2><p class="sub">${u.id === 'habita' ? 'Se editan sin deploy: gana la primera regla (por orden) que corresponde a la situación.' : 'Siguen la cadencia de Prospección de Turnia (días hábiles, tres mensajes como máximo).'}</p></div></div>
           <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Cuándo</th><th>Acción</th><th>Espera</th>${u.id === 'habita' ? '<th>Horario</th><th></th>' : '<th>Sale cuando</th>'}</tr></thead><tbody>
-          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
+          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button> <button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="${esc(r.key)}">EDITAR</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
           </tbody></table></div></section>
+          ${fuRuleEditor(u.id,snap)}
           ${stages.map((s) => {
             const vs = versions.filter((v) => v.stage === s.key);
             return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
               ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
                 ${v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
-                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p></div>`).join('') || '<p class="sub">Sin versiones.</p>'}
+                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
+              ${fuVersionEditor(u.id,snap,s.key)}
               <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns"><select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit">Guardar versión</button></div></form>
             </details>`;
           }).join('')}`;
@@ -2446,6 +2504,8 @@
       case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); openDrawer(ds.fuAccount); break; }
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
+      case 'rule-edit': state.fu.ruleEdit = ds.fuRule || null; render(); break;
+      case 'version-edit': state.fu.versionEdit = ds.fuVersion || null; render(); break;
       case 'rule-toggle': {
         const snap = state.fu.n.units[ds.fuUnitId];
         const rule = snap && (snap.rules || []).find((r) => r.key === ds.fuRule);
@@ -2457,9 +2517,10 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form]')) return;
+    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     const fd = Object.fromEntries(new FormData(form));
     const task = state.fu.task;
     const it = task && task.item;
