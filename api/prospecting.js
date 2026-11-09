@@ -481,6 +481,10 @@ async function doTask(req, res, user) {
   if (!unit.api || !apiOf(unit)) return fail(res, 403, `Para operar ${unit.name} falta la clave de su API.`);
   const f = body.followup && typeof body.followup === 'object' ? body.followup : null;
   if (!f || !FOLLOWUP_OPS.has(f.op)) return fail(res, 400, 'Operación de Follow-up desconocida.');
+  // Catalog and full rule/message editing are sensitive: the legacy open-name session
+  // is not sufficient authorization for changing outbound automation.
+  if (new Set(['rule-save', 'version-update', 'stage-create', 'state-save', 'state-delete']).has(f.op) && session.open())
+    return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
     const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: f.op === 'whatsapp-sync' ? 280000 : 45000 });
     return res.status(200).json({ result: out });
