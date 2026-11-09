@@ -374,6 +374,7 @@
 
   // ─── Resumen general (todas las unidades) ───────────────────
   function renderCommercialOverview() {
+  if (state.demo) return renderOverview();
   if (!state.fu.n) return state.fu.error
     ? `<section class="card glass"><h2>No se pudo cargar la operación comercial</h2><p>${esc(state.fu.error)}</p><button class="btn primary" type="button" data-fu="reload">Reintentar</button></section>`
     : '<div class="skeleton"></div><div class="skeleton"></div>';
