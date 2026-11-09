@@ -6,13 +6,16 @@
   const origin = 'https://turniasalud.app';
   const apiUrl = origin + '/api/prospeccion/audio';
   const selectionKey = 'cl-pr-turnia-voice-notes';
+  const textKey = 'cl-pr-turnia-voice-texts';
+  // Si Turnia todavía no informa la etapa: el seguimiento con audio, como antes.
+  const FOLLOWUP = { textOnly: false, needsSender: true, defaultText: '', panelTemplates: [] };
   const initialSender = '5483';
   const dialog = document.createElement('dialog');
   dialog.className = 'voice-dialog glass strong';
   dialog.setAttribute('aria-labelledby', 'voice-title');
   dialog.innerHTML = `
-    <div class="card-head"><div><h2 id="voice-title">Audios de seguimiento</h2>
-      <p class="sub">Elegí una etapa y su nota de voz. La misma grabación sirve para ambas líneas.</p></div>
+    <div class="card-head"><div><h2 id="voice-title">Audios y mensajes de WhatsApp</h2>
+      <p class="sub">Todas las etapas, del saludo al seguimiento. El saludo sale solo como texto; en las demás mandás un audio, un texto o los dos. La misma grabación sirve para ambas líneas.</p></div>
       <form method="dialog"><button class="btn ghost" aria-label="Cerrar audios">Cerrar</button></form></div>
     <p role="status" data-status></p>
     <button class="btn primary" type="button" data-authorize>Autorizar con Turnia</button>
@@ -24,7 +27,7 @@
         <form data-rules-form>
           <fieldset data-rules-fields disabled>
             <div class="voice-fields">
-              <label class="field">Audios por día entre ambas líneas<input name="dailyLimit" type="number" min="1" step="1" required></label>
+              <label class="field">Envíos por día entre ambas líneas (audios y mensajes)<input name="dailyLimit" type="number" min="1" step="1" required></label>
               <label class="field">Contactos por tanda<input name="batchSize" type="number" min="1" step="1" required></label>
               <label class="field">Espera mínima entre envíos (segundos)<input name="pauseMinSeconds" type="number" min="1" max="3600" step="1" required></label>
               <label class="field">Espera máxima entre envíos (segundos)<input name="pauseMaxSeconds" type="number" min="1" max="3600" step="1" required></label>
@@ -40,7 +43,9 @@
     <div data-voice-controls hidden>
       <div class="voice-fields">
         <label class="field">Etapa<select data-group>
-          <option value="no_abrio">Recibieron la demo y no la abrieron</option>
+          <option value="saludo">Por saludar · el primer mensaje, sin link</option>
+          <option value="presentacion">Saludados · falta mandarles la demo</option>
+          <option value="no_abrio" selected>Recibieron la demo y no la abrieron</option>
           <option value="abrio">Abrieron la demo y no hablaron con Sofi</option>
           <option value="hablo">Hablaron con Sofi</option>
         </select></label>
@@ -51,7 +56,7 @@
         <button class="btn small" type="button" data-test>Mandarme una prueba</button>
       </div>
       <audio controls preload="none" data-player hidden></audio>
-      <details><summary>Grabar o subir otro audio</summary>
+      <details data-recorder><summary>Grabar o subir otro audio</summary>
         <form data-upload>
           <label class="field">Nombre del audio<input name="label" maxlength="80" required placeholder="Ej. Ya habló con Sofi"></label>
           <div class="btns">
@@ -62,7 +67,8 @@
           <button class="btn" type="submit" data-save>Guardar para esta etapa</button>
         </form>
       </details>
-      <label class="field">Texto previo opcional<textarea data-text rows="2" maxlength="500" placeholder="Usá {saludo} y {link} para personalizarlo"></textarea></label>
+      <label class="field"><span data-text-label>Texto previo opcional</span><textarea data-text rows="3" maxlength="500" placeholder="Usá {saludo} y {link} para personalizarlo"></textarea></label>
+      <p class="sub" data-text-hint></p>
       <fieldset data-contacts>
         <legend>Destinatarios</legend>
         <label class="field">Enviar desde<select data-emitter></select></label>
@@ -97,6 +103,8 @@
   const rulesForm = el('rules-form');
   let preferred = {};
   try { preferred = JSON.parse(localStorage.getItem(selectionKey)) || {}; } catch { /* almacenamiento desactivado */ }
+  let texts = {};
+  try { texts = JSON.parse(localStorage.getItem(textKey)) || {}; } catch { /* almacenamiento desactivado */ }
   let token = '';
   let popup;
   let info;
@@ -114,6 +122,30 @@
   let previewUrl;
 
   function message(text) { el('status').textContent = text; }
+
+  const stage = () => info?.stage || FOLLOWUP;
+
+  // Qué se escribe en el cuadro de texto y qué sale si queda vacío.
+  function renderText() {
+    const s = stage();
+    const audio = Boolean(note.value);
+    el('recorder').hidden = s.textOnly;
+    el('preview').hidden = s.textOnly;
+    el('text-label').textContent = audio ? 'Texto antes del audio (opcional)' : 'Mensaje';
+    el('text').placeholder = audio ? 'Usá {saludo} y {link} para personalizarlo'
+      : s.textOnly ? 'Ej. ¡Buenas! ¿Es el consultorio de {destinatario}?' : 'Vacío: sale el mensaje del panel de Turnia';
+    const panel = s.panelTemplates.map((t) => `«${t.text.split('\n')[0]}${t.text.includes('\n') ? '…' : ''}» (${t.label.replace(/^WhatsApp: /, '')})`);
+    const rules = group.value === 'saludo' ? ' Sin link: va primero, solo para saber si es el número correcto.'
+      : group.value === 'presentacion' ? ' Tiene que llevar {link}, el de su demo.' : '';
+    el('text-hint').textContent = audio
+      ? 'Va antes de la nota de voz. Vacío, sale solo el audio.'
+      : `Variables: {saludo} (nombre de pila), {destinatario} («la Dra. Pérez»)${s.textOnly ? ' y {consultorio}' : ', {consultorio} y {link}'}.${rules}${panel.length ? ' Si lo dejás vacío, a cada uno le sale el del panel de Turnia que le corresponde: ' + panel.join(' o ') + '.' : ''}`;
+  }
+
+  function saveText() {
+    texts[group.value] = el('text').value;
+    try { localStorage.setItem(textKey, JSON.stringify(texts)); } catch { /* almacenamiento desactivado */ }
+  }
 
   function resetDraft(blob) {
     if (draftUrl) URL.revokeObjectURL(draftUrl);
@@ -158,7 +190,7 @@
       pauseMaxSeconds: Math.round(rules.pauseMaxMinutes * 60),
     };
     for (const [key, value] of Object.entries(fields)) rulesForm.elements.namedItem(key).value = String(value);
-    el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} audios y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${pauseLabel(rules)}.`;
+    el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} envíos (audios y mensajes) y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${pauseLabel(rules)}.`;
   }
 
   function focusRules() {
@@ -173,7 +205,7 @@
     el('voice-controls').hidden = !token;
     const locked = busy || running || reviewing || Boolean(recorder);
     group.disabled = locked || rulesDirty;
-    note.disabled = locked || rulesDirty;
+    note.disabled = locked || rulesDirty || stage().textOnly;
     emitter.disabled = locked || rulesDirty;
     el('rules-fields').disabled = locked || !token || !info?.rules;
     rulesForm.querySelector('button[type=submit]').classList.toggle('primary', rulesDirty);
@@ -181,7 +213,7 @@
     el('file').disabled = locked;
     el('record').disabled = (busy || running || !info?.ready) && !recorder;
     el('preview').disabled = locked || !note.value;
-    el('test').disabled = locked || !info?.ready || !info.testTo || !note.value;
+    el('test').disabled = locked || !info?.ready || !info.testTo || (!note.value && !testText());
     el('contacts').disabled = locked || !info || rulesDirty;
     el('detect').disabled = locked || !info?.ready;
     if (info?.sender) el('detect').textContent = `Buscar chats del ${info.sender} para revisar`;
@@ -193,7 +225,7 @@
     el('send').hidden = reviewing || running;
     el('pick').disabled = locked || rulesDirty || !info?.ready || !selectionLimit() || !el('people').querySelector('input:not(:disabled)');
     const n = selected().length;
-    el('send').disabled = locked || rulesDirty || !info?.ready || !note.value || !n || n > selectionLimit();
+    el('send').disabled = locked || rulesDirty || !info?.ready || !n || n > selectionLimit();
     el('pick').textContent = rulesDirty ? 'Guardá las reglas para aplicar la tanda' : selectionLimit() ? `Armar tanda de hasta ${selectionLimit()}` : 'Armar una tanda';
     el('selection').textContent = rulesDirty ? 'Guardá los ajustes de tanda y pausa para aplicarlos.' : info?.rules ? `Elegidos ${n} · máximo ${selectionLimit()} en esta tanda` : '';
     el('send').textContent = rulesDirty ? 'Guardá los ajustes antes de enviar' : n ? `Revisar tanda de ${n}` : 'Revisar tanda';
@@ -221,9 +253,18 @@
     throw error;
   }
 
+  // El texto de la prueba: el escrito o, sin audio, el primero del panel.
+  function testText() {
+    return el('text').value.trim() || (note.value ? '' : stage().panelTemplates[0]?.text || '');
+  }
+
   function renderPeople() {
     if (!info) return;
-    const filter = el('sender-filter').value;
+    const { needsSender } = stage();
+    // El saludo es el primer chat: se manda desde cualquier línea, sin confirmar nada.
+    el('sender-filter').closest('label').hidden = !needsSender;
+    el('detect').hidden = !needsSender;
+    const filter = needsSender ? el('sender-filter').value : 'all';
     const rows = info.people.filter((row) =>
       filter === 'all' || (filter === 'unknown' ? !row.senders.length : row.senders.includes(filter)));
     el('people').replaceChildren(...rows.map((row) => {
@@ -233,13 +274,14 @@
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.value = row.id;
-      box.disabled = row.sent || !info.ready || !note.value || !row.senders.includes(info.sender);
-      const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : 'Sin verificar';
-      const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && 'Audio ya registrado o reservado';
+      box.disabled = row.sent || !info.ready || (needsSender && !row.senders.includes(info.sender));
+      const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : needsSender ? 'Sin verificar' : '';
+      const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && (note.value ? 'Audio ya registrado o reservado' : 'Mensaje de esta etapa ya enviado');
       const suggestion = suggested.has(row.id) && !row.senders.includes(info.sender) && 'Chat encontrado, pendiente de confirmar';
       const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, suggestion, delivery].filter(Boolean).join(' · ');
       label.append(box, document.createTextNode(detail));
       line.append(label);
+      if (!needsSender) return line;
       const tags = document.createElement('div');
       tags.className = 'btns voice-senders';
       for (const sender of info.senderOptions) {
@@ -257,11 +299,11 @@
       line.append(tags);
       return line;
     }));
-    const available = rows.filter((row) => !row.sent && row.senders.includes(info.sender)).length;
+    const available = rows.filter((row) => !row.sent && (!needsSender || row.senders.includes(info.sender))).length;
     el('count').textContent = info.ready
       ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}`
       : `${rows.length} en esta vista`;
-    if (!rows.length) el('people').textContent = 'No hay contactos de esta etapa con ese emisor.';
+    if (!rows.length) el('people').textContent = needsSender ? 'No hay contactos de esta etapa con ese emisor.' : 'No hay nadie por saludar.';
     controls();
   }
 
@@ -278,8 +320,13 @@
       emitter.replaceChildren(...data.senderOptions.map((ending) =>
         new Option(ending === '0022' ? '0022 · personal' : ending, ending)));
       emitter.value = sender;
-      note.replaceChildren(new Option('Elegí un audio', ''), ...data.notes.map((row) => new Option(row.label, row.id)));
-      note.value = preferred[group.value] || '';
+      const textOnly = stage().textOnly;
+      note.replaceChildren(new Option(textOnly ? 'Solo texto · el saludo no lleva audio' : 'Sin audio · solo texto', ''),
+        ...(textOnly ? [] : data.notes.map((row) => new Option(row.label, row.id))));
+      note.value = textOnly ? '' : preferred[group.value] || '';
+      // El texto de fábrica de cada etapa habla del audio: sin audio, el cuadro arranca vacío (sale el del panel).
+      el('text').value = texts[group.value] ?? (note.value ? stage().defaultText || '' : '');
+      renderText();
       const senderFilter = el('sender-filter');
       const previous = senderFilter.value;
       senderFilter.replaceChildren(...data.senderOptions.map((sender) =>
@@ -289,7 +336,7 @@
         ? previous : emitter.value || 'unknown';
       renderPeople();
       message(info.ready
-        ? `WhatsApp emisor · ${data.sender}. Quedan ${data.remaining} audios hoy entre las dos líneas.`
+        ? `WhatsApp emisor · ${data.sender}. Quedan ${data.remaining} envíos hoy entre las dos líneas.`
         : `El WhatsApp ${sender} necesita conexión.`);
     } catch (error) {
       info = null;
@@ -337,6 +384,7 @@
   });
   group.addEventListener('change', () => { setPreferred(preferred[group.value] || ''); load(); });
   note.addEventListener('change', () => { setPreferred(note.value); load(); });
+  el('text').addEventListener('input', () => { saveText(); controls(); });
   emitter.addEventListener('change', () => { suggested.clear(); el('sender-filter').value = emitter.value; load(); });
   el('sender-filter').addEventListener('change', renderPeople);
   el('pick').addEventListener('click', () => {
@@ -487,8 +535,10 @@
     message(`Mandando la prueba a tu WhatsApp terminado en ${info.testTo}…`);
     controls();
     try {
-      await request({ body: { action: 'test', note: note.value, sender: info.sender } });
-      message(`WAHA aceptó la prueba. Confirmá que llegó como nota de voz al ${info.testTo}.`);
+      await request({ body: { action: 'test', note: note.value || null, text: testText(), sender: info.sender } });
+      message(note.value
+        ? `WAHA aceptó la prueba. Confirmá que llegó como nota de voz al ${info.testTo}.`
+        : `WAHA aceptó la prueba. Fijate cómo se lee en el ${info.testTo} (con tus datos y un link de muestra).`);
     } catch (error) { message(error.message); }
     finally { busy = false; controls(); }
   });
@@ -517,7 +567,10 @@
     if (el('send').disabled) return;
     const boxes = selected();
     const label = note.selectedOptions[0]?.textContent || '';
-    el('summary').textContent = `Vas a enviar «${label}» a ${boxes.length} desde el ${info.sender}${info.sender === '0022' ? ' personal' : ''}. Pausa guardada de ${pauseLabel(info.rules)}.`;
+    const written = el('text').value.trim();
+    const what = note.value ? `el audio «${label}»${written ? ' con el texto' : ''}`
+      : written ? 'el mensaje que escribiste' : 'el mensaje del panel de Turnia que le toca a cada uno';
+    el('summary').textContent = `Vas a enviar ${what} a ${boxes.length} desde el ${info.sender}${info.sender === '0022' ? ' personal' : ''}. Pausa guardada de ${pauseLabel(info.rules)}.`;
     reviewing = true;
     controls();
     el('back').focus();
@@ -528,7 +581,7 @@
     const boxes = selected();
     if (!boxes.length || boxes.length > selectionLimit()) return;
     const rules = info.rules;
-    const base = { action: 'send', sender: info.sender, group: group.value, note: note.value, text: el('text').value };
+    const base = { action: 'send', sender: info.sender, group: group.value, note: note.value || null, text: el('text').value };
     reviewing = false;
     running = true;
     paused = false;
