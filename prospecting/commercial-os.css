@@ -159,7 +159,9 @@ body[data-unit="turnia"] { --accent:#138378; }
   .os-business-list button { min-height:38px; flex:1 0 110px; justify-content:center; padding:8px; }
   .os-nav { display:flex; flex-wrap:nowrap; overflow-x:auto; padding:0 0 8px; gap:4px; }
   .os-nav button { width:auto; white-space:nowrap; flex:0 0 auto; min-height:36px; padding:8px 10px; }
-  .os-section-label,.os-legacy-title,.os-legacy-nav,.os-sidebar-footer { display:none; }
+  .os-section-label,.os-legacy-title,.os-sidebar-footer { display:none; }
+  .os-legacy-nav { display:flex; flex-wrap:nowrap; overflow-x:auto; padding:0 0 7px; border-top:1px solid #ffffff22; }
+  .os-legacy-nav button { flex:0 0 auto; }
   .top.os-top { top:0; padding:10px 15px; }
   .os-workspace > main { padding:18px 12px 65px; }
   .os-catalog-grid { grid-template-columns:1fr; }
