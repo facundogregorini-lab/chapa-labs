@@ -248,7 +248,7 @@ test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por
     return { ok: true, status: 200, json: async () => ({ templates: [], clinics: [], weeklyGoal: 320, funnelRates: { llamadas: 0.6 } }) };
   };
   try {
-    const t = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 320, rates: { demos: 0.15, visitadas: 0.65, interaccion: 0.5, llamadas: 0.6, fundadores: 0.5 } } });
+    const t = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 320, rates: { respondieron: 0.2, demos: 0.75, visitadas: 0.65, interaccion: 0.5, llamadas: 0.6, fundadores: 0.5 } } });
     assert.equal(t.statusCode, 200, JSON.stringify(t.body));
     assert.equal(sent.funnel.perWeek, 320);
     assert.equal(sent.funnel.rates.llamadas, 0.6);

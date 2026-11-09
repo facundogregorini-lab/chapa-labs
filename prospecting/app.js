@@ -1057,7 +1057,7 @@
     const isOn = (s, st) => f.step === s && f.stayed === st;
     // Turnia: el segmento elegido (o la pestaña) abre «Audios y mensajes» con su etapa ya elegida.
     const voiceGroup = id !== 'turnia' || state.demo ? null
-      : f.step !== null ? (f.stayed ? ['permiso', 'no_abrio', 'abrio', 'hablo'][f.step] || null : null)
+      : f.step !== null ? (f.stayed ? [null, 'permiso', 'no_abrio', 'abrio', 'hablo'][f.step] || null : null)
       : !f.withDemo && f.stage === 'prospect' ? 'saludo' : !f.withDemo && f.stage === 'closed' ? 'no_interesa' : null;
     const segment = f.step !== null && f.stayed && v.funnel[f.step + 1]
       ? `a los ${int(v.funnel[f.step].count - v.funnel[f.step + 1].count)} que ${lc(cfg.stayed[f.step])}`
@@ -1066,6 +1066,7 @@
       ? `<div class="ag-voice-cta"><button type="button" class="btn primary small" data-voice-open data-voice-group="${voiceGroup}">✉ Enviar mensaje o audio ${esc(segment)}</button><span class="sub">${voiceGroup === 'permiso'
         ? 'Se abre en el Paso 2, con quienes respondieron el saludo. Para mandar la demo, elegí ahí el Paso 3 (respondieron el Paso 2) o el Seguimiento 1 (24 horas sin responderlo).'
         : 'Se abre con esta etapa elegida.'} Turnia arma la lista con quienes se les puede escribir (celular, sin baja, con mensajes disponibles), sin el filtro de fechas.</span></div>`
+      : id === 'turnia' && !state.demo && f.step === 0 && f.stayed ? '<p class="sub ag-voice-cta">No respondieron el saludo: la secuencia no les escribe más. Si alguno respondió y no figura, tocá «Leer las respuestas ahora» en «🎤 Audios y mensajes» o marcalo «Respondió» en Turnia, y pasa al Paso 2.</p>'
       : id === 'turnia' && !state.demo && f.step !== null && !f.stayed ? '<p class="sub ag-voice-cta">Para mandar un mensaje, tocá la parte naranja de una barra: los que se quedaron en ese paso.</p>' : '';
     const set = (o) => esc(new URLSearchParams(o).toString());
     const bars = v.funnel.map((x, i) => {

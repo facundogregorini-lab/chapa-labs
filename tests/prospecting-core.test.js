@@ -281,18 +281,20 @@ test('embudo contra la meta de Turnia con datos como los de su planilla: visitad
   ];
   const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03', metrics: { uso: { clinicas: 1, clinicas_activas: 1 } } });
   const by = Object.fromEntries(tf.steps.map((s) => [s.key, s.actual]));
-  assert.deepEqual(by, { saludos: 6, demos: 4, visitadas: 4, interaccion: 2, llamadas: 0, fundadores: 0 });
-  for (let i = 1; i < 4; i++) assert.ok(tf.steps[i].actual <= tf.steps[i - 1].actual, tf.steps[i].key);
+  assert.deepEqual(by, { saludos: 6, respondieron: 4, demos: 4, visitadas: 4, interaccion: 2, llamadas: 0, fundadores: 0 });
+  for (let i = 1; i < 5; i++) assert.ok(tf.steps[i].actual <= tf.steps[i - 1].actual, tf.steps[i].key);
 });
 
 test('Turnia: el embudo termina en clientes fundadores (setup cobrado), con la llamada antes', () => {
   const { turnia } = require('../prospecting/units').UNITS;
-  assert.deepEqual(turnia.targets.map((s) => [s.key, s.rate || s.perWeek]), [['saludos', 250], ['demos', 0.15], ['visitadas', 0.65], ['interaccion', 0.5], ['llamadas', 0.45], ['fundadores', 0.5]]);
+  assert.deepEqual(turnia.targets.map((s) => [s.key, s.rate || s.perWeek]), [['saludos', 250], ['respondieron', 0.2], ['demos', 0.75], ['visitadas', 0.65], ['interaccion', 0.5], ['llamadas', 0.45], ['fundadores', 0.5]]);
+  // La meta de demos enviadas sigue siendo el 15 % de los saludos (20 % responden y al 75 % le llega la demo).
+  assert.ok(Math.abs(turnia.targets[1].rate * turnia.targets[2].rate - 0.15) < 1e-9);
   const a = (o) => ({ firstContact: '2026-11-02 10:00', touches: 1, stage: 'contactado', phoneKind: 'celular', ...o });
   const accounts = [a({ demoOpened: 'sí', demoChat: 'sí', stage: 'reunion' }), a({ demoOpened: 'sí', demoChat: 'sí', stage: 'cliente' }), a({ demoOpened: 'sí' }), a({})];
   const tf = C.targetFunnel(accounts, turnia, { range: { from: '2026-10-28', to: '2026-11-03' }, todayDay: '2026-11-03' });
   const by = Object.fromEntries(tf.steps.map((s) => [s.key, s.actual]));
-  assert.deepEqual(by, { saludos: 4, demos: 4, visitadas: 3, interaccion: 2, llamadas: 2, fundadores: 1 });
+  assert.deepEqual(by, { saludos: 4, respondieron: 4, demos: 4, visitadas: 3, interaccion: 2, llamadas: 2, fundadores: 1 });
   const row = C.toAccounts([['Código', 'Nombre', 'Cliente desde', 'Operativa desde', 'Interacciones del primer mes'], ['x', 'X', '2026-11-01 10:00', '2026-11-05 09:00', '37']], turnia).accounts[0];
   assert.equal(row.clientAt, '2026-11-01 10:00');
   assert.equal(row.operationalAt, '2026-11-05 09:00');
