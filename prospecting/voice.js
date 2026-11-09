@@ -19,6 +19,12 @@
       <form method="dialog"><button class="btn ghost" aria-label="Cerrar audios">Cerrar</button></form></div>
     <p role="status" data-status></p>
     <button class="btn primary" type="button" data-authorize>Autorizar con Turnia</button>
+    <section class="voice-rules" data-connection aria-labelledby="voice-connection-title" hidden>
+      <h3 id="voice-connection-title">Conexión de WhatsApp · 5483</h3>
+      <p role="status" data-connection-status></p>
+      <img width="240" height="240" data-connection-qr alt="Código QR para vincular el WhatsApp Business del 5483" hidden>
+      <button class="btn small" type="button" data-reconnect hidden>Generar QR</button>
+    </section>
     <section class="voice-rules" aria-labelledby="voice-rules-title">
       <h3 id="voice-rules-title">Reglas de envío</h3>
       <p class="sub" data-rules-summary>Autorizá con Turnia para ver el cupo disponible y ajustar las tandas y las pausas.</p>
@@ -121,6 +127,10 @@
   let draft;
   let draftUrl;
   let previewUrl;
+  let connectionTimer;
+  let connectionBusy = false;
+  let connectionTried = false;
+  const unavailable = new Set();
 
   function message(text) { el('status').textContent = text; }
 
@@ -246,9 +256,11 @@
     if (r.status === 401) {
       token = '';
       info = null;
+      clearConnection();
       controls();
     }
     const error = new Error(data.error || 'Turnia no pudo completar la operación.');
+    error.code = data.code;
     if (r.status === 429 && Number.isInteger(data.retryAfter) && data.retryAfter > 0 && data.retryAfter <= 3600) {
       error.retryAfter = data.retryAfter;
     }
@@ -276,12 +288,14 @@
       const box = document.createElement('input');
       box.type = 'checkbox';
       box.value = row.id;
-      box.disabled = row.sent || !info.ready || (needsSender && !row.senders.includes(info.sender));
+      const noWhatsApp = unavailable.has(`${emitter.value}:${row.id}:${row.last4}`);
+      box.disabled = row.sent || noWhatsApp || !info.ready || (needsSender && !row.senders.includes(info.sender));
       const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : needsSender ? 'Sin verificar' : '';
       const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && (note.value ? 'Audio ya registrado o reservado' : 'Mensaje de esta etapa ya enviado');
       const suggestion = suggested.has(row.id) && !row.senders.includes(info.sender) && 'Chat encontrado, pendiente de confirmar';
       const reply = row.reply && `respondió «${row.reply}»`;
-      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, reply, suggestion, delivery].filter(Boolean).join(' · ');
+      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, reply, suggestion, delivery,
+        noWhatsApp && 'Omitido: WAHA no encontró WhatsApp para este número'].filter(Boolean).join(' · ');
       label.append(box, document.createTextNode(detail));
       line.append(label);
       if (!needsSender) return line;
@@ -302,7 +316,7 @@
       line.append(tags);
       return line;
     }));
-    const available = rows.filter((row) => !row.sent && (!needsSender || row.senders.includes(info.sender))).length;
+    const available = el('people').querySelectorAll('input:not(:disabled)').length;
     el('count').textContent = info.ready
       ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}`
       : `${rows.length} en esta vista`;
@@ -310,11 +324,100 @@
     controls();
   }
 
+  function clearConnection() {
+    clearTimeout(connectionTimer);
+    el('connection').hidden = true;
+    el('connection-qr').hidden = true;
+    el('connection-qr').removeAttribute('src');
+  }
+
+  function canWatchConnection() {
+    return dialog.open && token && info?.channelStatus && emitter.value === initialSender;
+  }
+
+  function watchConnection(delay = 0) {
+    clearTimeout(connectionTimer);
+    if (canWatchConnection()) connectionTimer = setTimeout(checkConnection, delay);
+  }
+
+  async function reconnect(relink) {
+    connectionTried = true;
+    connectionBusy = true;
+    el('reconnect').hidden = true;
+    el('connection-status').textContent = relink ? 'Preparando una vinculación nueva…' : 'Intentando recuperar la conexión…';
+    try {
+      await request({ body: { action: 'reconnect', relink } });
+    } catch (error) {
+      if (canWatchConnection()) el('connection-status').textContent = error.message;
+    } finally {
+      connectionBusy = false;
+      watchConnection(2500);
+    }
+  }
+
+  async function checkConnection() {
+    if (!canWatchConnection()) return;
+    if (connectionBusy || busy || running || reviewing || recorder || document.hidden) {
+      watchConnection(5000);
+      return;
+    }
+    const id = generation;
+    let delay = 15000;
+    try {
+      const channel = await request({ query: { view: 'connection' } });
+      if (id !== generation || !canWatchConnection()) return;
+      if (channel.ready !== info.ready) {
+        info.ready = channel.ready && Boolean(info.rules);
+        info.sender = info.ready ? initialSender : null;
+        renderPeople();
+        message(info.ready
+          ? `WhatsApp emisor · ${initialSender}. Quedan ${info.remaining} envíos hoy entre las dos líneas.`
+          : `El WhatsApp ${initialSender} necesita conexión.`);
+      }
+      if (channel.ready) {
+        connectionTried = false;
+        clearConnection();
+        watchConnection(delay);
+        return;
+      }
+      el('connection').hidden = false;
+      const image = el('connection-qr');
+      const qr = channel.status === 'SCAN_QR_CODE' && channel.qr;
+      image.hidden = !qr;
+      if (qr) {
+        const src = 'data:image/png;base64,' + qr;
+        if (image.getAttribute('src') !== src) image.src = src;
+      } else image.removeAttribute('src');
+      const retry = el('reconnect');
+      retry.hidden = channel.status !== 'FAILED';
+      retry.dataset.relink = String(Boolean(channel.hasAccount));
+      retry.textContent = channel.hasAccount ? 'Volver a vincular' : 'Generar otro QR';
+      if (channel.status === 'FAILED' && !connectionTried) {
+        await reconnect(false);
+        return;
+      }
+      const labels = {
+        FAILED: channel.hasAccount ? 'La sesión no se pudo recuperar. Volvé a vincular el 5483 para obtener un QR.' : 'El QR venció. Generá uno nuevo cuando tengas el teléfono a mano.',
+        STARTING: 'WAHA está iniciando la sesión…',
+        SCAN_QR_CODE: qr ? 'En el WhatsApp Business del 5483, abrí Dispositivos vinculados → Vincular dispositivo y escaneá el QR.' : 'Esperando el próximo QR de WAHA…',
+        WRONG_NUMBER: 'WAHA tiene otro número vinculado. Revisá el servidor del 5483.',
+      };
+      const status = labels[channel.status] || 'El 5483 no está disponible. Revisá la sesión en WAHA.';
+      if (el('connection-status').textContent !== status) el('connection-status').textContent = status;
+      if (channel.status === 'STARTING' || channel.status === 'SCAN_QR_CODE') delay = 3000;
+    } catch {
+      if (id !== generation || !canWatchConnection()) return;
+      clearConnection();
+    }
+    if (id === generation) watchConnection(delay);
+  }
+
   async function load() {
     const id = ++generation;
     busy = true;
     controls();
     const sender = emitter.value || initialSender;
+    if (sender !== initialSender) clearConnection();
     try {
       const data = await request({ query: { group: group.value, note: preferred[group.value] || '', sender } });
       if (id !== generation) return;
@@ -345,7 +448,11 @@
       info = null;
       message(error.message);
     } finally {
-      if (id === generation) { busy = false; controls(); }
+      if (id === generation) {
+        busy = false;
+        controls();
+        watchConnection(info?.ready ? 15000 : 0);
+      }
     }
   }
 
@@ -376,11 +483,18 @@
     if (token && !running) load();
   });
   dialog.addEventListener('close', () => {
+    clearConnection();
     paused = true;
     reviewing = false;
     controls();
     adjustAfterSend = false;
     if (recorder?.state === 'recording') recorder.stop();
+  });
+  el('reconnect').addEventListener('click', () => {
+    if (!canWatchConnection() || busy || running || reviewing || connectionBusy) return;
+    const relink = el('reconnect').dataset.relink === 'true';
+    if (relink && !window.confirm('¿Querés reemplazar la vinculación del 5483? Vas a escanear un QR nuevo con ese teléfono.')) return;
+    reconnect(relink);
   });
   el('authorize').addEventListener('click', () => {
     popup = window.open(origin + '/panel/prospeccion/audio/acceso', '_blank', 'popup,width=540,height=650');
@@ -597,6 +711,7 @@
     paused = false;
     controls();
     let sent = 0;
+    let skipped = 0;
     let failures = 0;
     let lastError = '';
     for (const [i, box] of boxes.entries()) {
@@ -611,17 +726,24 @@
             await waitForNext(error.retryAfter, 'Pausa del servidor entre tandas o líneas.');
             continue;
           }
-          failures += 1;
-          lastError = error.message;
+          if (error.code === 'recipient_unavailable') {
+            const row = info?.people.find((person) => person.id === box.value);
+            if (row) unavailable.add(`${base.sender}:${row.id}:${row.last4}`);
+            skipped += 1;
+          } else {
+            failures += 1;
+            lastError = error.message;
+          }
         }
         break;
       }
       if (paused || failures >= 2 || i === boxes.length - 1 || !token || !dialog.open) break;
-      await waitForNext((rules.pauseMinMinutes * 60) + Math.floor(Math.random() * ((rules.pauseMaxMinutes - rules.pauseMinMinutes) * 60 + 1)), `${sent} aceptados por WAHA.`);
+      await waitForNext((rules.pauseMinMinutes * 60) + Math.floor(Math.random() * ((rules.pauseMaxMinutes - rules.pauseMinMinutes) * 60 + 1)),
+        `${sent} aceptados por WAHA · ${skipped} omitidos sin WhatsApp.`);
     }
     running = false;
     if (token && dialog.open) await load();
-    message(`${paused ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.${lastError ? ' ' + lastError : ''}`);
+    message(`${paused || failures >= 2 ? 'Tanda detenida. ' : ''}${sent} de ${boxes.length} aceptados por WAHA desde el ${base.sender}.${skipped ? ` ${skipped} omitidos porque WAHA no encontró WhatsApp.` : ''}${lastError ? ' ' + lastError : ''}`);
     controls();
     if (adjustAfterSend && dialog.open) { adjustAfterSend = false; focusRules(); }
     if (sent) window.dispatchEvent(new Event('turnia-voice-sent'));
