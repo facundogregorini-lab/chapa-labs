@@ -94,7 +94,8 @@ Las etapas y los pasos están en `prospecting/agencies.js` (`TURNIA`), junto a l
 
 Una sola tarjeta en un lugar fijo, para una persona o para un agente con computer use (por ejemplo, Claude en Chrome, que alterna entre este panel y la pestaña de WhatsApp Web). En la vista están las **instrucciones para el agente**, listas para copiar.
 
-- **Orden:** seguimientos que tocan hoy (primero quienes abrieron o probaron su demo), saludos por revisar (¿respondió?) y nuevos hasta la meta del día. «Saltar» lo manda al final de la sesión. Las conversaciones abiertas no entran: las contesta una persona.
+- **Orden:** en Turnia, primero van las respuestas al saludo o al pedido de permiso que tienen un paso pendiente. Después van los seguimientos que tocan hoy, los saludos por revisar y los nuevos hasta la meta del día. «Saltar» lo manda al final de la sesión. Las conversaciones abiertas después de recibir la demo se atienden en Follow-up.
+- **Línea de WhatsApp (Turnia)**. El filtro permite ver las cuentas con historial verificado para cada número o con la línea todavía sin verificar. Una persona con chat confirmado en ambos aparece en los dos filtros. Antes de enviar, revisá qué cuenta está abierta en WhatsApp.
 - **Estado en `data-state`** de `[data-testid="agent"]`: `ready` (se puede abrir), `check` (mirar si respondió el saludo), `opened` (falta confirmar), `wait` (pausa entre envíos), `paused` (fuera de horario o solo lectura), `done` (meta cumplida o cola vacía), `stopped` (tres «no salió» seguidos: revisar WhatsApp).
 - **Datos para verificar:** `agent-name`, `agent-phone` (con 549), `agent-message` (el texto exacto), y en la tarjeta `data-account-id`, `data-phone`, `data-expected-name`, `data-template` y `data-wa-url` (el link de WhatsApp Web).
 - **Botones:** `agent-open-whatsapp`, `agent-confirm-sent`, `agent-not-sent`, `agent-no-whatsapp`, `agent-skip`, `agent-open-chat`, `agent-replied` y `agent-override-hours`.

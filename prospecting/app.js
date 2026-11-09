@@ -677,15 +677,23 @@
     const d = state.data[id];
     const q = C.queue(scoped(id), u, { events: d.events });
     const wa = (a) => { const n = C.nextTemplate(a, u); return a.phone && C.canMessage(a, u) && n && n.channel === 'whatsapp'; };
+    const senderOptions = id === 'turnia' ? d.whatsappSenderOptions : null;
+    const selected = store('send-whatsapp-line');
+    const sender = senderOptions && (selected === 'unknown' || senderOptions.includes(selected)) ? selected : 'all';
+    const replied = id === 'turnia'
+      ? q.conversations.filter((a) => a.stage === 'respondio' && !a.touches && a.greetingSent
+        && a.lastReply > (a.permissionSent || a.greetingSent) && wa(a))
+      : [];
     const items = [
+      ...replied.map((a) => ({ a, step: a.permissionSent ? 'Respondió al Paso 2' : 'Respondió al saludo', check: true })),
       ...q.followUps.filter(wa).map((a) => ({ a, step: 'Seguimiento' })),
       // Turnia: después del Paso 2, el Seguimiento 1 espera 24 horas si no respondió (C.nowLocal es la hora de Buenos Aires).
       ...q.greeted.filter((a) => a.phone && !(a.permissionSent && !(a.lastReply > a.permissionSent) && hoursSince(a.permissionSent) < 24))
         .map((a) => ({ a, step: a.permissionSent ? 'Paso 2 enviado' : 'Saludado', check: true })),
       ...q.fresh.filter(wa).map((a) => ({ a, step: 'Nuevo', fresh: true })),
-    ];
+    ].filter(({ a }) => sender === 'all' || (sender === 'unknown' ? !a.whatsappSenders?.length : a.whatsappSenders?.includes(sender)));
     const skipped = agentSkipped(id);
-    return { q, items: [...items.filter((x) => !skipped.has(x.a.id)), ...items.filter((x) => skipped.has(x.a.id))] };
+    return { q, sender, senderOptions, items: [...items.filter((x) => !skipped.has(x.a.id)), ...items.filter((x) => skipped.has(x.a.id))] };
   }
 
   function agentInstructions(u) {
@@ -705,7 +713,7 @@
 
   function renderSend(id) {
     const u = unitOf(id);
-    const { q, items } = sendQueue(id);
+    const { q, items, sender, senderOptions } = sendQueue(id);
     const pending = state.pending && state.pending.inline ? state.pending : storedPending();
     const cur = pending ? (items.find((x) => x.a.id === pending.id) || { a: findAccount(pending.id), step: 'En curso' }) : items[0];
     const nextAt = store(`next-${id}`) || 0;
@@ -715,7 +723,11 @@
     let status;
     if (ro) { phase = 'paused'; status = `Solo lectura: falta la clave de la API de ${u.name}.`; }
     else if (pending && cur && cur.a) { phase = 'opened'; status = '¿Salió el mensaje? Confirmá antes de seguir.'; }
-    else if (!cur || !cur.a) { phase = 'done'; status = q.freshTotal ? 'No queda nadie para hoy. Pará.' : `No queda nadie para hoy y no hay ${esc(u.entity.many)} nuevos con WhatsApp: hay que sumar otra lista. Pará.`; }
+    else if (!cur || !cur.a) {
+      phase = 'done';
+      status = sender !== 'all' ? 'No hay contactos en la cola para este filtro.'
+        : q.freshTotal ? 'No queda nadie para hoy. Pará.' : `No queda nadie para hoy y no hay ${esc(u.entity.many)} nuevos con WhatsApp: hay que sumar otra lista. Pará.`;
+    }
     else if (state.agent.fails >= 3) { phase = 'stopped'; status = 'Pará: tres envíos seguidos no salieron. Revisá WhatsApp (¿restricción, sesión cerrada?).'; }
     else if (cur.fresh && q.doneToday >= q.goal) { phase = 'done'; status = `Meta del día cumplida (${int(q.doneToday)} de ${int(q.goal)}). Pará.`; }
     else if (!C.inSendWindow(u) && store(`override-${id}`) !== C.today()) { phase = 'paused'; status = `Fuera del horario de envío (${esc(u.hours)}). Próxima franja: ${esc(C.nextSendWindow(u))}.`; }
@@ -735,6 +747,7 @@
     // «---» separa dos mensajes (el Seguimiento 3 de Turnia): el chat se abre con el primero y el segundo se copia aparte.
     const parts = text.split(/\n[ \t]*-{3,}[ \t]*\n/).map((t) => t.trim()).filter(Boolean);
     const digits = a ? C.waDigits(a.phone) : '';
+    const senderLabel = a?.whatsappSenders?.length ? a.whatsappSenders.join(' y ') : 'Sin línea verificada';
     const kinds = { celular: 'celular de la persona', compartido: 'del consultorio u oficina', fijo: 'fijo', revisar: 'por revisar' };
     const btn = (testid, label, attrs = '', cls = '') => `<button type="button" class="btn ${cls}" data-testid="${testid}" ${attrs}>${label}</button>`;
     let actions = '';
@@ -745,6 +758,15 @@
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Enviar</span><h1>Uno por vez</h1><p>Una tarjeta, un mensaje, una confirmación. Sirve igual para una persona o para un agente de IA que alterna con la pestaña de WhatsApp. ${esc(u.hours)}</p></div>
         <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos nuevos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" style="--c0:${circ}" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">nuevos hoy · ${int(items.length)} en la cola</div></div></div></section>
+      ${senderOptions ? `<section class="card glass" aria-label="Filtro por línea de WhatsApp">
+        <label class="field">WhatsApp desde el que se escribió
+          <select data-send-whatsapp-line ${pending ? 'disabled' : ''}>
+            ${[['all', 'Todas las líneas'], ...senderOptions.map((ending) => [ending, ending === '0022' ? '0022 · Personal' : ending === '5483' ? '5483 · Business' : ending]), ['unknown', 'Sin línea verificada']]
+              .map(([value, label]) => `<option value="${esc(value)}" ${value === sender ? 'selected' : ''}>${esc(label)}</option>`).join('')}
+          </select>
+        </label>
+        <p class="sub">${sender === 'all' || sender === 'unknown' ? 'Antes de enviar, verificá qué cuenta está abierta en WhatsApp.' : `Antes de enviar, verificá que esté abierta la cuenta terminada en ${esc(sender)}.`}</p>
+      </section>` : ''}
       <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, parts[0] || text) : '')}" aria-labelledby="agent-name">
         <p class="agent-status ${phase}" role="status" aria-live="polite" data-testid="agent-status">${status}${phase === 'paused' && !ro && a ? ` <button type="button" class="btn small ghost" data-testid="agent-override-hours" data-agent="override" data-arm="Confirmar: mandar fuera de horario">Mandar igual</button>` : ''}</p>
         ${a ? `
@@ -755,6 +777,7 @@
             <p class="sub" style="margin:2px 0 10px">${esc([a.org !== a.name ? a.org : '', a.zone].filter(Boolean).join(' · '))}</p>
             <dl class="facts">
               <dt>WhatsApp</dt><dd><strong data-testid="agent-phone">+${esc(digits)}</strong>${a.phoneKind ? ` <span class="sub">(${esc(kinds[a.phoneKind] || a.phoneKind)})</span>` : ''}</dd>
+              ${senderOptions ? `<dt>Línea registrada</dt><dd>${esc(senderLabel)}</dd>` : ''}
               ${a.touches ? `<dt>Mensajes</dt><dd>${int(a.touches)} de ${u.maxTouches}</dd>` : ''}
               ${a.lastContact ? `<dt>Último</dt><dd>${esc(when(a.lastContact))}</dd>` : ''}
             </dl>
@@ -774,7 +797,7 @@
           <div class="btns"><button class="btn small" type="button" data-action="copy-instructions">${icon.copy} Copiar instrucciones</button></div>
         </details>
       </section>
-      <section class="card glass"><div class="card-head"><div><h2>Después</h2><p class="sub">El orden de la cola: seguimientos, saludos por revisar y nuevos hasta la meta. Los saltados van al final.</p></div></div>
+      <section class="card glass"><div class="card-head"><div><h2>Después</h2><p class="sub">${id === 'turnia' ? 'Primero, las respuestas al saludo o al Paso 2. ' : ''}Luego, seguimientos, saludos por revisar y nuevos hasta la meta. Los saltados van al final.</p></div></div>
         <div class="rows">${items.slice(cur && items[0] && items[0].a.id === (a && a.id) ? 1 : 0, 9).map((x) => `<div class="arow" data-open-account="${esc(x.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(x.a.name)}</strong><div class="meta"><span>${esc(x.step)}</span>·<span>${esc(x.a.zone || '')}</span>${signals(x.a)}</div></div></div>`).join('') || '<p class="empty">Nadie más por ahora.</p>'}</div>
       </section>`;
   }
@@ -2323,6 +2346,12 @@
       const f = filt(state.unit);
       if (e.target.value) f.dims[e.target.dataset.dimSelect] = e.target.value; else delete f.dims[e.target.dataset.dimSelect];
       render();
+    }
+    if (e.target.matches('[data-send-whatsapp-line]')) {
+      store('send-whatsapp-line', e.target.value);
+      state.agent.replied = null;
+      render();
+      $('[data-send-whatsapp-line]')?.focus();
     }
     if (e.target.matches('[data-tpl]')) { $('#drawer').dataset.key = e.target.value; renderDrawer(); }
     if (e.target.matches('[data-bulk-pick]') && state.bulk) { state.bulk.picks[e.target.dataset.bulkPick] = e.target.value; render(); }

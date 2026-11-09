@@ -534,6 +534,7 @@ module.exports = async (req, res) => {
       let lastImport;
       let events = data.events;
       let rowsFromApi = false;
+      let whatsappSenderOptions;
       if (unit.api && apiOf(unit)) {
         try {
           const out = await callApi(unit);
@@ -551,6 +552,10 @@ module.exports = async (req, res) => {
               const rows = await callApi(unit, { query: unit.api.rowsQuery });
               if (Array.isArray(rows.header) && Array.isArray(rows.rows)) {
                 accounts = core.toAccounts([rows.header, ...rows.rows], unit).accounts;
+                if (Array.isArray(rows.whatsappSenders?.options)) {
+                  whatsappSenderOptions = rows.whatsappSenders.options;
+                  accounts = accounts.map((a) => ({ ...a, whatsappSenders: rows.whatsappSenders.byCode?.[a.id] ?? [] }));
+                }
                 if (Array.isArray(rows.events)) events = rows.events;
                 rowsFromApi = true;
               }
@@ -573,6 +578,7 @@ module.exports = async (req, res) => {
         rowsFromApi,
         sheet: { title: data.meta.title, tab: sheet.tab, url: `https://docs.google.com/spreadsheets/d/${sheet.id}/edit`, missingTab: Boolean(data.missingTab), missingColumns: unit.api && unit.api.rows && apiOf(unit) ? [] : missing.map((k) => core.LABEL[k]), mapped: Object.keys(data.map) },
         accounts,
+        whatsappSenderOptions,
         events: events.slice(-8000),
         // habita.: cuándo entró la planilla por última vez a su base (el panel la sincroniza si pasó una hora).
         sync: unit.api && unit.api.sync && apiOf(unit) ? { lastImport: lastImport ? lastImport.at : null } : undefined,
