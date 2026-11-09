@@ -39,6 +39,9 @@
     ['nextAt', 'Fecha del próximo paso', /fecha.*pr[oó]xim|^seguimiento$/i],
     ['touches', 'Mensajes', /^mensajes( enviados)?$/i],
     ['greetingSent', 'Saludo enviado', /^saludo enviado$/i],
+    // Turnia (09/11): el Paso 2, el gancho que pide permiso para pasar el link, y la última respuesta.
+    ['permissionSent', 'Paso 2 enviado', /^paso 2 enviado$/i],
+    ['lastReply', 'Última respuesta', /^[uú]ltima respuesta$/i],
     ['firstContact', 'Primer contacto', /^(primer contacto|fecha (de )?env[ií]o|fecha)$/i],
     ['lastContact', 'Último contacto', /^[uú]ltimo contacto/i],
     ['lastChannel', 'Último canal', /^([uú]ltimo canal|canal)$/i],
@@ -183,7 +186,7 @@
       a.stageRaw = a.stage;
       a.stage = stageFromText(a.stage);
       // Fechas o «Sí»; cualquier otro texto en Baja también cuenta como baja.
-      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'demoClinic', 'demoChat', 'accountAt', 'accountActive', 'clientAt', 'operationalAt', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
+      for (const k of ['nextAt', 'firstContact', 'lastContact', 'greetingSent', 'permissionSent', 'lastReply', 'demoClinic', 'demoChat', 'accountAt', 'accountActive', 'clientAt', 'operationalAt', 'demoOpened', 'demoTried', 'replied', 'interested', 'meeting', 'customer']) a[k] = parseDate(a[k]);
       a.optOut = parseDate(a.optOut) || (a.optOut && !/^(no|false|falso|-)$/i.test(a.optOut) ? 'sí' : '');
       a.touches = Number(String(a.touches).replace(',', '.')) || 0;
       a.firstMonth = a.firstMonth === '' ? null : Number(a.firstMonth) || 0;

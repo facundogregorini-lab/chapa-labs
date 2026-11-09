@@ -8,14 +8,22 @@
   const selectionKey = 'cl-pr-turnia-voice-notes';
   const textKey = 'cl-pr-turnia-voice-texts';
   // Si Turnia todavía no informa la etapa: el seguimiento con audio, como antes.
-  const FOLLOWUP = { textOnly: false, needsSender: true, defaultText: '', panelTemplates: [] };
+  const FOLLOWUP = { textOnly: false, needsSender: true, defaultText: '', panelTemplates: [], link: 'optional' };
+  // Las etapas que dependen de si respondió: se leen las respuestas de WhatsApp (a las 8 o con el botón).
+  const BY_REPLY = ['permiso', 'entrega', 'sin_respuesta', 'no_interesa'];
+  const EMPTY = {
+    saludo: 'No hay nadie por saludar.',
+    permiso: 'Nadie respondió el saludo todavía. Si alguien respondió hace poco, tocá «Leer las respuestas ahora».',
+    entrega: 'Nadie respondió el Paso 2 todavía. Si alguien respondió hace poco, tocá «Leer las respuestas ahora».',
+    sin_respuesta: 'Nadie lleva 24 horas sin responder el Paso 2.',
+  };
   const initialSender = '5483';
   const dialog = document.createElement('dialog');
   dialog.className = 'voice-dialog glass strong';
   dialog.setAttribute('aria-labelledby', 'voice-title');
   dialog.innerHTML = `
     <div class="card-head"><div><h2 id="voice-title">Audios y mensajes de WhatsApp</h2>
-      <p class="sub">Todas las etapas, del saludo al seguimiento. El saludo sale solo como texto; en las demás mandás un audio, un texto o los dos. La misma grabación sirve para ambas líneas.</p></div>
+      <p class="sub">La secuencia de WhatsApp, siempre a la recepción: el Paso 1, el 2 a quienes respondieron, el link en el Paso 3 o el Seguimiento 1, y los Seguimientos 2 y 3. Antes del link sale solo texto; después, un audio, un texto o los dos. La misma grabación sirve para ambas líneas.</p></div>
       <form method="dialog"><button class="btn ghost" aria-label="Cerrar audios">Cerrar</button></form></div>
     <p role="status" data-status></p>
     <button class="btn primary" type="button" data-authorize>Autorizar con Turnia</button>
@@ -50,11 +58,13 @@
     <div data-voice-controls hidden>
       <div class="voice-fields">
         <label class="field">Etapa<select data-group>
-          <option value="saludo">Por saludar · el primer mensaje, sin link</option>
-          <option value="presentacion">Saludados · falta mandarles la demo</option>
-          <option value="no_abrio" selected>Recibieron la demo y no la abrieron</option>
-          <option value="abrio">Abrieron la demo y no hablaron con Sofi</option>
-          <option value="hablo">Hablaron con Sofi</option>
+          <option value="saludo">Paso 1 · Por saludar (sin link)</option>
+          <option value="permiso">Paso 2 · Respondieron el saludo: pedir permiso (sin link)</option>
+          <option value="entrega">Paso 3 · Respondieron el Paso 2: mandar la demo</option>
+          <option value="sin_respuesta">Seguimiento 1 · 24 h sin responder el Paso 2: la demo igual</option>
+          <option value="no_abrio" selected>Seguimientos 2 y 3 · No abrieron la demo</option>
+          <option value="abrio">Seguimientos 2 y 3 · Abrieron la demo y no hablaron con Sofi</option>
+          <option value="hablo">Seguimientos 2 y 3 · Hablaron con Sofi</option>
           <option value="no_interesa">Dijeron que no les interesa · pedirles feedback</option>
         </select></label>
         <label class="field">Audio para esta etapa<select data-note></select></label>
@@ -75,14 +85,15 @@
           <button class="btn" type="submit" data-save>Guardar para esta etapa</button>
         </form>
       </details>
-      <label class="field"><span data-text-label>Texto previo opcional</span><textarea data-text rows="3" maxlength="500" placeholder="Usá {saludo} y {link} para personalizarlo"></textarea></label>
+      <label class="field"><span data-text-label>Texto previo opcional</span><textarea data-text rows="4" maxlength="1500" placeholder="Usá {destinatario} y {link} para personalizarlo"></textarea></label>
       <p class="sub" data-text-hint></p>
       <fieldset data-contacts>
         <legend>Destinatarios</legend>
         <label class="field">Enviar desde<select data-emitter></select></label>
         <label class="field">Chats iniciados desde<select data-sender-filter></select></label>
         <p class="sub">Confirmá una línea si ya le escribiste desde ese número. La búsqueda de chats muestra sugerencias para revisar. Las reglas de arriba se aplican a cada tanda.</p>
-        <div class="btns"><button class="btn small" type="button" data-detect>Buscar chats para revisar</button></div>
+        <div class="btns"><button class="btn small" type="button" data-detect>Buscar chats para revisar</button>
+          <button class="btn small" type="button" data-sync hidden>Leer las respuestas ahora</button></div>
         <button class="btn small" type="button" data-pick>Armar una tanda</button>
         <p class="sub" data-count></p>
         <p class="sub" data-selection></p>
@@ -143,15 +154,23 @@
     el('recorder').hidden = s.textOnly;
     el('preview').hidden = s.textOnly;
     el('text-label').textContent = audio ? 'Texto antes del audio (opcional)' : 'Mensaje';
-    el('text').placeholder = audio ? 'Usá {saludo} y {link} para personalizarlo'
-      : s.textOnly ? 'Ej. ¡Buenas! ¿Es el consultorio de {destinatario}?' : 'Vacío: sale el mensaje del panel de Turnia';
-    const panel = s.panelTemplates.map((t) => `«${t.text.split('\n')[0]}${t.text.includes('\n') ? '…' : ''}» (${t.label.replace(/^WhatsApp: /, '')})`);
-    const rules = group.value === 'saludo' ? ' Sin link: va primero, solo para saber si es el número correcto.'
-      : group.value === 'presentacion' ? ' Tiene que llevar {link}, el de su demo.'
-      : group.value === 'no_interesa' ? ' Sale una sola vez, no cuenta como uno de los tres mensajes y después queda en «No le interesa».' : '';
+    el('text').placeholder = audio ? 'Usá {destinatario} y {link} para personalizarlo' : 'Vacío: sale el mensaje del panel de Turnia (abajo)';
+    const panel = s.panelTemplates.map((t) => `«${t.text.split('\n')[0]}${t.text.includes('\n') ? '…' : ''}» (${t.label.replace(/^WhatsApp( ·|:) /, '')})`);
+    const link = s.link === 'forbidden' ? ' Sin link: todavía no dio permiso para pasarlo.'
+      : s.link === 'required' ? ' Tiene que llevar {link}, el de su demo.' : '';
+    const rules = {
+      saludo: ' Va primero: confirma que es la recepción.',
+      permiso: ' Solo a quienes respondieron el saludo.',
+      entrega: ' A quienes respondieron el Paso 2. Es el primero de los tres mensajes.',
+      sin_respuesta: ' A las 24 horas del Paso 2, si no respondió. Es el primero de los tres mensajes.',
+      no_abrio: ' El Seguimiento 2 va como audio (unos 12 segundos); el 3 son dos mensajes, el segundo listo para reenviar a los doctores.',
+      abrio: ' El Seguimiento 2 va como audio (unos 12 segundos); el 3 son dos mensajes, el segundo listo para reenviar a los doctores.',
+      hablo: ' El Seguimiento 2 va como audio (unos 12 segundos); el 3 son dos mensajes, el segundo listo para reenviar a los doctores.',
+      no_interesa: ' Sale una sola vez, no cuenta como uno de los tres mensajes y después queda en «No le interesa».',
+    }[group.value] || '';
     el('text-hint').textContent = audio
       ? 'Va antes de la nota de voz. Vacío, sale solo el audio.'
-      : `Variables: {saludo} (nombre de pila), {destinatario} («la Dra. Pérez»)${s.textOnly ? ' y {consultorio}' : ', {consultorio} y {link}'}.${rules}${panel.length ? ' Si lo dejás vacío, a cada uno le sale el del panel de Turnia que le corresponde: ' + panel.join(' o ') + '.' : ''}`;
+      : `Variables: {destinatario} («la Dra. Pérez»), {del_consultorio} («del Consultorio Odontológico Pérez»)${s.link === 'forbidden' ? '' : ' y {link} (su demo)'}. Una línea con --- separa dos mensajes.${link}${rules}${panel.length ? ' Si lo dejás vacío, a cada uno le sale el del panel de Turnia que le corresponde: ' + panel.join(' o ') + '.' : ''}`;
   }
 
   function saveText() {
@@ -235,6 +254,7 @@
     el('test').disabled = locked || !info?.ready || !info.testTo || (!note.value && !testText());
     el('contacts').disabled = locked || !info || rulesDirty;
     el('detect').disabled = locked || !info?.ready;
+    el('sync').disabled = locked || !info;
     if (info?.sender) el('detect').textContent = `Buscar chats del ${info.sender} para revisar`;
     el('text').disabled = locked;
     el('stop').hidden = !running;
@@ -285,6 +305,7 @@
     // El saludo es el primer chat: se manda desde cualquier línea, sin confirmar nada.
     el('sender-filter').closest('label').hidden = !needsSender;
     el('detect').hidden = !needsSender;
+    el('sync').hidden = !BY_REPLY.includes(group.value);
     const filter = needsSender ? el('sender-filter').value : 'all';
     const rows = info.people.filter((row) =>
       filter === 'all' || (filter === 'unknown' ? !row.senders.length : row.senders.includes(filter)));
@@ -323,12 +344,13 @@
       line.append(tags);
       return line;
     }));
-    const available = el('people').querySelectorAll('input:not(:disabled)').length;
+    // Cada casilla por sí misma: mientras carga, el fieldset deshabilitado haría que :disabled cuente cero.
+    const available = [...el('people').querySelectorAll('input')].filter((box) => !box.disabled).length;
     const unavailable = rows.filter((row) => row.whatsappUnavailable).length;
     el('count').textContent = info.ready
       ? `${rows.length} en esta vista · ${available} disponibles desde el ${info.sender}${unavailable ? ` · ${unavailable} pausados sin WhatsApp` : ''}`
       : `${rows.length} en esta vista`;
-    if (!rows.length) el('people').textContent = needsSender ? 'No hay contactos de esta etapa con ese emisor.' : 'No hay nadie por saludar.';
+    if (!rows.length) el('people').textContent = info.people.length || !EMPTY[group.value] ? (needsSender ? 'No hay contactos de esta etapa con ese emisor.' : EMPTY.saludo) : EMPTY[group.value];
     controls();
   }
 
@@ -435,7 +457,7 @@
         new Option(ending === '0022' ? '0022 · personal' : ending, ending)));
       emitter.value = sender;
       const textOnly = stage().textOnly;
-      note.replaceChildren(new Option(!textOnly ? 'Sin audio · solo texto' : group.value === 'saludo' ? 'Solo texto · el saludo no lleva audio' : 'Solo texto', ''),
+      note.replaceChildren(new Option(!textOnly ? 'Sin audio · solo texto' : group.value === 'no_interesa' ? 'Solo texto' : 'Solo texto · antes del link no va audio', ''),
         ...(textOnly ? [] : data.notes.map((row) => new Option(row.label, row.id))));
       note.value = textOnly ? '' : preferred[group.value] || '';
       // El texto de fábrica de cada etapa habla del audio: sin audio, el cuadro arranca vacío (sale el del panel).
@@ -562,6 +584,22 @@
       el('sender-filter').value = 'all';
       renderPeople();
       message(`Se revisaron ${found.chats} chats del ${found.sender}. Hay ${suggested.size} sugerencias entre todas las etapas. Confirmá solo las que reconozcas como envíos desde esa línea.`);
+    } catch (error) { message(error.message); }
+    finally { busy = false; controls(); }
+  });
+  // Lee los chats de las dos líneas (como «Leer WhatsApp ahora» de la bandeja): quién respondió el saludo o el Paso 2.
+  el('sync').addEventListener('click', async () => {
+    if (busy || running) return;
+    busy = true;
+    controls();
+    message('Leyendo las respuestas de las dos líneas… puede tardar un par de minutos.');
+    try {
+      const read = await request({ body: { action: 'sync' } });
+      const problems = (read.lines || []).filter((line) => line.status !== 'ok').map((line) => `${line.line}: ${line.problem || 'sin configurar'}`);
+      await load();
+      message(read.reused
+        ? 'Las respuestas se leyeron hace menos de 10 minutos: esta lista ya las tiene.'
+        : `Respuestas leídas: ${read.nuevas} nuevas.${problems.length ? ' No se pudo leer ' + problems.join('; ') + '.' : ''}`);
     } catch (error) { message(error.message); }
     finally { busy = false; controls(); }
   });

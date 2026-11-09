@@ -66,7 +66,7 @@
       const ev = (type, extra = {}) => events.push({ at: at(day, 9 + Math.floor(r() * 6)), id, account: a.name, type, channel: 'whatsapp', template: '', detail: '', by: a.sdr, ...extra });
       a.firstContact = at(day, 9);
       if (unit.greetingFirst) {
-        ev('saludo', { template: a.phoneKind === 'compartido' ? 'whatsapp_saludo_consultorio' : 'whatsapp_saludo' });
+        ev('saludo', { template: unit.id === 'turnia' ? 'whatsapp_abridor' : 'whatsapp_saludo' });
         a.stage = 'saludado';
         if (r() < 0.25 && C.daysBetween(day, t) < 3) { a.lastContact = a.firstContact; a.nextAt = C.addBusinessDays(day, 1); continue; }
         day = C.addDays(day, r() < 0.6 ? 0 : 1);
@@ -74,7 +74,7 @@
       const steps = 1 + Math.floor(r() * 3);
       let replied = false;
       for (let s = 1; s <= steps && day <= t; s++) {
-        const key = unit.id === 'turnia' ? (s === 1 ? 'whatsapp_1' : s === 2 ? 'whatsapp_2' : 'whatsapp_3') : `whatsapp_${s}`;
+        const key = unit.id === 'turnia' ? (s === 1 ? 'whatsapp_entrega' : s === 2 ? 'whatsapp_seguimiento' : 'whatsapp_reenviable') : `whatsapp_${s}`;
         ev('mensaje', { template: key });
         a.touches = s;
         a.lastContact = at(day, 10);

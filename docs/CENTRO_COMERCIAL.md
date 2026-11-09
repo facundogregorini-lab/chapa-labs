@@ -175,7 +175,7 @@ Implementación:
 - **Repo público:** el de Chapa no lleva ids de planillas, claves ni datos personales. Las listas de prospectos se pasan por chat o por archivo y se importan en el panel de cada producto: nunca van a ningún repo.
 - **habita. → Turnia:** cada mejora de habita. se lleva a Turnia, adaptada a sus etapas y su cadencia (ver `CLAUDE.md` o `AGENTS.md`).
 - **WhatsApp:** abrir el chat no cuenta como envío. El contacto cuenta cuando se confirma que salió. Nunca se envía solo, sin aprobación.
-- **Saludo y bajas (Turnia):** el saludo va primero, sin link; tres mensajes como máximo; «Pidió no recibir más» es para siempre.
+- **Saludo y bajas (Turnia):** la secuencia le habla a la recepción (09/11): el saludo va primero, sin link; cuando responde, el Paso 2 pide permiso (tampoco lleva link ni cuenta); el link va en el Paso 3 o, a las 24 h sin respuesta, en el Seguimiento 1. Tres mensajes como máximo (el link y los Seguimientos 2 y 3); «Pidió no recibir más» es para siempre. Ver `docs/PROSPECCION.md` y, en turniasalud, `PLAN_PROSPECCION.md` → «Los mensajes».
 - **Esquemas:**
   - En habita., cada migración se aplica a mano en el SQL Editor de Supabase; hay que dar el enlace al archivo.
   - En Turnia, el build de producción aplica `supabase/schema.sql`, que tiene que ser idempotente.

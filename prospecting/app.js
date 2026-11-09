@@ -670,6 +670,8 @@
     set.add(accountId);
     try { sessionStorage.setItem(`cl-pr-skip-${state.unit}`, JSON.stringify([...set])); } catch { /* sin storage */ }
   }
+  // Horas desde una fecha «AAAA-MM-DD HH:MM» de Buenos Aires.
+  const hoursSince = (at) => (Date.parse(`${C.nowLocal().replace(' ', 'T')}:00Z`) - Date.parse(`${String(at).replace(' ', 'T')}:00Z`)) / 3600000;
   function sendQueue(id) {
     const u = unitOf(id);
     const d = state.data[id];
@@ -677,7 +679,9 @@
     const wa = (a) => { const n = C.nextTemplate(a, u); return a.phone && C.canMessage(a, u) && n && n.channel === 'whatsapp'; };
     const items = [
       ...q.followUps.filter(wa).map((a) => ({ a, step: 'Seguimiento' })),
-      ...q.greeted.filter((a) => a.phone).map((a) => ({ a, step: 'Respondió el saludo' })),
+      // Turnia: después del Paso 2, el Seguimiento 1 espera 24 horas si no respondió (C.nowLocal es la hora de Buenos Aires).
+      ...q.greeted.filter((a) => a.phone && !(a.permissionSent && !(a.lastReply > a.permissionSent) && hoursSince(a.permissionSent) < 24))
+        .map((a) => ({ a, step: a.permissionSent ? 'Paso 2 enviado' : 'Saludado', check: true })),
       ...q.fresh.filter(wa).map((a) => ({ a, step: 'Nuevo', fresh: true })),
     ];
     const skipped = agentSkipped(id);
@@ -689,7 +693,7 @@
       `Sos quien manda los mensajes de prospección de ${u.name} por WhatsApp Web. Trabajás con dos pestañas: este panel (${location.origin}/prospecting/${u.id}?vista=enviar) y WhatsApp Web, que el panel abre siempre en la misma pestaña.`,
       'Repetí, de a uno:',
       '1. En el panel, leé la tarjeta (data-testid="agent"): nombre (agent-name), teléfono (agent-phone) y el mensaje exacto (agent-message). Mirá data-state: solo seguís si dice "ready" o "check". Si dice "opened", ya se abrió WhatsApp para esa persona: andá al paso 4.',
-      '2. Si data-state="check" (le mandamos el saludo): tocá «Abrir chat» (agent-open-chat), fijate en WhatsApp si la persona respondió. Si respondió, volvé y tocá «Respondió: mandar la demo» (agent-replied). Si no, «Todavía no» (agent-skip).',
+      '2. Si data-state="check" (le mandamos el saludo o el Paso 2): tocá «Abrir chat» (agent-open-chat), fijate en WhatsApp si la persona respondió. Si respondió, volvé y tocá el botón principal (agent-replied). Si no, «Todavía no» (agent-skip).',
       '3. Tocá «Abrir WhatsApp» (agent-open-whatsapp): se abre WhatsApp Web en una pestaña nueva con el chat y el texto ya escritos (tarda unos segundos en cargar). Comprobá que el chat sea del mismo número y que el texto sea igual al de la tarjeta. Tocá Enviar una sola vez y esperá el tilde.',
       '4. Cerrá esa pestaña de WhatsApp (que no se acumulen: WhatsApp Web no deja que el panel la reutilice), volvé al panel y tocá «Sí, se envió» (agent-confirm-sent) solo si viste el mensaje enviado. Si no salió, «No salió» (agent-not-sent). Si WhatsApp dice que el número no es válido o no tiene WhatsApp, «No tiene WhatsApp» (agent-no-whatsapp).',
       'Si preferís una sola pestaña fija de WhatsApp: en vez de «Abrir WhatsApp», tocalo igual (marca el envío como abierto) y cerrá la pestaña nueva, o navegá tu pestaña de WhatsApp al link de data-wa-url de la tarjeta.',
@@ -715,7 +719,12 @@
     else if (state.agent.fails >= 3) { phase = 'stopped'; status = 'Pará: tres envíos seguidos no salieron. Revisá WhatsApp (¿restricción, sesión cerrada?).'; }
     else if (cur.fresh && q.doneToday >= q.goal) { phase = 'done'; status = `Meta del día cumplida (${int(q.doneToday)} de ${int(q.goal)}). Pará.`; }
     else if (!C.inSendWindow(u) && store(`override-${id}`) !== C.today()) { phase = 'paused'; status = `Fuera del horario de envío (${esc(u.hours)}). Próxima franja: ${esc(C.nextSendWindow(u))}.`; }
-    else if (cur.step === 'Respondió el saludo' && state.agent.replied !== cur.a.id) { phase = 'check'; status = 'Le mandamos el saludo: mirá si respondió antes de mandar la demo.'; }
+    else if (cur.check && state.agent.replied !== cur.a.id) {
+      phase = 'check';
+      status = cur.a.permissionSent
+        ? 'Le mandamos el Paso 2: mirá si respondió. Si dijo que sí, va el Paso 3 con la demo; si pasaron 24 horas sin respuesta, el Seguimiento 1.'
+        : 'Le mandamos el saludo: mirá si respondió antes de mandar el Paso 2.';
+    }
     else if (wait > 0) { phase = 'wait'; status = `Ritmo seguro: esperá ${wait} s para el próximo.`; }
     else { phase = 'ready'; status = 'Listo para enviar.'; }
 
@@ -723,18 +732,20 @@
     const next = a ? (pending ? { key: pending.key } : C.nextTemplate(a, u)) : null;
     const tpl = next && templatesOf(id)[next.key];
     const text = a && tpl ? C.renderTemplate(tpl.text, a, u) : '';
+    // «---» separa dos mensajes (el Seguimiento 3 de Turnia): el chat se abre con el primero y el segundo se copia aparte.
+    const parts = text.split(/\n[ \t]*-{3,}[ \t]*\n/).map((t) => t.trim()).filter(Boolean);
     const digits = a ? C.waDigits(a.phone) : '';
     const kinds = { celular: 'celular de la persona', compartido: 'del consultorio u oficina', fijo: 'fijo', revisar: 'por revisar' };
     const btn = (testid, label, attrs = '', cls = '') => `<button type="button" class="btn ${cls}" data-testid="${testid}" ${attrs}>${label}</button>`;
     let actions = '';
-    if (a && phase === 'check') actions = btn('agent-open-chat', `${icon.wa} Abrir chat`, `data-agent="chat"`) + btn('agent-replied', 'Respondió: mandar la demo', `data-agent="replied"`, 'primary') + btn('agent-skip', 'Todavía no', `data-agent="skip"`, 'ghost');
+    if (a && phase === 'check') actions = btn('agent-open-chat', `${icon.wa} Abrir chat`, `data-agent="chat"`) + btn('agent-replied', cur.a.permissionSent ? 'Mandar la demo' : 'Respondió: mandar el Paso 2', `data-agent="replied"`, 'primary') + btn('agent-skip', 'Todavía no', `data-agent="skip"`, 'ghost');
     else if (a && phase === 'opened') actions = btn('agent-confirm-sent', 'Sí, se envió', `data-agent="sent"`, 'primary') + btn('agent-not-sent', 'No salió', `data-agent="not-sent"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
     else if (a && (phase === 'ready' || phase === 'wait' || phase === 'paused')) actions = btn('agent-open-whatsapp', `${icon.wa} Abrir WhatsApp`, `data-agent="open" ${phase === 'ready' ? '' : 'disabled'}`, 'primary') + btn('agent-skip', 'Saltar', `data-agent="skip"`, 'ghost') + btn('agent-no-whatsapp', 'No tiene WhatsApp', `data-agent="no-wa"`, 'ghost danger');
     const R = 27; const circ = 2 * Math.PI * R; const ratio = Math.min(1, q.doneToday / q.goal);
     return `
       <section class="hero"><div><span class="eyebrow" style="color:${color(u)}">● ${esc(u.name)} · Enviar</span><h1>Uno por vez</h1><p>Una tarjeta, un mensaje, una confirmación. Sirve igual para una persona o para un agente de IA que alterna con la pestaña de WhatsApp. ${esc(u.hours)}</p></div>
         <div class="progress"><svg class="ring" viewBox="0 0 64 64" role="img" aria-label="${int(q.doneToday)} de ${int(q.goal)} contactos nuevos hoy"><circle class="bg" cx="32" cy="32" r="${R}"/><circle class="fg" style="--c0:${circ}" cx="32" cy="32" r="${R}" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - ratio)}" transform="rotate(-90 32 32)"/></svg><div><div class="num" style="font-size:24px;font-weight:700">${int(q.doneToday)}<span class="sub"> / ${int(q.goal)}</span></div><div class="sub">nuevos hoy · ${int(items.length)} en la cola</div></div></div></section>
-      <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, text) : '')}" aria-labelledby="agent-name">
+      <section id="agent" class="card glass strong agent" data-testid="agent" data-state="${phase}" data-account-id="${esc(a ? a.id : '')}" data-phone="${esc(digits)}" data-expected-name="${esc(a ? a.name : '')}" data-template="${esc(next ? next.key : '')}" data-wa-url="${esc(a && text ? C.waWebLink(a.phone, parts[0] || text) : '')}" aria-labelledby="agent-name">
         <p class="agent-status ${phase}" role="status" aria-live="polite" data-testid="agent-status">${status}${phase === 'paused' && !ro && a ? ` <button type="button" class="btn small ghost" data-testid="agent-override-hours" data-agent="override" data-arm="Confirmar: mandar fuera de horario">Mandar igual</button>` : ''}</p>
         ${a ? `
         <div class="agent-grid">
@@ -751,7 +762,8 @@
           </div>
           <div>
             <span class="eyebrow">${phase === 'check' ? 'Lo que se manda si respondió' : 'Mensaje exacto'}</span>
-            <pre class="tpl" data-testid="agent-message">${esc(text)}</pre>
+            <pre class="tpl" data-testid="agent-message">${esc(parts[0] || text)}</pre>
+            ${parts.slice(1).map((part, i) => `<span class="eyebrow">Mensaje ${i + 2}, aparte (para reenviar)</span><pre class="tpl" data-testid="agent-message-${i + 2}">${esc(part)}</pre><button type="button" class="btn small" data-copy-text="${esc(part)}">${icon.copy} Copiar el mensaje ${i + 2}</button>`).join('')}
           </div>
         </div>
         <div class="btns agent-actions">${actions}</div>` : ''}
@@ -1022,13 +1034,15 @@
     const isOn = (s, st) => f.step === s && f.stayed === st;
     // Turnia: el segmento elegido (o la pestaña) abre «Audios y mensajes» con su etapa ya elegida.
     const voiceGroup = id !== 'turnia' || state.demo ? null
-      : f.step !== null ? (f.stayed ? ['presentacion', 'no_abrio', 'abrio', 'hablo'][f.step] || null : null)
+      : f.step !== null ? (f.stayed ? ['permiso', 'no_abrio', 'abrio', 'hablo'][f.step] || null : null)
       : !f.withDemo && f.stage === 'prospect' ? 'saludo' : !f.withDemo && f.stage === 'closed' ? 'no_interesa' : null;
     const segment = f.step !== null && f.stayed && v.funnel[f.step + 1]
       ? `a los ${int(v.funnel[f.step].count - v.funnel[f.step + 1].count)} que ${lc(cfg.stayed[f.step])}`
       : voiceGroup === 'saludo' ? 'para saludar a los que faltan' : 'para pedirles feedback a los que dijeron que no';
     const voiceAction = voiceGroup
-      ? `<div class="ag-voice-cta"><button type="button" class="btn primary small" data-voice-open data-voice-group="${voiceGroup}">✉ Enviar mensaje o audio ${esc(segment)}</button><span class="sub">Se abre con esta etapa elegida. Turnia arma la lista con quienes se les puede escribir (celular, sin baja, con mensajes disponibles), sin el filtro de fechas.</span></div>`
+      ? `<div class="ag-voice-cta"><button type="button" class="btn primary small" data-voice-open data-voice-group="${voiceGroup}">✉ Enviar mensaje o audio ${esc(segment)}</button><span class="sub">${voiceGroup === 'permiso'
+        ? 'Se abre en el Paso 2, con quienes respondieron el saludo. Para mandar la demo, elegí ahí el Paso 3 (respondieron el Paso 2) o el Seguimiento 1 (24 horas sin responderlo).'
+        : 'Se abre con esta etapa elegida.'} Turnia arma la lista con quienes se les puede escribir (celular, sin baja, con mensajes disponibles), sin el filtro de fechas.</span></div>`
       : id === 'turnia' && !state.demo && f.step !== null && !f.stayed ? '<p class="sub ag-voice-cta">Para mandar un mensaje, tocá la parte naranja de una barra: los que se quedaron en ese paso.</p>' : '';
     const set = (o) => esc(new URLSearchParams(o).toString());
     const bars = v.funnel.map((x, i) => {
@@ -2020,6 +2034,7 @@
     const t = e.target.closest('button, [data-open-account], [data-goto], a');
     if (!t) return;
     const ds = t.dataset;
+    if (ds.copyText !== undefined) { copy(ds.copyText); return; }
     // Confirmación en la misma página (sin ventanas del navegador, que traban a los agentes de IA):
     // el primer clic pide confirmar y el segundo, dentro de 5 s, ejecuta.
     if (ds.arm && ds.armed !== '1') {

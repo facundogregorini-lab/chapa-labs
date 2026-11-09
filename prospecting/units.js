@@ -55,7 +55,8 @@
     sender: 'Axel, de Turnia',
     dailyGoal: 50,
     maxTouches: 3,
-    cadence: [2, 4],
+    // El Seguimiento 2 al día hábil siguiente del link; el 3, dos días hábiles después (48-72 h).
+    cadence: [1, 2],
     window: 7,
     greetingFirst: true,
     hours: 'De 8:30 a 9:30 y de 13 a 14:30. Nunca después de las 21.',
@@ -63,9 +64,10 @@
     sendWindows: [['08:30', '09:30'], ['13:00', '14:30']],
     pacing: [45, 90],
     rules: [
-      'Primero el saludo, sin link: un número desconocido que manda un link de entrada termina bloqueado.',
-      'A la persona que decide. Si el número es del consultorio, el mensaje va a nombre del odontólogo y le habla a la recepción.',
-      'Tres mensajes como máximo (el saludo no cuenta). Baja inmediata y para siempre ante cualquier «no me escribas».',
+      'Siempre a la recepción: los teléfonos son los de los consultorios. Los mensajes nombran al odontólogo y le piden que se la pase a los doctores.',
+      'Primero el saludo, sin link: un número desconocido que manda un link de entrada termina bloqueado. Cuando responde, el Paso 2 pide permiso (tampoco lleva link).',
+      'El link va en el Paso 3 (dijo que sí) o, a las 24 horas sin respuesta, en el Seguimiento 1.',
+      'Tres mensajes como máximo (el Paso 1 y el 2 no cuentan). Baja inmediata y para siempre ante cualquier «no me escribas».',
       'Nunca «vi que abriste la demo»: preguntá si llegó a probarla.',
       'Tu WhatsApp Business con el perfil de Turnia, no el chip de WAHA. Si aparece un aviso de restricción, frená por ese día.',
     ],
@@ -88,41 +90,51 @@
       const t = String(a.title || '').trim();
       return { destinatario: t ? `${/a\.?$/i.test(t) ? 'la' : 'el'} ${t} ${lastName(a.name)}` : a.name };
     },
+    // La secuencia de WhatsApp (09/11), siempre a la recepción: el Paso 1, el 2 cuando responde, el link en el
+    // Paso 3 (respondió el 2) o el Seguimiento 1 (no respondió), y los Seguimientos 2 y 3. Como en Turnia
+    // (whatsappTemplateKey en src/lib/sales/outreach-messages.ts).
     nextTemplate(a) {
-      const shared = a.phoneKind === 'compartido';
       if (a.stage === 'por_contactar') {
-        if (a.phone && a.phoneKind !== 'fijo') return { key: shared ? 'whatsapp_saludo_consultorio' : 'whatsapp_saludo', kind: 'saludo', channel: 'whatsapp' };
+        if (a.phone && a.phoneKind !== 'fijo') return { key: 'whatsapp_abridor', kind: 'saludo', channel: 'whatsapp' };
         if (a.instagram) return { key: 'instagram', kind: 'mensaje', channel: 'instagram' };
         return { key: 'llamada', kind: 'llamada', channel: 'llamada' };
       }
-      if (a.stage === 'saludado') return { key: shared ? 'whatsapp_consultorio' : 'whatsapp_1', kind: 'mensaje', channel: 'whatsapp' };
-      if (a.stage === 'contactado') {
-        if (!a.touches) return { key: shared ? 'whatsapp_consultorio' : 'whatsapp_1', kind: 'mensaje', channel: 'whatsapp' };
-        if (a.touches === 1) return { key: a.demoTried ? 'whatsapp_demo' : 'whatsapp_2', kind: 'mensaje', channel: 'whatsapp' };
-        if (a.touches === 2) return { key: 'whatsapp_3', kind: 'mensaje', channel: 'whatsapp' };
+      if (!['saludado', 'contactado', 'respondio'].includes(a.stage)) return null;
+      const after = (x, y) => Boolean(x && y && String(x) > String(y));
+      if (!a.touches) {
+        if (!a.greetingSent) return { key: 'whatsapp_abridor', kind: 'saludo', channel: 'whatsapp' };
+        if (!a.permissionSent) return { key: 'whatsapp_permiso', kind: 'mensaje', channel: 'whatsapp' };
+        return { key: after(a.lastReply, a.permissionSent) ? 'whatsapp_entrega' : 'whatsapp_sin_respuesta', kind: 'mensaje', channel: 'whatsapp' };
       }
+      // Después del link, si respondió, lo atiende una persona.
+      if (after(a.lastReply, a.lastContact)) return null;
+      if (a.touches === 1) return { key: 'whatsapp_seguimiento', kind: 'mensaje', channel: 'whatsapp' };
+      if (a.touches === 2) return { key: 'whatsapp_reenviable', kind: 'mensaje', channel: 'whatsapp' };
       return null;
     },
+    // Los de fábrica (los que valen salen de Turnia: Panel → Prospección → Mensajes). «---» separa dos mensajes.
     templates: {
-      whatsapp_saludo: { title: 'Saludo', hint: 'Siempre primero y sin link. No cuenta como uno de los tres mensajes.', channel: 'whatsapp', text: '¡Buenas! ¿Hablo con {saludo}?' },
-      whatsapp_saludo_consultorio: { title: 'Saludo al consultorio', hint: 'Cuando el número es del consultorio.', channel: 'whatsapp', text: '¡Buenas! ¿Hablo con el consultorio de {destinatario}?' },
-      whatsapp_1: {
-        title: 'Presentación', hint: 'Cuando responde el saludo.', channel: 'whatsapp',
-        text: 'Hola {saludo}, ¿cómo estás? Soy Axel, de Turnia.\nTe armé una demo con tu consultorio: Sofi contesta el WhatsApp cuando estás atendiendo o fuera de horario, responde las consultas y da el turno.\nProbala en un minuto, como si fueras un paciente: {link}\nSi te interesa, te la muestro en 15 minutos. Y si no, avisame y no te escribo más.',
+      whatsapp_abridor: { title: 'Paso 1 · El abridor', hint: 'Siempre primero y sin link. No cuenta como uno de los tres mensajes.', channel: 'whatsapp', text: 'Buenas! Hablo con la recepción de {destinatario}?' },
+      whatsapp_permiso: {
+        title: 'Paso 2 · El gancho de permiso', hint: 'Cuando responden el Paso 1. Sin link; tampoco cuenta como uno de los tres.', channel: 'whatsapp',
+        text: 'Qué tal! Soy Axel. Sé que en recepción viven a mil con el WhatsApp, así que les armé gratis una ayudante virtual cargada con los datos de {destinatario}.\n\nSirve para que conteste sola las preguntas repetidas de obras sociales, precios y horarios fuera de hora, así no llegan el lunes a la mañana con 100 mensajes atrasados.\n\nSeguro tiene algún error porque la armé rápido con la info que encontré en internet. ¿Te paso el link por acá y la probás 20 segundos como paciente a ver si le pifié en algo?',
       },
-      whatsapp_consultorio: {
-        title: 'Presentación al consultorio', hint: 'A la recepción, a nombre del odontólogo.', channel: 'whatsapp',
-        text: 'Hola, ¿cómo están? Soy Axel, de Turnia.\nLe armé a {destinatario} una demo con el consultorio: Sofi contesta el WhatsApp a la noche y los fines de semana, y deja los turnos dados para que a la mañana no haya mensajes acumulados.\n¿Se la pueden pasar? Es este link: {link}\n¡Gracias! Y si no les interesa, me avisan y no escribo más.',
+      whatsapp_entrega: {
+        title: 'Paso 3 · La entrega y el puente al médico', hint: 'Cuando dicen «Dale, pasame». Lleva el link de su demo.', channel: 'whatsapp',
+        text: 'Acá tenés: {link}\n\nMandale un audio o escribile haciéndole alguna pregunta difícil como si fueras un paciente real!\n\nSi ves que responde bien, reenviale el link a los doctores: además de sacarte preguntas repetidas a vos, a ellos les rellena solos los huecos de turnos que se cancelan sobre la hora. Avisame si le encontraste algún error!',
       },
-      whatsapp_2: {
-        title: 'Seguimiento', hint: 'Dos días hábiles después, si no respondió.', channel: 'whatsapp',
-        text: 'Hola {saludo}, te escribo de nuevo por si quedó tapado entre mensajes.\nSe viene la temporada y con los turistas aumentan las consultas por WhatsApp a cualquier hora. Sofi las contesta al instante y deja el turno dado.\nLa demo con tu consultorio sigue acá: {link}\n¿Te la muestro esta semana? Son 15 minutos.',
+      whatsapp_sin_respuesta: {
+        title: 'Seguimiento 1 · Sin respuesta al Paso 2', hint: 'A las 24 horas del Paso 2: el link directo igual.', channel: 'whatsapp',
+        text: 'Buenas! Sé que en recepción no paran un segundo, así que te dejo directo acá la prueba que armé para {destinatario} por si querés chusmear en 20 segundos si cargué bien los datos: {link}',
       },
-      whatsapp_demo: {
-        title: 'Después de probar la demo', hint: 'Reemplaza al seguimiento cuando ya la probó.', channel: 'whatsapp',
-        text: 'Hola {saludo}, ¿llegaste a probar la demo? ¿Qué te pareció?\nSi te sirve, la dejamos andando con tus horarios y tus tratamientos. Te muestro cómo en 15 minutos, ¿te queda bien esta semana?',
+      whatsapp_seguimiento: {
+        title: 'Seguimiento 2 · A las 24 h del link', hint: 'Audio de unos 12 segundos: este es el guion.', channel: 'whatsapp',
+        text: 'Buenas! ¿Cómo va? Che, te consulto rápido: ¿pudiste hacerle alguna pregunta difícil al link que te pasé ayer o mostrárselo a los doctores? Avisame si le pifié en alguna obra social así ya lo corrijo!',
       },
-      whatsapp_3: { title: 'Último mensaje', hint: 'Cuatro días hábiles después del seguimiento. Después no se escribe más.', channel: 'whatsapp', text: 'Hola {saludo}, último mensaje, prometido. ¿Te sirve que te muestre la demo en 15 minutos esta semana, o lo dejamos acá? Cualquiera de las dos está perfecto.' },
+      whatsapp_reenviable: {
+        title: 'Seguimiento 3 · El mensaje para reenviar', hint: 'A las 48-72 horas. Dos mensajes: el segundo, solo, para reenviar a los doctores. Después no se escribe más.', channel: 'whatsapp',
+        text: 'Buenas! Para no robarte más tiempo a vos en recepción, te dejo acá abajo un resumen cortito listo por si querés tocar "Reenviar" y pasárselo directo al WhatsApp de los doctores así lo evalúan ellos:\n---\nHola Doc! Nos armaron esta prueba gratis cargada con los datos del consultorio: {link} . Es una asistente de IA para el WhatsApp que responde dudas de pacientes y obras sociales 24/7 sin menús robóticos, agenda turnos y rellena sola los huecos de cancelaciones. Probala haciéndole una pregunta como paciente.',
+      },
       instagram: { title: 'Instagram', hint: 'Sin link: los pedidos de mensaje con links se filtran.', channel: 'instagram', text: 'Hola {saludo}! Soy Axel, de Turnia. Armé una demo de Sofi con tu consultorio: contesta el WhatsApp cuando estás atendiendo o fuera de horario y da los turnos sola. ¿Te paso el link para probarla? Es un minuto.' },
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
     },
