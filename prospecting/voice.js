@@ -28,6 +28,7 @@
     <section class="voice-rules" aria-labelledby="voice-rules-title">
       <h3 id="voice-rules-title">Reglas de envío</h3>
       <p class="sub" data-rules-summary>Autorizá con Turnia para ver el cupo disponible y ajustar las tandas y las pausas.</p>
+      <p data-sent-today hidden></p>
       <p class="sub">Horario de 8 a 21 h de Buenos Aires. El cupo diario se comparte entre las dos líneas. El 5483 se elige al abrir y el 0022 personal requiere tu selección.</p>
       <div data-rules-details>
         <form data-rules-form>
@@ -202,6 +203,12 @@
     };
     for (const [key, value] of Object.entries(fields)) rulesForm.elements.namedItem(key).value = String(value);
     el('rules-summary').textContent = `Hoy se usaron ${info.used} de ${rules.dailyLimit} envíos (audios y mensajes) y quedan ${info.remaining}. Cada tanda tiene hasta ${rules.batchSize} contactos y pausas de ${pauseLabel(rules)}.`;
+    const sentToday = el('sent-today');
+    if (info.sentToday) {
+      const lines = info.sentToday.byLine.map(({ ending, sent }) => `${ending}: ${sent}`);
+      if (info.sentToday.withoutSender) lines.push(`Sin emisor registrado: ${info.sentToday.withoutSender}`);
+      sentToday.textContent = `Aceptados hoy por WAHA · ${lines.join(' · ')}`;
+    }
   }
 
   function focusRules() {
@@ -214,6 +221,7 @@
   function controls() {
     el('authorize').hidden = Boolean(token);
     el('voice-controls').hidden = !token;
+    el('sent-today').hidden = !token || !info?.sentToday;
     const locked = busy || running || reviewing || Boolean(recorder);
     group.disabled = locked || rulesDirty;
     note.disabled = locked || rulesDirty || stage().textOnly;
