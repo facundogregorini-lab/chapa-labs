@@ -515,6 +515,8 @@ button.chip:hover { background: var(--glass-strong); }
 .ag-filter summary::-webkit-details-marker { display: none; }
 .ag-filter-form { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; display: grid; gap: 10px; width: 280px; padding: 14px; border-radius: 18px; background: var(--glass-strong); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%); box-shadow: inset 0 0 0 1px var(--glass-line), var(--glass-shadow); }
 .ag-scope { margin: 0 4px; font-size: 14px; color: var(--ink-2); }
+.ag-voice-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 4px 4px 0; }
+.ag-voice-cta .sub { margin: 0; font-size: 13px; }
 .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
 
 .ag-table td { vertical-align: middle; }

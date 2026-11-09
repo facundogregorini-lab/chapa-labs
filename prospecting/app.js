@@ -1020,6 +1020,16 @@
     const v = AG.view(d.rows, f, cfg);
     const filtering = Boolean(f.account || f.minScore !== null || f.days);
     const isOn = (s, st) => f.step === s && f.stayed === st;
+    // Turnia: el segmento elegido (o la pestaña) abre «Audios y mensajes» con su etapa ya elegida.
+    const voiceGroup = id !== 'turnia' || state.demo ? null
+      : f.step !== null ? (f.stayed ? ['presentacion', 'no_abrio', 'abrio', 'hablo'][f.step] || null : null)
+      : !f.withDemo && f.stage === 'prospect' ? 'saludo' : !f.withDemo && f.stage === 'closed' ? 'no_interesa' : null;
+    const segment = f.step !== null && f.stayed && v.funnel[f.step + 1]
+      ? `a los ${int(v.funnel[f.step].count - v.funnel[f.step + 1].count)} que ${lc(cfg.stayed[f.step])}`
+      : voiceGroup === 'saludo' ? 'para saludar a los que faltan' : 'para pedirles feedback a los que dijeron que no';
+    const voiceAction = voiceGroup
+      ? `<div class="ag-voice-cta"><button type="button" class="btn primary small" data-voice-open data-voice-group="${voiceGroup}">✉ Enviar mensaje o audio ${esc(segment)}</button><span class="sub">Se abre con esta etapa elegida. Turnia arma la lista con quienes se les puede escribir (celular, sin baja, con mensajes disponibles), sin el filtro de fechas.</span></div>`
+      : id === 'turnia' && !state.demo && f.step !== null && !f.stayed ? '<p class="sub ag-voice-cta">Para mandar un mensaje, tocá la parte naranja de una barra: los que se quedaron en ese paso.</p>' : '';
     const set = (o) => esc(new URLSearchParams(o).toString());
     const bars = v.funnel.map((x, i) => {
       const last = i === v.funnel.length - 1;
@@ -1042,6 +1052,7 @@
         <form class="ag-range" data-ag-range><label>Desde <input class="input" type="date" name="desde" value="${esc(f.period.from && f.period.key === 'rango' ? f.period.from : '')}"></label><label>Hasta <input class="input" type="date" name="hasta" value="${esc(f.period.to && f.period.key === 'rango' ? f.period.to : '')}"></label><button class="btn small" type="submit">Aplicar</button></form></div></div>
       <ul class="ag-f-legend" aria-hidden="true"><li class="is-went">Pasaron al paso siguiente</li><li class="is-stayed">Se quedaron (para hacer seguimiento)</li></ul>
       <ol class="ag-f-chart">${bars}</ol>
+      ${f.step !== null ? voiceAction : ''}
       <p class="sub" style="margin:0">Tocá una parte de una barra para ver sus ${esc(cfg.many)}: lo verde pasó al paso siguiente; lo naranja se quedó ahí. ${esc(cfg.note)}</p></section>`;
     const review = d.toReview && d.toReview.length ? `<section class="card glass"><h2>Cuentas reclamadas para revisar (${int(d.toReview.length)})</h2><ul class="ag-review">${d.toReview.map((a) => `<li><a href="${esc(app)}/admin/inmobiliarias/${esc(a.id)}?pestana=cuenta" target="_blank" rel="noopener">${esc(a.name)}</a> · ${esc(a.claim_email || '')} · <span class="ag-pill ${a.claim_review === 'mismatch' ? 'is-alert' : ''}">${a.claim_review === 'mismatch' ? 'El email no coincide con su web' : 'Email personal'}</span></li>`).join('')}</ul></section>` : '';
     const tabs = [
@@ -1059,6 +1070,7 @@
             <label class="field">Última actividad<select class="input" name="actividad">${opt('', 'Cualquier fecha', f.days)}${opt(7, 'Últimos 7 días', f.days)}${opt(30, 'Últimos 30 días', f.days)}${opt(90, 'Últimos 90 días', f.days)}</select></label>
             <div class="btns">${filtering ? `<button class="btn small ghost" type="button" data-ag-set="${set({ cuenta: '', score: '', actividad: '' })}">Quitar filtros</button>` : ''}<button class="btn small primary" type="submit">Aplicar</button></div>
           </form></details></div></section>`;
+    const tabAction = f.step === null ? voiceAction : '';
     const scope = v.periodOn || f.step !== null ? `<p class="ag-scope">${int(v.shown.length)} ${v.shown.length === 1 ? esc(cfg.one) : esc(cfg.many)}${f.step !== null ? (f.stayed ? ` en «${esc(cfg.steps[f.step])}» sin pasar a «${esc(cfg.steps[f.step + 1])}» (${esc(lc(cfg.stayed[f.step]))})` : ` en «${esc(cfg.steps[f.step])}»`) : ' con demos en el período'}${v.periodOn ? ` · ${esc(AG.periodLabel(f.period))} (${int(v.periodDemos)} ${v.periodDemos === 1 ? 'demo' : 'demos'})` : ''} · <button type="button" class="link" data-ag-set="${set({ periodo: '', desde: '', hasta: '', paso: '', quedo: '' })}">Ver ${esc(cfg.all.toLowerCase())}</button></p>` : '';
     const sortHead = (by, label, title) => {
       const on = f.sort.by === by;
@@ -1105,7 +1117,7 @@
     const recalc = !api_ ? '' : `<p class="ag-recalc"><button type="button" class="link" data-action="ag-recalc">${state.agRecalc === 'busy' ? 'Recalculando…' : 'Recalcular lead scores'}</button>${state.agRecalc && state.agRecalc !== 'busy' ? ` · <span role="status">${esc(state.agRecalc)}</span>` : ''}</p>`;
     state.agRows = new Map(v.items.map((r) => [r.id, { r, step: v.per.get(r.id).step, app }]));
     queueMicrotask(agPop);
-    return head + funnel + review + toolbar + scope + table + recalc;
+    return head + funnel + review + toolbar + tabAction + scope + table + recalc;
   }
   // Turnia: tilde rápido de «le mandé un audio» desde el celular. Cuenta como mensaje (salvo que ese día ya
   // haya salido uno) y queda en «Audio enviado». Con un toque alcanza.

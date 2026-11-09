@@ -48,6 +48,7 @@
           <option value="no_abrio" selected>Recibieron la demo y no la abrieron</option>
           <option value="abrio">Abrieron la demo y no hablaron con Sofi</option>
           <option value="hablo">Hablaron con Sofi</option>
+          <option value="no_interesa">Dijeron que no les interesa · pedirles feedback</option>
         </select></label>
         <label class="field">Audio para esta etapa<select data-note></select></label>
       </div>
@@ -136,7 +137,8 @@
       : s.textOnly ? 'Ej. ¡Buenas! ¿Es el consultorio de {destinatario}?' : 'Vacío: sale el mensaje del panel de Turnia';
     const panel = s.panelTemplates.map((t) => `«${t.text.split('\n')[0]}${t.text.includes('\n') ? '…' : ''}» (${t.label.replace(/^WhatsApp: /, '')})`);
     const rules = group.value === 'saludo' ? ' Sin link: va primero, solo para saber si es el número correcto.'
-      : group.value === 'presentacion' ? ' Tiene que llevar {link}, el de su demo.' : '';
+      : group.value === 'presentacion' ? ' Tiene que llevar {link}, el de su demo.'
+      : group.value === 'no_interesa' ? ' Sale una sola vez, no cuenta como uno de los tres mensajes y después queda en «No le interesa».' : '';
     el('text-hint').textContent = audio
       ? 'Va antes de la nota de voz. Vacío, sale solo el audio.'
       : `Variables: {saludo} (nombre de pila), {destinatario} («la Dra. Pérez»)${s.textOnly ? ' y {consultorio}' : ', {consultorio} y {link}'}.${rules}${panel.length ? ' Si lo dejás vacío, a cada uno le sale el del panel de Turnia que le corresponde: ' + panel.join(' o ') + '.' : ''}`;
@@ -278,7 +280,8 @@
       const source = row.senders.length ? 'Desde ' + row.senders.join(' y ') : needsSender ? 'Sin verificar' : '';
       const delivery = row.needsReview ? 'Revisá el envío en WhatsApp' : row.sent && (note.value ? 'Audio ya registrado o reservado' : 'Mensaje de esta etapa ya enviado');
       const suggestion = suggested.has(row.id) && !row.senders.includes(info.sender) && 'Chat encontrado, pendiente de confirmar';
-      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, suggestion, delivery].filter(Boolean).join(' · ');
+      const reply = row.reply && `respondió «${row.reply}»`;
+      const detail = [row.name, row.practice, row.last4 && '…' + row.last4, source, reply, suggestion, delivery].filter(Boolean).join(' · ');
       label.append(box, document.createTextNode(detail));
       line.append(label);
       if (!needsSender) return line;
@@ -321,11 +324,11 @@
         new Option(ending === '0022' ? '0022 · personal' : ending, ending)));
       emitter.value = sender;
       const textOnly = stage().textOnly;
-      note.replaceChildren(new Option(textOnly ? 'Solo texto · el saludo no lleva audio' : 'Sin audio · solo texto', ''),
+      note.replaceChildren(new Option(!textOnly ? 'Sin audio · solo texto' : group.value === 'saludo' ? 'Solo texto · el saludo no lleva audio' : 'Solo texto', ''),
         ...(textOnly ? [] : data.notes.map((row) => new Option(row.label, row.id))));
       note.value = textOnly ? '' : preferred[group.value] || '';
       // El texto de fábrica de cada etapa habla del audio: sin audio, el cuadro arranca vacío (sale el del panel).
-      el('text').value = texts[group.value] ?? (note.value ? stage().defaultText || '' : '');
+      el('text').value = texts[group.value] ?? (note.value || textOnly ? stage().defaultText || '' : '');
       renderText();
       const senderFilter = el('sender-filter');
       const previous = senderFilter.value;
@@ -355,7 +358,14 @@
   }
 
   document.addEventListener('click', (event) => {
-    if (!event.target.closest('[data-voice-open]')) return;
+    const opener = event.target.closest('[data-voice-open]');
+    if (!opener) return;
+    // Desde un segmento del funnel: la etapa ya elegida.
+    const wanted = opener.dataset.voiceGroup;
+    if (wanted && !running && !reviewing && [...group.options].some((option) => option.value === wanted) && group.value !== wanted) {
+      group.value = wanted;
+      setPreferred(preferred[wanted] || '');
+    }
     if (!running) {
       emitter.value = initialSender;
       el('sender-filter').value = initialSender;
