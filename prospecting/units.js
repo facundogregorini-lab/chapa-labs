@@ -135,6 +135,10 @@
         title: 'Seguimiento 3 · El mensaje para reenviar', hint: 'A las 48-72 horas. Dos mensajes: el segundo, solo, para reenviar a los doctores. Después no se escribe más.', channel: 'whatsapp',
         text: 'Buenas! Para no robarte más tiempo a vos en recepción, te dejo acá abajo un resumen cortito listo por si querés tocar "Reenviar" y pasárselo directo al WhatsApp de los doctores así lo evalúan ellos:\n---\nHola Doc! Nos armaron esta prueba gratis cargada con los datos del consultorio: {link} . Es una asistente de IA para el WhatsApp que responde dudas de pacientes y obras sociales 24/7 sin menús robóticos, agenda turnos y rellena sola los huecos de cancelaciones. Probala haciéndole una pregunta como paciente.',
       },
+      whatsapp_feedback: {
+        title: 'Feedback de no interesados', hint: 'A quien respondió que no: una vez, cierra la charla. No cuenta como uno de los tres.', channel: 'whatsapp',
+        text: 'Gracias por contestarme. No te escribo más. Si me decís en una línea por qué no te sirve, me ayudás un montón.',
+      },
       instagram: { title: 'Instagram', hint: 'Sin link: los pedidos de mensaje con links se filtran.', channel: 'instagram', text: 'Hola {saludo}! Soy Axel, de Turnia. Armé una demo de Sofi con tu consultorio: contesta el WhatsApp cuando estás atendiendo o fuera de horario y da los turnos sola. ¿Te paso el link para probarla? Es un minuto.' },
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
     },

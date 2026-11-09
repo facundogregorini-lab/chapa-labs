@@ -1038,7 +1038,7 @@
       : !f.withDemo && f.stage === 'prospect' ? 'saludo' : !f.withDemo && f.stage === 'closed' ? 'no_interesa' : null;
     const segment = f.step !== null && f.stayed && v.funnel[f.step + 1]
       ? `a los ${int(v.funnel[f.step].count - v.funnel[f.step + 1].count)} que ${lc(cfg.stayed[f.step])}`
-      : voiceGroup === 'saludo' ? 'para saludar a los que faltan' : 'para pedirles feedback a los que dijeron que no';
+      : voiceGroup === 'saludo' ? 'para saludar a los que faltan' : 'con el feedback de no interesados';
     const voiceAction = voiceGroup
       ? `<div class="ag-voice-cta"><button type="button" class="btn primary small" data-voice-open data-voice-group="${voiceGroup}">✉ Enviar mensaje o audio ${esc(segment)}</button><span class="sub">${voiceGroup === 'permiso'
         ? 'Se abre en el Paso 2, con quienes respondieron el saludo. Para mandar la demo, elegí ahí el Paso 3 (respondieron el Paso 2) o el Seguimiento 1 (24 horas sin responderlo).'

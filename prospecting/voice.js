@@ -65,7 +65,7 @@
           <option value="no_abrio" selected>Seguimientos 2 y 3 · No abrieron la demo</option>
           <option value="abrio">Seguimientos 2 y 3 · Abrieron la demo y no hablaron con Sofi</option>
           <option value="hablo">Seguimientos 2 y 3 · Hablaron con Sofi</option>
-          <option value="no_interesa">Dijeron que no les interesa · pedirles feedback</option>
+          <option value="no_interesa">Feedback de no interesados · respondieron que no</option>
         </select></label>
         <label class="field">Audio para esta etapa<select data-note></select></label>
       </div>
@@ -124,6 +124,9 @@
   try { preferred = JSON.parse(localStorage.getItem(selectionKey)) || {}; } catch { /* almacenamiento desactivado */ }
   let texts = {};
   try { texts = JSON.parse(localStorage.getItem(textKey)) || {}; } catch { /* almacenamiento desactivado */ }
+  // El texto de fábrica anterior del feedback (con el nombre de pila) quedaba guardado al abrir la etapa:
+  // se descarta para que salga el de Turnia («Feedback de no interesados», en Mensajes y metas).
+  if (/^Gracias por contestarme, \{saludo\}\./.test(texts.no_interesa || '')) delete texts.no_interesa;
   let token = '';
   let popup;
   let info;
