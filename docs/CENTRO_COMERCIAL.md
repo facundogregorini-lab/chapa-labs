@@ -1,5 +1,22 @@
 # Centro comercial: Chapa Labs + habita. + Turnia
 
+## Commercial OS · navegación centralizada (09/11/2026)
+
+Chapa Labs adopta un único workspace con selector **General / habita. / Turnia**. El diseño se comparte; los motores y bases siguen separados.
+
+- **General**: resumen operativo de ambas colas; Cola, Embudos, Prospectos, Reglas y Mensajes, Resultados. Se suman tareas, respuestas y envíos, nunca tasas de conversión con definiciones distintas.
+- **Por producto**: Cola de ejecución (Follow-up real, por defecto), Respuestas (inbox de la unidad), Embudo (etapas comerciales/etapas técnicas + filas accionables), Prospectos, Reglas y Mensajes, Resultados y Etapas y situaciones.
+- **Habita**: siete etapas comerciales en la capa visual; las claves técnicas y el envío quedan en amoblaia. Se pueden editar reglas y versiones en Chapa a través de `rule-save` y `version-update`.
+- **Catálogo Habita**: `followupSnapshot.catalog` trae etapas personalizadas, estados y overrides; `stage-create`, `state-save` y `state-delete` pasan por las funciones validadas del producto, no por una base nueva en Chapa.
+- **Turnia**: misma navegación, cola, detalle, métricas, respuesta y embudo según sus propias etapas; configuración de reglas y catálogo sigue solo lectura hasta implementar APIs equivalentes.
+- **Herramientas previas**: no se eliminaron; aparecen en navegación secundaria (también en mobile) mientras se verifica paridad y continuidad operativa.
+- **Seguridad**: por el riesgo de que la sesión por nombre quede abierta públicamente, Chapa exige `PROSPECTING_PASSWORD` (12 caracteres o más) para editar reglas, versiones, etapas o situaciones. La UI informa si está abierta. No poner contraseñas en GitHub.
+- **No cambia**: el contrato existente de tomar 10 minutos, abrir WhatsApp sin contar envío, confirmar idempotente, bloqueos, baja permanente, cadencias propias y auditoría en cada producto.
+- **QA antes de retirar paneles duplicados**: validar login por persona, 10 ejecuciones reales con Facu y Axel simultáneamente, versiones y catálogo en habita., clasificación de no interesados, límites de WhatsApp, persistencia desde Chapa y conciliación de métricas por dos semanas.
+
+**Estado técnico:** la UI y los endpoints quedaron implementados en ramas; las pruebas con bases y credenciales reales, deploy y paridad funcional total de Turnia deben verificarse por separado.
+
+
 Traspaso para quien siga este trabajo (persona o IA), sin necesidad de leer conversaciones anteriores. Estado al **08/11/2026**.
 
 ## En una frase
