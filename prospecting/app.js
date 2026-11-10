@@ -2671,28 +2671,60 @@
     const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
     const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
     return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
-      <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
-      <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
-      <div class="os-fu-preview-actions">
-        <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
-        <button type="button" class="btn" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
-        <button type="button" class="btn" disabled title="Primero tomá y enviá la tarea">✓ Confirmar envío</button>
-        <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
-        <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
+      <button type="button" class="os-fu-preview-back" data-fu="focus-queue">← Volver a la cola</button>
+      <header class="os-fu-preview-head">
+        <span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span>
+        <h2>${esc(x.name)}</h2>
+        <div class="os-fu-preview-tags">
+          <span class="os-fu-preview-tag-stage"><b>ETAPA:</b> ${esc(stage?.title||x.stageTitle||'—')}</span>
+          <span class="os-fu-preview-tag-situation"><b>SITUACIÓN:</b> ${esc(x.situationLabel||'—')}</span>
+          <span class="os-fu-preview-tag-owner"><b>QUIÉN LO TOMA:</b> ${esc(x.owner||'Todos')}</span>
+        </div>
+      </header>
+      <div class="os-fu-preview-actions" aria-label="Acciones del contacto">
+        <button type="button" class="btn primary os-fu-preview-wa" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} WhatsApp</button>
+        <button type="button" class="btn os-fu-preview-edit" data-fu="queue-focus-stage" data-fu-key="${esc(x.key)}">✎ Cambiar etapa ${icon.chev}</button>
+        <button type="button" class="btn os-fu-preview-edit" data-fu="queue-focus-situation" data-fu-key="${esc(x.key)}">⇄ Cambiar situación ${icon.chev}</button>
       </div>
-      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
-      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
-      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
-      <div class="os-fu-preview-card"><strong>Información del contacto</strong><dl>
-        <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd><dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
-        <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
-        <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
-      <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
-      <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
+      <section class="os-fu-preview-card os-fu-preview-contact">
+        <h3>ⓘ &nbsp; Información del contacto</h3>
+        <dl>
+          <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd>
+          <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd>
+          <dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
+          <dt>Prioridad</dt><dd><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></dd>
+          <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd>
+        </dl>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-context">
+        <h3>▤ &nbsp; Resumen / Contexto</h3>
+        <p>Etapa: ${esc(stage?.title||x.stageTitle||'—')} · Situación: ${esc(x.situationLabel||'—')}</p>
+        <p>Actividad: ${esc(x.stageTitle||'—')}.${x.lastText?' Última acción: '+esc(x.lastText)+'.':''}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-said">
+        <h3>☏ &nbsp; Qué dijo</h3>
+        <p>${esc(x.situationNote||'Sin texto original registrado.')}</p>
+      </section>
+      <section class="os-fu-preview-card is-action">
+        <h3>◎ &nbsp; Próxima acción</h3>
+        <p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-message-card" data-testid="followup-script-message">
+        <h3>◉ &nbsp; Mensaje de WhatsApp · borrador</h3>
+        <p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p>
+        <button type="button" class="btn small os-fu-copy-preview" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-notes-card" data-testid="followup-script-notes">
+        <h3>✎ &nbsp; Observaciones</h3>
+        <p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-rule" data-testid="followup-applied-rule">
+        <h3>◇ &nbsp; Regla aplicada</h3>
+        <p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p>
+      </section>
+      <p class="os-fu-caption">La vista previa no confirma ningún envío. Para enviar, tomá la tarea y validá los datos.</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
-      '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
+        '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
     </aside>`;
   }
 
@@ -3762,6 +3794,16 @@
         if(item){
           state.fu.selectedQueueKey=item.key;render();
         }
+        break;
+      }
+      case 'focus-queue': { const list=main.querySelector('.os-fu-tablecard');list?.scrollIntoView({behavior:'smooth',block:'start'});break; }
+      case 'queue-focus-stage':
+      case 'queue-focus-situation': {
+        const field=ds.fu==='queue-focus-stage'?'stage':'situation';
+        const selector='[data-fu-row-field="'+field+'"][data-fu-key="'+CSS.escape(ds.fuKey)+'"]';
+        const input=main.querySelector(selector);
+        if(input){input.scrollIntoView({block:'nearest',behavior:'smooth'});input.focus();}
+        else toast('Seleccioná la etapa o situación desde la fila.',true);
         break;
       }
       case 'queue-edit-situation': {
