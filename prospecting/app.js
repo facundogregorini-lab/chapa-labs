@@ -2362,7 +2362,7 @@
     <label class="field"><span>Contacto</span><select class="input" name="id" required><option value="">Elegí un contacto</option>
     ${[...new Map([...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope).map(x=>[x.id,x])).values()].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.stageTitle||'')}</option>`).join('')}</select></label>
     <label class="field"><span>Texto original</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió…"></textarea></label>
-    <label class="field"><span>Clasificación</span><select class="input" name="clase"><option value="">Clasificar más tarde</option>
+    <label class="field"><span>Clasificación</span><select class="input" name="clase"><option value="">${scope==="turnia"?"Sin clasificar (Turnia registra Neutro)":"Clasificar más tarde"}</option>
     ${allowed.map(x=>`<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('')}</select></label>
     <button class="btn primary" type="submit">REGISTRAR RESPUESTA</button></form>`:'';
   const item=selected?`
@@ -2372,9 +2372,9 @@
     <form data-fu-inbox-form data-fu-reply-key="${esc(selected.key)}">
       <fieldset class="os-fu-reply-classes"><legend>CLASIFICACIÓN ${selected.confidence!=null?' · sugerida '+Math.round(selected.confidence*100)+'%':''}</legend>
       <div class="os-fu-chips">${allowed.map(o=>`<label><input type="radio" name="clase" value="${esc(o.key)}" ${selected.classification===o.key?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div></fieldset>
-      ${selected.unit==='habita'?`<div class="os-fu-conditional" data-reply-condition="mas_adelante" hidden>
+      ${selected.unit==='habita'?`<div class="os-fu-conditional" data-reply-condition="mas_adelante" ${selected.classification==="mas_adelante"?"":"hidden"}>
         <label class="field"><span>Retomar el contacto (opcional)</span><input class="input" type="date" name="hasta"></label></div>
-      <div class="os-fu-conditional" data-reply-condition="derivo" hidden>
+      <div class="os-fu-conditional" data-reply-condition="derivo" ${selected.classification==="derivo"?"":"hidden"}>
         <label class="field"><span>Nombre de la nueva persona</span><input class="input" name="contactoNombre" maxlength="120"></label>
         <label class="field"><span>WhatsApp del referido</span><input class="input" name="contactoWhatsapp" maxlength="40"></label></div>`:''}
       <label class="field" style="margin-top:14px"><span>Observación (opcional)</span><textarea class="input" name="nota" rows="2" maxlength="700" placeholder="Contexto para la siguiente acción…"></textarea></label>
@@ -2399,6 +2399,35 @@
         <span class="os-fu-conv-status">${esc(r.status==='facu'?'PARA FACU':opts[r.classification]||r.classification||'SIN CLASIFICAR')}</span>
       </button>`).join('')||'<p class="empty">No hay respuestas pendientes.</p>'}
     </div><div class="os-fu-reply-detail" data-testid="followup-reply-detail">${item}</div></section>`;
+}
+
+  async function fuReplySubmit(form,submitter) {
+  const fd=new FormData(form), scope=fuScope();
+  if(form.matches('[data-fu-inbox-form]')){
+    const r=F.inboxItems(state.fu.n,scope).find(x=>x.key===form.dataset.fuReplyKey);
+    if(!r)return;
+    const classification=fd.get('clase')||null, review=submitter?.name==='facu';
+    if(!classification&&!review){toast('Elegí una clasificación.',true);return;}
+    if(r.unit==='habita'){
+      const until=fd.get('hasta')?new Date(String(fd.get('hasta'))+'T09:00:00-03:00').toISOString():null;
+      const fields={op:'reply',id:r.replyId,clasificacion:classification,
+        facu:review,nota:String(fd.get('nota')||''),contactoNombre:String(fd.get('contactoNombre')||''),
+        contactoWhatsapp:String(fd.get('contactoWhatsapp')||''),hasta:until};
+      if(!await fuOp(r.unit,fields,{label:review?'Enviada a revisión.':'Respuesta clasificada.'}))return;
+    }else{
+      if(review)return;
+      // La respuesta ya consta en la auditoría de Turnia: actualizar su situación, no duplicarla.
+      if(!await fuOp(r.unit,{op:'situation',inmobiliaria:r.id,situacion:classification,
+        texto:r.body||String(fd.get('nota')||'Clasificada desde Chapa')},{label:'Respuesta clasificada.'}))return;
+    }
+    await loadFollowup({quiet:true});fuReplyState().selected=null;render();
+  }else if(form.matches('[data-fu-manual-reply-form]')){
+    const id=String(fd.get('id')||''), body=String(fd.get('texto')||'').trim(),classification=String(fd.get('clase')||'');
+    if(!id||!body){toast('Elegí el contacto y copiá su respuesta.',true);return;}
+    const data={op:'reply',inmobiliaria:id,texto:body,...(classification?{clasificacion:classification,confianza:1}:{})};
+    if(!await fuOp(scope,data,{label:'Respuesta registrada.'}))return;
+    fuReplyState().manual=false;await loadFollowup({quiet:true});render();
+  }
 }
 
   function fuBlockReasons(list) {
@@ -2788,9 +2817,10 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form]')) return;
+    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if(form.matches('[data-fu-inbox-form], [data-fu-manual-reply-form]')) { await fuReplySubmit(form,e.submitter);return; }
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
     const fd = Object.fromEntries(new FormData(form));
@@ -2820,6 +2850,11 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
+    if(e.target.matches('[data-fu-inbox-form] input[name="clase"]')){
+      const selected=e.target.value, form=e.target.closest('[data-fu-inbox-form]');
+      for(const block of form.querySelectorAll('[data-reply-condition]'))
+        block.hidden=block.dataset.replyCondition!==selected;
+    }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
     if(e.target.matches('[data-fu-queue-select]')){
       const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
