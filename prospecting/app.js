@@ -2313,6 +2313,7 @@
     if (!r) return false;
     state.fu.task = F.prepared(it.unit, r, it);
     state.fu.task.mode = 'ejecutar';
+    state.fu.selectedQueueKey = it.key;
     render();
     // Do not start an expensive full-board refresh while the operator is
     // opening the new task. Refresh when returning to the queue instead.
@@ -2676,15 +2677,15 @@
     </div></details>
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
-    <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
-    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
+    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed,selected:x.key===(rows.some(r=>r.key===state.fu.selectedQueueKey)?state.fu.selectedQueueKey:rows[0]?.key)})).join('')||'<tr><td colspan="8" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
     <div class="os-fu-mobile-list" data-testid="fu-mobile-queue">
       ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||'<p class="os-fu-mobile-empty">No hay tareas con estos filtros.</p>'}
     </div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
     <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
     </section>
-    ${q.kpi==='bloqueadas'?'':(state.fu.task?'<aside class="os-fu-side" data-testid="followup-execution-aside">'+renderFuTask(state.fu.task)+'</aside>':fuRecommended(scope,rows,current,q))}
+    ${q.kpi==='bloqueadas'?'':fuRecommended(scope,rows,current,q)}
     </div>
     <details class="card glass" data-fu-details="sched" ${state.fu.open.sched?'open':''}><summary><strong>Programadas</strong> <span class="count">${int(n.scheduled.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
       ${n.scheduled.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin programadas.</p>'}</div></details>
@@ -3632,7 +3633,7 @@
     if (ds.fu === undefined && ds.fuOpen) {
       if (e.target.closest('button, a')) return;
       const it = fuFind(ds.fuOpen);
-      if (it) { state.fu.task = { unit: it.unit, mode: 'ver', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (it) { state.fu.selectedQueueKey=it.key;render(); }
       return;
     }
     if (ds.arm && ds.armed !== '1') return; // la confirmación en dos clics la maneja el panel
@@ -3644,20 +3645,31 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'next-preview': {
+        const rows=fuQueueSelection(fuScope()).rows;
+        const i=rows.findIndex(x=>x.key===state.fu.selectedQueueKey);
+        if(rows.length)state.fu.selectedQueueKey=rows[(i+1)%rows.length].key;
+        render();break;
+      }
+      case 'queue-whatsapp': {
+        const x=fuFind(ds.fuKey);
+        if(x?.wa&&x.phone)openWhatsApp(x.phone,'');
+        else toast('Este contacto no tiene WhatsApp válido.',true);
+        break;
+      }
       case 'queue-view': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();window.scrollTo({top:0,behavior:'smooth'});
+          state.fu.selectedQueueKey=item.key;render();
         }
         break;
       }
       case 'queue-edit-situation': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();
-          setTimeout(()=>main.querySelector('[data-fu-situation]')?.scrollIntoView({block:'start',behavior:'smooth'}),0);
+          state.fu.selectedQueueKey=item.key;
+          const row=main.querySelector('[data-fu-row-field="situation"][data-fu-key="'+CSS.escape(item.key)+'"]');
+          if(row){row.focus();row.click();}else render();
         }
         break;
       }
@@ -4194,6 +4206,21 @@
         label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
     if(e.target.matches('[data-fu-queue-select]')){
       const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
     }
