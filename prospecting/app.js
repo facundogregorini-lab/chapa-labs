@@ -2392,11 +2392,11 @@
 
   function renderFu() {
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
-    // Mobile is a focused action screen, never a queue squeezed into a right rail.
-    if (state.fu.task && window.ProspectingWhatsApp?.isMobileClient(window))
-      return renderFuTask(state.fu.task);
-    if (state.fu.task && fuView()!=='hoy') return fuTaskWithQueue(state.fu.task);
     const v = fuView();
+    // A claimed task must not hijack unrelated tabs on mobile or desktop.
+    // Keep its reservation, but show the selected view below the navigation.
+    if (state.fu.task && v==='hoy' && window.ProspectingWhatsApp?.isMobileClient(window))
+      return renderFuTask(state.fu.task);
     const sub = '';
     if (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])) {
       const reason = state.fu.n?.errors?.[fuScope()] || state.fu.error;
@@ -2891,6 +2891,7 @@
     <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
     <p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>
     ${detail}
+    ${fuFunnelReviewList(snap,rows,focus,chart)}
   </section>`;
 }
 
