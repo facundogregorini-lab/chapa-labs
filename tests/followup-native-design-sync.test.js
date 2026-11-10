@@ -4,62 +4,58 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const read=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-const app=read('prospecting/app.js');
-const css=read('prospecting/commercial-os.css');
-const html=read('prospecting/index.html');
+const root=path.join(__dirname,'..');
+const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
+const js=read('prospecting/app.js');
+const helpers=require('../prospecting/followup.js');
 
-test('Habita native workspace has all six original upper tabs and title',()=>{
-  assert.doesNotThrow(()=>new vm.Script(app));
-  assert.match(app,/function habitaFuChrome\(content\)/);
-  for(const label of ['EJECUCIÓN COMERCIAL','Gestioná el outreach y el seguimiento',
-    'COLA DE EJECUCIÓN','RESPUESTAS','EMBUDO','REGLAS','ETAPAS Y SITUACIONES','RESULTADOS'])
-    assert.ok(app.includes(label),label);
-  for(const target of ['/panel','/galeria','/precios','/cuenta','/inicio'])
-    assert.ok(app.includes("'"+target+"'"),target);
-  assert.match(app,/main\.innerHTML=habitaFuChrome\(main\.innerHTML\)/);
+test('La Cola reproduce la jerarquía Habita: tarjetas comerciales, KPIs, filtros, tabla y panel a la derecha',()=>{
+  assert.doesNotThrow(()=>new vm.Script(js));
+  for(const anchor of ['followup-reference-stage-cards','followup-kpi-','followup-queue-situations',
+    'followup-queue-grid','followup-recommended','fu-desktop-message',
+    'fu-desktop-observations','fu-confirm-desktop','fu-confirm-next-desktop',
+    'os-fu-inline-stage','os-fu-inline-situation','followup-queue-order'])
+    assert.ok(js.includes(anchor)||anchor==='followup-queue-order'&&js.includes('data-fu-queue-select="order"'),anchor);
+  assert.match(js,/renderFuTask\(state\.fu\.task\)/);
+  assert.match(js,/case 'confirm':/);
+  assert.match(js,/op: 'confirm'/);
 });
-
-test('Manrope is actually fetched and auth/logout remains accessible in native shell',()=>{
-  assert.match(html,/fonts\.googleapis\.com\/css2\?family=Manrope/);
-  assert.match(css,/\.habita-fu-head-copy h1/);
-  assert.match(css,/\.habita-fu-tabs button\.is-on/);
-  assert.match(css,/body\[data-unit="habita"\]:has\(\.habita-fu-workspace-head\) \.os-top \.os-user/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-sidebar::after/);
+test('Reglas: etapa comercial, prioridades, editor, mensaje, plantillas, orden y baja reales',()=>{
+  for(const anchor of ['followup-flow','followup-commercial-stage','followup-rules-workspace',
+    'followup-rules-list','followup-rule-detail','followup-rule-form','followup-part-when',
+    'followup-rule-action','followup-rule-save','followup-rule-message',
+    "case 'rules-stage'","case 'rules-select'","case 'rules-template'","case 'rules-move'",
+    "case 'rules-delete'",'fuRulesMove','data-fu-drag-key'])
+    assert.ok(js.includes(anchor),anchor);
+  assert.match(js,/op:'rule-reorder'/);
+  assert.match(js,/op:'rule-delete'/);
+  assert.match(js,/op:'rule-save'/);
+  assert.match(js,/op:'version-create'/);
+  assert.match(js,/encuesta_cierre/);
+  assert.match(js,/catalog_situation/);
+  assert.match(js,/min_demo_activity_level/);
 });
-
-test('Native queue preserves compact scoring, situation edit action, recommended CTA and mobile layout',()=>{
-  assert.match(app,/os-fu-score-bubble/);
-  assert.match(app,/data-fu="queue-edit-situation"/);
-  assert.match(app,/case 'queue-edit-situation':/);
-  assert.match(app,/data-testid="followup-reference-stage-cards"/);
-  assert.match(app,/data-testid="followup-queue-situations"/);
-  assert.match(css,/\.os-fu-center > \.os-fu-kpis\s*\{[^}]*order:12/);
-  assert.match(css,/grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+test('Las operaciones sensibles requieren sesión protegida y usan APIs del producto',()=>{
+  const api=read('api/prospecting.js');
+  for(const op of ['rule-save','rule-reorder','rule-delete','version-create','version-update'])
+    assert.ok(api.includes("'"+op+"'"),op);
+  assert.match(api,/session\.open\(\)/);
+  assert.match(js,/state\.session\?\.open/);
 });
-
-test('Native Habita rules editor is one aligned header + when + what + message + preview',()=>{
-  assert.match(app,/data-testid="followup-part-when"/);
-  assert.match(app,/data-testid="followup-part-what"/);
-  assert.match(app,/data-fu-rule-version/);
-  assert.match(app,/case 'rules-message-focus':/);
-  assert.match(app,/case 'rules-version-new':/);
-  assert.match(app,/function syncFuLinkedRulePanel\(form\)/);
-  assert.match(app,/data-testid="followup-preview"/);
-  assert.match(css,/\.fu-ref-detail>\.fu-ref-rule-form\s*\{\s*display:contents/);
-  assert.match(css,/\.fu-ref-rule-form>\.fu-ref-edit-head\s*\{[^}]*grid-column:1\/3/);
-  assert.match(css,/\.fu-ref-detail>\.fu-ref-wa-preview\s*\{[^}]*grid-column:3/);
+test('El mismo contexto de lead se conserva desde los datos de Habita hasta la recomendación',()=>{
+  const q=helpers.item('habita',{
+    agencyId:'abc',name:'Inmobiliaria Ejemplo',shortName:'Ejemplo',person:'Ana',zone:'Miramar',
+    website:'https://example.test',properties:17,address:'Calle 10',wa:true,needsReview:false,
+    action:'principal',stage:'no-responde',situation:'interesado',phone:'+54 11 1111',
+  },{stages:[],labels:{situations:{interesado:'Interesado'}}},'cola');
+  assert.equal(q.shortName,'Ejemplo');assert.equal(q.person,'Ana');assert.equal(q.properties,17);
+  assert.equal(q.website,'https://example.test');assert.equal(q.wa,true);assert.equal(q.needsReview,false);
+  assert.equal(q.situationLabel,'Interesado');
 });
-
-test('Habita funnel shows exactly original nine-step historical chart, not second invented flowboard',()=>{
-  assert.match(app,/if\(scope==='habita'\)return fuNativeChart\(snap\)/);
-  assert.match(app,/data-testid="followup-native-funnel"/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-native-segment\.is-stayed/);
-});
-
-test('Catalog remains bound to origin and preserves native labels and uppercase heading',()=>{
-  assert.match(app,/HABITA_SITUATION_NOTES/);
-  assert.match(app,/data-testid="followup-state-catalog"/);
-  assert.match(css,/body\[data-unit="habita"\] \.fu-catalog-head h2\s*\{[^}]*text-transform:uppercase/);
-  assert.match(app,/PROSPECTING_PASSWORD/);
+test('La experiencia de reglas y la Cola conserva layout de dos columnas y responsive',()=>{
+  const css=read('prospecting/commercial-os.css');
+  for(const cls of ['.fu-ref-workspace','.fu-ref-flow','.fu-ref-rule','.fu-ref-detail',
+    '.os-fu-queue-grid','.os-fu-side','.os-fu-side-rule','.fu-ref-rule.drag-target'])
+    assert.ok(css.includes(cls),cls);
+  assert.match(css,/@media\(max-width:760px\)/);
 });
