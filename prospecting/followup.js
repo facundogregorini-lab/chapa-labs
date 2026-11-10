@@ -127,7 +127,7 @@
       const nextReached = nextTechnical ? Number(funnel.find(s=>s.key===nextTechnical)?.reached || 0) : null;
       return { key, title, technical, reached, waiting, rate: nextReached===null || !reached ? null : Math.min(1,nextReached/reached) };
     });
-    if (unit === 'habita') {
+    if (unit === 'habita' || unit === 'turnia') {
       for(const s of (snap.catalog?.stages || []))
         stages.push({ key:s.key, title:s.label, technical:[s.technical_stage],
           waiting:Number(s.waiting||0), reached:0, rate:null, situation:s.entry_situation });
