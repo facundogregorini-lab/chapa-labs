@@ -1,0 +1,40 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const app=fs.readFileSync(path.join(__dirname,'../prospecting/app.js'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../prospecting/commercial-os.css'),'utf8');
+test('Desktop execution queue exposes inline stage, situation, owner and WhatsApp without city',()=>{
+  const start=app.indexOf('function fuQueueTableRow(');
+  const end=app.indexOf('// Compact native mobile cards:',start);
+  const row=app.slice(start,end);
+  assert.ok(start>0&&end>start);
+  for(const field of ["'stage'","'situation'","'owner'"])assert.ok(row.includes(field));
+  assert.match(row,/data-fu-row-field/);
+  assert.match(row,/data-fu="queue-whatsapp"/);
+  assert.doesNotMatch(row,/x\.zone|<th>CIUDAD/);
+  const headers=app.slice(app.indexOf('class="os-fu-table os-fu-queue-table"'),app.indexOf('data-testid="fu-mobile-queue"'));
+  assert.match(headers,/QUIÉN LO TOMA/);
+  assert.match(headers,/ÚLTIMO CONTACTO/);
+  assert.match(headers,/ETAPA/);
+  assert.match(headers,/SITUACIÓN/);
+});
+test('Selected lead sidebar contains visible message, action, notes and mobile-inspired CTAs',()=>{
+  const side=app.slice(app.indexOf('function fuRecommended('),app.indexOf('function fuHoy()'));
+  for(const label of ['Abrir WhatsApp','Copiar borrador','Confirmar envío','Siguiente tarea','Reclasificar','Próxima acción','Mensaje de WhatsApp','Observaciones'])assert.ok(side.includes(label),label);
+  assert.match(side,/rows\.find\(r=>r\.key===state\.fu\.selectedQueueKey\)\|\|rows\[0\]/);
+  assert.match(side,/renderFuTask\(task\)/);
+  assert.match(css,/\.os-fu-side-working \.os-fu-mobile-send\{display:grid/);
+});
+test('Inline mutations only accept confirmed server receipts and refresh source queue',()=>{
+ const start=app.indexOf("if(e.target.matches('[data-fu-row-field]'))");
+ const end=app.indexOf("if(e.target.matches('[data-fu-queue-select]'))",start);
+ const handler=app.slice(start,end);
+ assert.match(handler,/await fuOp\(x\.unit,body\)/);
+ assert.match(handler,/result\?\.owner===selected/);
+ assert.match(handler,/result\?\.situation===selected/);
+ assert.match(handler,/result\?\.stage===selected/);
+ assert.match(handler,/await loadFollowup/);
+ assert.doesNotMatch(handler,/confirmExecution|op:'confirm'/);
+});

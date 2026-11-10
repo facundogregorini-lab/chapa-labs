@@ -64,7 +64,7 @@ test('Mobile execute is disabled for claimed, blocked, scheduled and closed item
 });
 
 test('Desktop original table and next action stay available',()=>{
-  assert.match(app,/fuQueueTableRow\(x,\{closed:q\.closed\}\)/);
+  assert.match(app,/fuQueueTableRow\(x,\{closed:q\.closed,selected:/);
   assert.match(app,/data-testid="fu-take-next"/);
   assert.match(app,/data-testid="fu-confirm-mobile"/);
   assert.match(css,/\.os-fu-mobile-list\{display:none\}/);

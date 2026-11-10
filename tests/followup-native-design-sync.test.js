@@ -29,7 +29,7 @@ test('Manrope is actually fetched and auth/logout remains accessible in native s
 });
 
 test('Native queue preserves compact scoring, situation edit action, recommended CTA and mobile layout',()=>{
-  assert.match(app,/os-fu-score-bubble/);
+  assert.match(app,/os-fu-inline-select/);
   assert.match(app,/data-fu="queue-edit-situation"/);
   assert.match(app,/case 'queue-edit-situation':/);
   assert.match(app,/data-testid="followup-reference-stage-cards"/);

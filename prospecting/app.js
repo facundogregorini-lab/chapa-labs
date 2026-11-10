@@ -2313,6 +2313,7 @@
     if (!r) return false;
     state.fu.task = F.prepared(it.unit, r, it);
     state.fu.task.mode = 'ejecutar';
+    state.fu.selectedQueueKey = it.key;
     render();
     // Do not start an expensive full-board refresh while the operator is
     // opening the new task. Refresh when returning to the queue instead.
@@ -2513,25 +2514,23 @@
   return {q,snap,stages,current,all:base,rows:filtered};
 }
 
-  function fuQueueTableRow(x,{closed=false}={}) {
-  const me=state.session?.user?.name;
-  const locked=x.claim&&x.claim.by!==me;
-  const active=!closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
-  return `<tr class="os-fu-table-row" data-fu-open="${esc(x.key)}" tabindex="0" aria-label="Ver ${esc(x.name)}" data-testid="fu-item">
-    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':`<span class="os-fu-score-bubble">${esc(String(x.score))}</span>`}</td>
-    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small>
-      ${x.unit==='habita'?`<button type="button" class="os-fu-edit-stage" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}" aria-label="Editar etapa y situación de ${esc(x.name)}">✎ Editar etapa / estado</button>`:''}</td>
-    <td>${esc(x.zone||'—')}</td>
-    <td><span class="os-fu-pill">${esc(x.situationLabel||'—')}</span></td>
-    <td><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
-    <td><span>${esc(x.lastText||'—')}</span><small>${esc(ago(x.since)||'—')}</small></td>
-    <td>${esc(x.phone||'—')}</td>
-    <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
-    <td>${closed?'<span class="os-fu-muted">CERRADO</span>':x.blocked?'<span class="os-fu-muted">BLOQUEADA</span>':x.dueAt?'<span class="os-fu-muted">PROGRAMADA</span>':locked?`<span class="os-fu-muted">TOMADA POR ${esc(x.claim.by)}</span>`:
-      active?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">EJECUTAR →</button>`:
-      '<span class="os-fu-muted">VER DETALLE</span>'}</td>
-  </tr>`;
-}
+  function fuQueueTableRow(x,{closed=false,selected=false}={}) {
+    const snap=state.fu.n?.units?.[x.unit];
+    const stages=F.commercialStages(x.unit,snap).filter(v=>v.technical?.length&&!v.situation);
+    const situations=fuSituationOptions(snap?.labels?.situations||{},x.stage,x.unit);
+    const owner=x.owner||'Todos';
+    const opts=(field,choices,value)=>'<select class="os-fu-inline-select" data-fu-row-field="'+field+'" data-fu-key="'+esc(x.key)+'" aria-label="'+esc(field+' de '+x.name)+'">'+choices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===value?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
+    return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item">
+      <td class="os-fu-name"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+      <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
+      <td>${opts('situation',situations,x.situation)}</td>
+      <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
+      <td>${esc(ago(x.since)||'—')}</td>
+      <td><button type="button" class="os-fu-inline-wa" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" title="Abrir WhatsApp" aria-label="WhatsApp de ${esc(x.name)}" ${x.wa?'':'disabled'}>${icon.wa}</button></td>
+      <td>${x.unit==='habita'?opts('owner',['Todos','Facu','Axel','Extensión'].map(v=>[v,v]),owner):esc(owner)}</td>
+      <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
+    </tr>`;
+  }
 
   // Compact native mobile cards: only the action and the minimum decision
   // context are visible by default. Expanded details never claim a lead.
@@ -2569,40 +2568,44 @@
   }
 
   function fuRecommended(scope,rows,selected,q) {
-  const safe=rows.find(x=>x.action&&!x.claim&&!x.blocked&&!x.dueAt&&!q.closed)||null;
-  const snap=safe?state.fu.n.units[safe.unit]:null;
-  const rule=safe&&(snap.rules||[]).find(x=>x.key===safe.ruleKey);
-  const version=safe&&F.versionRows(safe.unit,snap).find(x=>x.id===safe.versionId);
-  if(!safe)return `<aside class="os-fu-side" data-testid="followup-recommended"><div class="os-fu-side-head"><span>◎ SIGUIENTE EN LA COLA</span></div><p class="os-fu-caption">No queda ningún contacto libre con los filtros elegidos.</p></aside>`;
-  const checks=[
-    ['Número de WhatsApp validado',Boolean(safe.wa)&&!safe.needsReview],
-    ['Situación: '+(safe.situationLabel||'Sin clasificar'),true],
-    ['Regla: '+(rule?.name||rule?.action_label||safe.action||'Revisión manual'),Boolean(safe.ruleKey)],
-    ['Horario y bloqueos controlados por '+fuName(safe.unit),!safe.blocked&&!safe.dueAt],
-  ];
-  return `<aside class="os-fu-side" data-testid="followup-recommended" data-prospect="${esc(safe.id)}">
-    <div class="os-fu-side-head"><span>◎ SIGUIENTE RECOMENDADA</span><span class="os-tag">${esc(safe.stageTitle||safe.stage)}</span></div>
-    <div class="os-fu-side-ident"><h3>${esc(safe.name)}</h3><p>${esc(safe.zone||'Sin ciudad')} · SCORE ${safe.score==null?'—':esc(String(safe.score))}</p>
-      <div><span>WHATSAPP</span><strong>${esc(safe.phone||'Sin WhatsApp')}</strong></div></div>
-    <div class="os-fu-side-rule" data-testid="followup-applied-rule"><span>◇ REGLA APLICADA</span><strong>${esc(rule?.name||safe.action||'No hay regla activa')}</strong>
-      <p>${esc(rule?.situations?.map(s=>snap.labels?.situations?.[s]||s).join(', ')||safe.situationLabel||'Revisar situación actual')}</p></div>
-    <button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="${esc(safe.key)}" data-testid="followup-recommended-execute">↗ EJECUTAR ESTA</button>
-    <div class="os-fu-side-status"><span>SITUACIÓN ACTUAL</span><span class="os-fu-pill">${esc(safe.situationLabel||'—')}</span></div>
-    <details class="os-fu-side-details" data-testid="followup-recommended-context"><summary>ANTECEDENTES Y NOTAS</summary>
-      <div class="os-fu-side-detail"><b>CONTEXTO</b><p>${esc(safe.website||'Sin web')}${safe.properties!=null?' · '+int(safe.properties)+' propiedades':''}</p>${safe.address?`<p>${esc(safe.address)}</p>`:''}<p>En el mensaje: «${esc(safe.shortName||safe.name)}»</p>
-      <b>ÚLTIMA ACCIÓN</b><p>${esc(safe.lastText||'Sin acciones anteriores')} · ${esc(ago(safe.since)||'')}</p></div></details>
-    <details class="os-fu-side-details" data-testid="followup-recommended-flow"><summary>PRÓXIMO PASO DEL FLUJO</summary>
-      <div class="os-fu-side-detail"><p>Ejecutar ${esc(safe.action||'acción pendiente')}. ${esc(safe.actionReason||'El motor del producto determina la próxima etapa al confirmar.')}</p></div></details>
-    <details class="os-fu-side-details" data-testid="followup-recommended-preparation"><summary>VALIDACIONES Y MENSAJE</summary>
-      <div class="os-fu-side-detail"><b>ANTES DE ENVIAR</b>
-      <ul>${checks.map(([label,ok])=>`<li><span>${ok?'✓':'!'}</span>${esc(label)}</li>`).join('')}</ul>
-      <b>MENSAJE (${esc(safe.action||'Seguimiento')}${version?' · V'+int(version.version):''})</b>
-      <p class="os-fu-side-preview">${esc(version?.body?
-        version.body.replaceAll('{{inmobiliaria}}',safe.shortName||safe.name).replaceAll('{{decisor}}',safe.person||''):
-        'El texto personalizado se prepara al tomar la tarea. Revisalo antes de enviar.')}</p></div></details>
-    <p class="os-fu-caption">Al tomarla, la reserva dura 10 minutos. Abrir WhatsApp no confirma el envío; tenés que confirmarlo después.</p>
-  </aside>`;
-}
+    const x=rows.find(r=>r.key===state.fu.selectedQueueKey)||rows[0]||null;
+    if(!x)return '<aside class="os-fu-side" data-testid="followup-recommended">No hay contactos con estos filtros.</aside>';
+    const snap=state.fu.n.units[x.unit];
+    const stage=F.commercialStages(x.unit,snap).find(v=>!v.situation&&v.technical.includes(x.stage));
+    const task=state.fu.task;
+    if(task?.mode==='confirmado')return '<aside class="os-fu-side os-fu-side-working" data-testid="followup-execution-aside">'+renderFuTask(task)+'</aside>';
+    if(task?.item?.key===x.key)
+      return '<aside class="os-fu-side os-fu-side-working" data-testid="followup-execution-aside">'+renderFuTask(task)+'</aside>';
+    const locked=x.claim&&x.claim.by!==state.session?.user?.name;
+    const ready=!q.closed&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
+    const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x.versionId);
+    const template=version?.body||'';
+    const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
+    return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
+      <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
+      <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
+      <div class="os-fu-preview-actions">
+        <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
+        <button type="button" class="btn" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
+        <button type="button" class="btn" disabled title="Primero tomá y enviá la tarea">✓ Confirmar envío</button>
+        <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
+        <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
+      </div>
+      <div class="os-fu-preview-card"><strong>Información del contacto</strong><dl>
+        <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd><dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
+        <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
+        <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
+      <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
+      <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
+      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
+      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
+      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
+      <div class="os-fu-preview-card"><strong>Observaciones</strong><p>${esc(x.situationNote||x.actionReason||'Sin observaciones.')}</p></div>
+      <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
+      ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
+      '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
+    </aside>`;
+  }
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
@@ -2676,15 +2679,15 @@
     </div></details>
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
-    <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
-    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
+    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed,selected:x.key===(rows.some(r=>r.key===state.fu.selectedQueueKey)?state.fu.selectedQueueKey:rows[0]?.key)})).join('')||'<tr><td colspan="8" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
     <div class="os-fu-mobile-list" data-testid="fu-mobile-queue">
       ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||'<p class="os-fu-mobile-empty">No hay tareas con estos filtros.</p>'}
     </div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
     <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
     </section>
-    ${q.kpi==='bloqueadas'?'':(state.fu.task?'<aside class="os-fu-side" data-testid="followup-execution-aside">'+renderFuTask(state.fu.task)+'</aside>':fuRecommended(scope,rows,current,q))}
+    ${q.kpi==='bloqueadas'?'':fuRecommended(scope,rows,current,q)}
     </div>
     <details class="card glass" data-fu-details="sched" ${state.fu.open.sched?'open':''}><summary><strong>Programadas</strong> <span class="count">${int(n.scheduled.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
       ${n.scheduled.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin programadas.</p>'}</div></details>
@@ -3572,10 +3575,10 @@
             ${t.unit === 'turnia' ? `<form class="btns" data-fu-owner><input class="input" name="responsable" list="fu-owners" value="${esc(it.owner || '')}" placeholder="Facu, Axel…" style="flex:1 1 120px" aria-label="Responsable"><datalist id="fu-owners"><option>Facu</option><option>Axel</option>${me ? `<option>${esc(me)}</option>` : ''}</datalist><button class="btn small" type="submit">Asignar</button></form>` : '<p class="sub" style="margin:0">En habita. el responsable es el SDR de la cuenta.</p>'}</div>
           ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
         </section>
-        <section class="card glass os-fu-message-card"><h2>Mensaje</h2>
+        <section class="card glass os-fu-message-card"><h2>Mensaje</h2><div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(it.action||it.actionReason||'Sin acción pendiente')}</p></div>
           ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}${fuDemoWarning(t)}
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
-            ${t.notes ? `<div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes)}</p></div>` : ''}`
+            <div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes||'Sin observaciones registradas.')}</p></div>`
           : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !it.blocked && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
           <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
         </section>
@@ -3638,9 +3641,9 @@
     if (!t || !main.contains(t) && !$('#drawer').contains(t)) return;
     const ds = t.dataset;
     if (ds.fu === undefined && ds.fuOpen) {
-      if (e.target.closest('button, a')) return;
+      if (e.target.closest('button, a, select, input, textarea, label')) return;
       const it = fuFind(ds.fuOpen);
-      if (it) { state.fu.task = { unit: it.unit, mode: 'ver', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (it) { state.fu.selectedQueueKey=it.key;render(); }
       return;
     }
     if (ds.arm && ds.armed !== '1') return; // la confirmación en dos clics la maneja el panel
@@ -3652,20 +3655,31 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'next-preview': {
+        const rows=fuQueueSelection(fuScope()).rows;
+        const i=rows.findIndex(x=>x.key===state.fu.selectedQueueKey);
+        if(rows.length)state.fu.selectedQueueKey=rows[(i+1)%rows.length].key;
+        render();break;
+      }
+      case 'queue-whatsapp': {
+        const x=fuFind(ds.fuKey);
+        if(x?.wa&&x.phone)openWhatsApp(x.phone,'');
+        else toast('Este contacto no tiene WhatsApp válido.',true);
+        break;
+      }
       case 'queue-view': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();window.scrollTo({top:0,behavior:'smooth'});
+          state.fu.selectedQueueKey=item.key;render();
         }
         break;
       }
       case 'queue-edit-situation': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();
-          setTimeout(()=>main.querySelector('[data-fu-situation]')?.scrollIntoView({block:'start',behavior:'smooth'}),0);
+          state.fu.selectedQueueKey=item.key;
+          const row=main.querySelector('[data-fu-row-field="situation"][data-fu-key="'+CSS.escape(item.key)+'"]');
+          if(row){row.focus();row.click();}else render();
         }
         break;
       }
@@ -3948,6 +3962,19 @@
       default: break;
     }
   });
+  document.addEventListener('pointerover',(e)=>{
+    if(e.pointerType==='touch')return;
+    const row=e.target.closest?.('.os-fu-queue-table tr[data-fu-open]');
+    if(!row||row.contains(e.relatedTarget)||row.dataset.fuOpen===state.fu.selectedQueueKey)return;
+    state.fu.selectedQueueKey=row.dataset.fuOpen;
+    const q=fuQueueSelection(fuScope());
+    const side=main.querySelector('.os-fu-queue-grid > .os-fu-side');
+    if(side)side.outerHTML=fuRecommended(fuScope(),q.rows,q.current,q.q);
+    main.querySelectorAll('.os-fu-queue-table tr[data-fu-open]').forEach(tr=>{
+      const on=tr.dataset.fuOpen===state.fu.selectedQueueKey;
+      tr.classList.toggle('is-selected',on);tr.setAttribute('aria-selected',String(on));
+    });
+  });
   document.addEventListener('toggle', (e) => {
     const d=e.target;
     if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
@@ -4092,7 +4119,7 @@
       if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: until, motivo: fd.motivo }, { label: 'Reprogramada.' })) { state.fu.task = null; loadFollowup(); }
     }
   }, true);
-  document.addEventListener('change', (e) => {
+  document.addEventListener('change', async (e) => {
     if(!e.target.matches('[data-fu-rule-version]')&&
       e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
       fuRulesState(state.unit).dirty=true;
@@ -4226,6 +4253,36 @@
         label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
     if(e.target.matches('[data-fu-queue-select]')){
       const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
     }
