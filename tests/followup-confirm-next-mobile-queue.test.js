@@ -94,3 +94,13 @@ test('Recontactar is only a situation, starting from contacted or greeted',()=>{
   assert.match(app,/Recontactar · Más adelante/);
   assert.match(app,/no altera su etapa del embudo/);
 });
+
+test('Both units expose recontact situations only after first contact',()=>{
+  assert.doesNotThrow(()=>new vm.Script(app));
+  assert.match(app,/function fuSituationOptions\(situations, stage, unit\)/);
+  assert.match(app,/unit === 'turnia' \? 'sin-saludo' : 'no-contactado'/);
+  assert.match(app,/recontactar_vacaciones/);
+  assert.match(app,/recontactar_mas_adelante/);
+  assert.match(app,/fuSituationOptions\(situations,it.stage,t.unit\)/);
+  assert.match(app,/selected\?\.technical/);
+});
