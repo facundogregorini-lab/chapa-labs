@@ -3563,8 +3563,20 @@
         break;
       }
       case 'rules-message-focus': {
+        const ui=fuRulesState(state.unit);
         const message=main.querySelector('[data-testid="followup-rule-message"]');
-        if(message){message.scrollIntoView({block:'center',behavior:'smooth'});}
+        const id=main.querySelector('[data-fu-rule-version]')?.value||null;
+        if(ui.dirty&&!window.confirm('Hay cambios sin guardar en la regla. ¿Descartarlos y editar el mensaje?'))break;
+        if(id){
+          ui.dirty=false;
+          state.fu.versionEdit=id;
+          render();
+          main.querySelector('[data-fu-version-edit-form]')?.scrollIntoView({block:'center',behavior:'smooth'});
+        }else{
+          const details=message?.querySelector('.fu-ref-new-message');
+          if(details){details.open=true;details.scrollIntoView({block:'center',behavior:'smooth'});}
+          else toast('Seleccioná una regla con mensaje para editar sus versiones.',true);
+        }
         break;
       }
       case 'rules-version-new': {
