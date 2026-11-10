@@ -23,12 +23,12 @@ test('next task uses existing filtered and ranked queue with no claimed, blocked
   assert.match(app, /function fuNextCandidate\(currentKey\)/);
   assert.match(app, /fuQueueSelection\(fuScope\(\)\)\.rows\.find\(x=>/);
   assert.match(app, /x\.key!==currentKey&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
-  assert.match(app, /case 'next-after': await fuNext\(\)/);
+  assert.match(app, /case 'next-after': await fuNext\(t\)/);
   assert.match(app, /if\(!next\)\{\s*toast\('No hay otra tarea libre/);
 });
 
 test('next task checks eligibility BEFORE releasing and does not use confirm operation', () => {
-  const start = app.indexOf('  async function fuNext() {');
+  const start = app.indexOf('  async function fuNext(clicked) {');
   const end = app.indexOf('  // ── Las vistas ──', start);
   assert.ok(start > 0 && end > start);
   const fn = app.slice(start, end);
@@ -43,7 +43,7 @@ test('next task checks eligibility BEFORE releasing and does not use confirm ope
 });
 
 test('other navigation keeps current business and active queue filters', () => {
-  const start = app.indexOf('  async function fuNext() {');
+  const start = app.indexOf('  async function fuNext(clicked) {');
   const end = app.indexOf('  // ── Las vistas ──', start);
   const fn = app.slice(start, end);
   assert.doesNotMatch(fn, /q\.commercial\s*=|q\.situation\s*=|q\.tech\s*=|q\.rule\s*=|go\(/);
