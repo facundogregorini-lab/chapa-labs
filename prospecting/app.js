@@ -2513,25 +2513,23 @@
   return {q,snap,stages,current,all:base,rows:filtered};
 }
 
-  function fuQueueTableRow(x,{closed=false}={}) {
-  const me=state.session?.user?.name;
-  const locked=x.claim&&x.claim.by!==me;
-  const active=!closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
-  return `<tr class="os-fu-table-row" data-fu-open="${esc(x.key)}" tabindex="0" aria-label="Ver ${esc(x.name)}" data-testid="fu-item">
-    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':`<span class="os-fu-score-bubble">${esc(String(x.score))}</span>`}</td>
-    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small>
-      ${x.unit==='habita'?`<button type="button" class="os-fu-edit-stage" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}" aria-label="Editar etapa y situación de ${esc(x.name)}">✎ Editar etapa / estado</button>`:''}</td>
-    <td>${esc(x.zone||'—')}</td>
-    <td><span class="os-fu-pill">${esc(x.situationLabel||'—')}</span></td>
-    <td><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
-    <td><span>${esc(x.lastText||'—')}</span><small>${esc(ago(x.since)||'—')}</small></td>
-    <td>${esc(x.phone||'—')}</td>
-    <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
-    <td>${closed?'<span class="os-fu-muted">CERRADO</span>':x.blocked?'<span class="os-fu-muted">BLOQUEADA</span>':x.dueAt?'<span class="os-fu-muted">PROGRAMADA</span>':locked?`<span class="os-fu-muted">TOMADA POR ${esc(x.claim.by)}</span>`:
-      active?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">EJECUTAR →</button>`:
-      '<span class="os-fu-muted">VER DETALLE</span>'}</td>
-  </tr>`;
-}
+  function fuQueueTableRow(x,{closed=false,selected=false}={}) {
+    const snap=state.fu.n?.units?.[x.unit];
+    const stages=F.commercialStages(x.unit,snap).filter(v=>v.technical?.length&&!v.situation);
+    const situations=fuSituationOptions(snap?.labels?.situations||{},x.stage,x.unit);
+    const owner=x.owner||'Todos';
+    const opts=(field,choices,value)=>'<select class="os-fu-inline-select" data-fu-row-field="'+field+'" data-fu-key="'+esc(x.key)+'" aria-label="'+esc(field+' de '+x.name)+'">'+choices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===value?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
+    return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item">
+      <td class="os-fu-name"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+      <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
+      <td>${opts('situation',situations,x.situation)}</td>
+      <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
+      <td>${esc(ago(x.since)||'—')}</td>
+      <td><button type="button" class="os-fu-inline-wa" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" title="Abrir WhatsApp" aria-label="WhatsApp de ${esc(x.name)}" ${x.wa?'':'disabled'}>${icon.wa}</button></td>
+      <td>${x.unit==='habita'?opts('owner',['Todos','Facu','Axel','Extensión'].map(v=>[v,v]),owner):esc(owner)}</td>
+      <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
+    </tr>`;
+  }
 
   // Compact native mobile cards: only the action and the minimum decision
   // context are visible by default. Expanded details never claim a lead.
