@@ -16,7 +16,7 @@ test('La Cola reproduce la jerarquía Habita: tarjetas comerciales, KPIs, filtro
     'followup-recommended-context','followup-recommended-flow',
     'followup-recommended-preparation','followup-recommended-execute','followup-queue-order'])
     assert.ok(js.includes(anchor)||anchor==='followup-queue-order'&&js.includes('data-fu-queue-select="order"'),anchor);
-  assert.match(js,/state\.fu\.task\?renderFuTask/);
+  assert.match(js,/renderFuTask\(state\.fu\.task\)/);
   assert.match(js,/case 'confirm':/);
   assert.match(js,/op: 'confirm'/);
 });
