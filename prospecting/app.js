@@ -3387,6 +3387,19 @@
   // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
   function renderFuTask(t) {
     const it = t.item || {};
+    // After a confirmed send, show a durable receipt with a separate Next
+    // action. Confirmation is never conflated with release or with claiming.
+    if(t.mode==='confirmado')return `${demoBanner()}
+      <section class="os-fu-confirmed-receipt" data-testid="fu-confirmed-receipt" role="status">
+        <span class="os-fu-confirmed-icon" aria-hidden="true">✓</span>
+        <h1>Envío confirmado</h1>
+        <p>El mensaje a <strong>${esc(t.name||it.name)}</strong> quedó registrado como enviado.</p>
+        <p class="os-fu-confirmed-hint">Podés seguir trabajando en la misma cola y con los mismos filtros.</p>
+        <div class="os-fu-confirmed-actions">
+          <button type="button" class="btn primary" data-fu="next-after" data-testid="fu-next-confirmed">Siguiente tarea →</button>
+          <button type="button" class="btn" data-fu="back" data-testid="fu-confirmed-back">Volver a la cola</button>
+        </div>
+      </section>`;
     const u = unitOf(t.unit);
     const snap = state.fu.n && state.fu.n.units[t.unit];
     const situations = (snap && snap.labels && snap.labels.situations) || {};
@@ -3628,8 +3641,16 @@
         break;
       }
       case 'confirm': {
+        if(!task||task.mode!=='ejecutar')break;
         const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: task.messages.join('\n\n') || task.message }, { label: 'Envío confirmado.' });
-        if (r) { state.fu.task = null; await loadFollowup({ quiet: true }); render(); }
+        if (r) {
+          // Keep the completed item only as a receipt so the operator can
+          // explicitly take the next task. Never send/confirm it again.
+          state.fu.task = {...task,mode:'confirmado',confirmedAt:new Date().toISOString()};
+          render();
+          window.scrollTo({top:0,behavior:'smooth'});
+          await loadFollowup({quiet:true});
+        }
         break;
       }
       case 'next-after': await fuNext(); break;
