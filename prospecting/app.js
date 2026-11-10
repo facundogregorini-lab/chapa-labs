@@ -432,6 +432,23 @@
       <div class="rows" style="margin-top:12px">${today.map(x=>fuRow(x)).join('')||'<p class="empty">No hay tareas listas ahora.</p>'}</div></section>`;
 }
 
+  // Copied verbatim from Habita's situationNotes in admin-followup.tsx:
+  // the same canonical descriptions must be visible in Chapa even when the
+  // agency never created a custom override for the situation.
+  const HABITA_SITUATION_NOTES = {
+    sin_respuesta:'Todavía no respondió al mensaje.',
+    confirmo_numero:'Confirmó que es el WhatsApp de la inmobiliaria.',
+    interesado:'Quiere conocer o probar HABITA.',
+    neutro:'Respondió sin expresar interés ni rechazo.',
+    pregunta_precios:'Consultó por planes, créditos o precios.',
+    mas_adelante:'Pidió retomar la conversación más adelante.',
+    derivo:'Indicó con quién continuar la conversación.',
+    rechazo:'Respondió que la propuesta no le interesa.',
+    proveedor_ia:'Ya trabaja con otro proveedor de IA.',
+    no_contactar:'Pidió que no se le vuelva a escribir.',
+    sin_whatsapp:'El número no tiene WhatsApp.',
+    numero_incorrecto:'El número corresponde a otro destinatario.',
+  };
   function fuCatalog() {
   const unit=fuScope(),snap=state.fu.n?.units?.[unit];
   if(!snap)return '<section class="card glass">Catálogo no disponible.</section>';
@@ -443,7 +460,7 @@
   const rows=[
     ...canonical.map(([id,label])=>{
       const o=overrides.find(x=>x.key===id);
-      return {key:id,label:o?.label||label,description:o?.description||'',examples:o?.examples||'',
+      return {key:id,label:o?.label||label,description:o?.description||((unit==='habita'&&HABITA_SITUATION_NOTES[id])||''),examples:o?.examples||'',
         active:o?.enabled!==false,removed:!!o?.removed,base:true,source:'manual',maps_to:id,product_stage:null};
     }).filter(x=>!x.removed),
     ...(db.states||[]).filter(s=>s.commercial_stage===key).map(x=>({...x,base:false,active:x.active===true}))
