@@ -149,6 +149,10 @@ test('Reclassify displays only commercial funnel stages, not internal technical 
   assert.match(markup,/v\.technical\.includes\(it\.stage\)\?it\.stage:v\.technical\[0\]/);
   assert.doesNotMatch(markup,/Etapa del funnel<select/);
   assert.doesNotMatch(markup,/\(snap\?\.stages\|\|\[\]\)\.map\(v=>/);
+  assert.match(markup,/commercialStage = F\.commercialStages\(t\.unit,snap\)/);
+  assert.match(markup,/Etapa: \$\{esc\(commercialStage\?\.title/);
+  assert.match(markup,/Situación: \$\{esc\(it\.situationLabel\)/);
+  assert.match(markup,/Actividad: \$\{esc\(it\.stageTitle\)/);
   assert.match(markup,/Situación<select/);
   assert.match(markup,/fuSituationOptions\(situations,it\.stage,t\.unit\)/);
 });
