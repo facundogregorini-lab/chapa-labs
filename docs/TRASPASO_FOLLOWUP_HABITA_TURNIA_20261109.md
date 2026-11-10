@@ -1,5 +1,14 @@
 ## Hallazgo de QA visual del 09/11 — REGLAS Y MENSAJES NO tiene paridad
 
+## Estado posterior de QA y paridad — 10/11/2026 (actualización)
+
+- Cola y Reglas: mergeadas a main en Chapa PR #62 y Habita PR #228. Vercel las reporta en producción. **No declarar fidelidad visual 100% sin capturas y pruebas reales de interacción.**
+- Etapas y situaciones: Chapa PR #63 y Habita PR #229, con el catálogo en dos columnas, árbol lateral de etapas, listado con interruptores Habilitada/Deshabilitada, edición, creación y eliminación; operaciones delegadas al motor de Habita. Chapa CI pasó; Habita CI seguía en ejecución al redactar esta actualización. No integrar hasta que pase.
+- Embudo: **todavía no es literalmente idéntico** al Follow-up original. Habita usa `CommercialFunnelChart` (`src/components/commercial-funnel-chart.tsx`) más selector de etapa, subtareas técnicas, detalle de regla, versiones y Cola. Chapa todavía presenta tarjetas en lugar de aquel gráfico y no ofrece las mismas lecturas por período/segmentos. Para reproducirlo sin inventar métricas, extender primero el snapshot de Habita con `chart`, `lostAt` y parámetros de período, reutilizando el mismo `funnelCounts`/filtros; adaptar el componente de Chapa o reutilizar frontend original. **No dibujar barras ficticias.**
+- Turnia: la edición avanzada en PR #167 sigue bloqueada por Vercel y CI; Chapa PR #61 depende de ella. No mergear estas ramas sin resolver error y aplicar migración SQL real. El layout de Turnia puede ser el mismo, pero sus 8 etapas comerciales y sus reglas de consentimiento y mensajes son propias.
+- Usuario exige fidelidad *literal* del diseño de interacción, no simplemente semejanza visual: confirmar con screenshots desktop/mobile de ambas apps y QA de todos los CTAs/filtros antes de declarar terminado.
+
+
 El usuario envió una captura de Chapa y señaló que **Reglas y mensajes se ve completamente diferente del panel original de Habita**. Confirmado revisando código publicado:
 - **Habita** `src/components/admin-followup.tsx` `RulesWorkspace`: selector horizontal de 7 etapas comerciales; cabecera de etapa; DOS COLUMNAS con listado de reglas de la etapa a la izquierda y editor completo (regla + mensaje) a la derecha; prioridad P1, reordenamiento drag-and-drop, agregar nueva o usar regla existente como plantilla; selector de etapa y situación, validación y versiones de mensajes asociadas.
 - **Chapa en producción** `prospecting/app.js` `fuSecuencias()`: una TABLA global de reglas seguida de muchos acordeones por paso técnico, con formularios separados. **No es literalmente igual**. Ni PR #60 (ya integrado y desplegado) ni PR #61 (catálogo Turnia) corrigen por sí mismos esta diferencia.
