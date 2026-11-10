@@ -83,3 +83,16 @@ test('Execution hides legacy menu and presents compact reclasificar action',()=>
   assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
   assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
 });
+
+test('Fast mobile queue retains all commercial stage cards and exposes one tap execution',()=>{
+  assert.match(app,/data-testid="followup-reference-stage-cards"/);
+  assert.match(app,/commercialStages\.map\(s=>/);
+  assert.match(app,/data-testid="fu-fast-execution"/);
+  assert.match(app,/data-testid="fu-fast-next"/);
+  assert.match(app,/data-fu="queue-toggle-filters"/);
+  assert.match(app,/id="fu-advanced-filters" data-expanded=/);
+  assert.match(app,/case 'queue-toggle-filters':/);
+  assert.match(app,/data-testid="fu-mobile-execute"/);
+  assert.match(css,/\.os-fu-fastbar\{display:none\}/);
+  assert.match(css,/\.os-fu-advanced\[data-expanded="true"\]\{display:block\}/);
+});
