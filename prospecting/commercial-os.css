@@ -1152,3 +1152,50 @@ body[data-unit="habita"] .fu-ref-what-actions .btn:focus-visible{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
+
+
+/* Keep the existing authenticated session/logout control available.
+   Habita has a compact logout utility in the native upper-right corner.
+   Hide only the duplicate breadcrumb/search/theme—not the account action. */
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .top.os-top{
+  display:flex;
+  position:fixed;top:22px;right:15px;left:auto;
+  width:43px;height:43px;min-height:0;
+  padding:0;margin:0;justify-content:center;align-items:center;
+  border:0;background:transparent;box-shadow:none;
+  backdrop-filter:none;z-index:100;
+}
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .os-top .os-breadcrumb,
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .os-top .gsearch,
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .os-top #theme{
+  display:none!important;
+}
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .os-top .os-user{
+  min-width:40px;width:40px;height:40px;
+  background:#fff;border:1px solid #d9e8dd;border-radius:12px;
+  color:#19593c;font-size:11px;box-shadow:0 2px 7px #21452c09;
+}
+body[data-unit="habita"] .habita-fu-utilities{
+  padding-right:52px;
+}
+body[data-unit="habita"] .os-sidebar{
+  isolation:isolate;
+}
+body[data-unit="habita"] .os-sidebar::after{
+  content:"";display:block;position:absolute;z-index:-1;
+  left:0;right:0;bottom:58px;height:350px;
+  opacity:.88;pointer-events:none;
+  background:linear-gradient(to bottom,#103d2e 0%,transparent 16%),
+    url("https://www.habitaia.app/admin/follow-up/sidebar-reference.webp")
+      center bottom / cover no-repeat;
+}
+@media(max-width:900px){
+  body[data-unit="habita"] .os-sidebar::after{display:none}
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .habita-fu-utilities{padding-right:0}
+  body[data-unit="habita"]:has(.habita-fu-workspace-head) .top.os-top{
+    position:fixed;top:10px;right:10px;
+  }
+  body[data-unit="habita"] .habita-fu-workspace-head{padding-right:47px}
+}
