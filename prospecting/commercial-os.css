@@ -1458,3 +1458,127 @@ body[data-unit="habita"] .os-fu-actions [data-testid="followup-reply-facu"]{
     padding:13px;
   }
 }
+
+
+/* Manual execution: the selected task is a focused mobile screen, not a
+   cramped right sidebar underneath the full prospect queue. */
+.os-fu-mobile-send{display:none}
+.os-fu-wa-native{display:none!important}
+.os-fu-wa-desktop{display:inline-flex;align-items:center;gap:7px}
+.os-fu-wa-desktop svg,.os-fu-wa-native svg,.os-fu-mobile-copy svg{width:18px;height:18px;flex:none}
+@media(max-width:760px){
+  body[data-unit="habita"]:has([data-testid="fu-mobile-actions"]) .habita-fu-workspace-head,
+  body[data-unit="habita"]:has([data-testid="fu-mobile-actions"]) .habita-fu-tabs{
+    display:none!important;
+  }
+  body[data-unit="habita"]:has([data-testid="fu-mobile-actions"]) .os-workspace > main{
+    padding: max(68px,calc(env(safe-area-inset-top) + 22px)) 12px
+      calc(36px + env(safe-area-inset-bottom));
+    width:100%;min-width:0;overflow-x:hidden;
+  }
+  body[data-unit="habita"] [data-testid="fu-detail"]{
+    display:flex;flex-direction:column;gap:12px;
+    grid-template-columns:minmax(0,1fr);
+  }
+  body[data-unit="habita"] .os-fu-task-cards>.os-fu-message-card{
+    order:1;
+  }
+  body[data-unit="habita"] .os-fu-task-cards>.os-fu-execution-card{
+    order:2;
+  }
+  body[data-unit="habita"] .os-fu-task-cards>.os-fu-context-card{
+    order:3;
+  }
+  body[data-unit="habita"] .os-fu-task-cards>.card{
+    width:100%;min-width:0;margin:0;padding:15px;
+    border-radius:16px;
+    box-shadow:0 4px 14px #143d2710;
+  }
+  body[data-unit="habita"] .os-fu-mobile-title{
+    display:block;margin:10px 0 12px;padding:0;
+    border:0;box-shadow:none;background:transparent;
+  }
+  body[data-unit="habita"] .os-fu-mobile-title h1{
+    font-size:clamp(23px,6.1vw,34px);line-height:1.14;
+    letter-spacing:-.035em;overflow-wrap:anywhere;
+  }
+  body[data-unit="habita"] .os-fu-mobile-title p{
+    font-size:12px;line-height:1.5;margin-top:6px;
+  }
+  body[data-unit="habita"] [data-testid="followup-task-context"] .os-fu-task-sidebar{display:none}
+  body[data-unit="habita"] [data-testid="fu-mobile-actions"]{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);
+    gap:9px;
+    margin:0 0 13px;padding:13px;
+    border:1px solid #d3e6d7;background:#f0f9f1;
+    border-radius:17px;
+  }
+  body[data-unit="habita"] .os-fu-wa-native{
+    display:inline-flex!important;align-items:center;justify-content:center;
+    gap:7px;min-height:52px;padding:11px 9px;
+    background:#087b49;color:#fff;border:1px solid #087b49;
+    border-radius:12px;font-weight:850;font-size:13px;
+    text-align:center;text-decoration:none;
+  }
+  body[data-unit="habita"] .os-fu-wa-desktop{display:none!important}
+  body[data-unit="habita"] .os-fu-mobile-copy{
+    display:flex;align-items:center;justify-content:center;
+    min-height:52px;border:1px solid #c7decd;
+    background:#fff;color:#175536;border-radius:12px;
+    font-weight:750;font-size:12px;
+  }
+  body[data-unit="habita"] .os-fu-mobile-send p{
+    grid-column:1/-1;margin:0;
+    font-size:11px;color:#647c6c;line-height:1.45;
+  }
+  body[data-unit="habita"] .os-fu-mobile-confirm{
+    grid-column:1/-1;min-height:48px;
+    background:#fff;border:1px solid #c8ddcf;border-radius:12px;
+    color:#135f3c;font-size:13px;font-weight:800;
+  }
+  body[data-unit="habita"] .os-fu-execution-primary{display:none!important}
+  body[data-unit="habita"] .os-fu-task-cards .section{
+    min-width:0;
+  }
+  body[data-unit="habita"] .os-fu-task-cards .facts{
+    grid-template-columns:minmax(90px,.7fr) minmax(0,1fr);
+  }
+  body[data-unit="habita"] .os-fu-task-cards .input,
+  body[data-unit="habita"] .os-fu-task-cards textarea,
+  body[data-unit="habita"] .os-fu-task-cards select{
+    width:100%;min-width:0;max-width:100%;
+    min-height:42px;font-size:16px;
+  }
+  body[data-unit="habita"] .os-fu-task-cards button,
+  body[data-unit="habita"] .os-fu-mobile-send button{
+    touch-action:manipulation;
+  }
+  body[data-unit="habita"] .os-fu-task-cards .section h3{
+    font-size:12px;
+  }
+  body[data-unit="habita"] .os-fu-task-cards .btns{
+    display:flex;flex-wrap:wrap;gap:8px;
+  }
+  body[data-unit="habita"] .os-fu-task-cards .btns>.btn{
+    min-height:42px;
+  }
+  body[data-unit="habita"] .os-fu-task-cards [data-fu-situation],
+  body[data-unit="habita"] .os-fu-task-cards [data-fu-reply]{
+    border:1px solid #dce9df;background:#f7fbf8;
+    padding:13px;border-radius:13px;
+  }
+  body[data-unit="habita"] [data-testid="fu-mobile-actions"] .btn:focus-visible{
+    outline:3px solid #126944;outline-offset:3px;
+  }
+}
+
+@media(max-width:760px){
+  body[data-unit="habita"] .os-fu-app-fallback{
+    display:inline-block;margin-top:5px;color:#0d6c43;
+    text-decoration:underline;text-underline-offset:2px;
+    font-size:11px;font-weight:700;
+  }
+  body[data-unit="habita"] .os-fu-app-fallback:focus-visible{
+    outline:2px solid #166f46;outline-offset:3px;
+  }
+}
