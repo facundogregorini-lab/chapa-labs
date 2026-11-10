@@ -474,6 +474,8 @@
     neutro:'Respondió sin expresar interés ni rechazo.',
     pregunta_precios:'Consultó por planes, créditos o precios.',
     mas_adelante:'Pidió retomar la conversación más adelante.',
+    recontactar_vacaciones:'Pidió retomar después de sus vacaciones. No altera su etapa del embudo.',
+    recontactar_mas_adelante:'Pidió retomar más adelante. No altera su etapa del embudo.',
     derivo:'Indicó con quién continuar la conversación.',
     rechazo:'Respondió que la propuesta no le interesa.',
     proveedor_ia:'Ya trabaja con otro proveedor de IA.',
@@ -2624,7 +2626,9 @@
     (!q.rule||x.ruleKey===q.rule)).length;
   const canonical=Object.entries(snap?.labels?.situations||{});
   const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
-  const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed)).map(([key,label])=>{
+  const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed) &&
+    (!['recontactar_vacaciones','recontactar_mas_adelante'].includes(key) ||
+     !current || !current.technical.some(t=>t==='no-contactado'||t==='sin-saludo'))).map(([key,label])=>{
     const o=override.find(a=>a.key===key);return {key,label:o?.label||label}
   }),...(snap?.catalog?.states||[]).filter(s=>s.active&&(!current||s.commercial_stage===current.key)).map(s=>({key:s.key,label:s.label}))];
   const rules=scope!=='todas' && current?F.ruleRows(scope,snap).filter(r=>current.technical.includes(r.stage)): [];
@@ -3451,9 +3455,11 @@
 
   // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
   function fuSituationOptions(situations, stage, unit) {
+    // A stage is progress in the funnel; situations are independent metadata.
+    // Recontact is available only once the first outbound contact exists.
     const first = unit === 'turnia' ? 'sin-saludo' : 'no-contactado';
     return Object.entries(situations || {}).filter(([key]) =>
-      (key !== 'recontactar_vacaciones' && key !== 'recontactar_mas_adelante') || stage !== first);
+      !['recontactar_vacaciones','recontactar_mas_adelante'].includes(key) || stage !== first);
   }
 
   function renderFuTask(t) {
