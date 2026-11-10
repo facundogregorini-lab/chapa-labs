@@ -2815,6 +2815,36 @@
       </tbody></table></div>${all.length > shown ? `<div style="text-align:center;padding:8px"><button class="btn small" type="button" data-more-block="fu-prospectos">Ver los ${int(all.length - shown)} restantes</button></div>` : ''}</section>`;
   }
 
+  // Native Habita interaction: selected condition chips + '+ AGREGAR'.
+  // Inputs remain native checkboxes so FormData and the commercial motor are
+  // unchanged. Only their presentation and editor interactions differ.
+  function syncFuRuleSituationChips(form) {
+    const area=form?.querySelector('[data-fu-sit-chips]');
+    const picker=form?.querySelector('[data-fu-rule-add-sit]');
+    if(!area||!picker)return;
+    const checkboxes=[...form.querySelectorAll('input[name="sit"]')];
+    area.replaceChildren();
+    const checked=checkboxes.filter(box=>box.checked);
+    if(!checked.length){
+      const any=document.createElement('span');
+      any.className='fu-ref-chipbtn is-on is-static';
+      any.textContent='✓ CUALQUIER SITUACIÓN';
+      area.appendChild(any);
+    }else for(const box of checked){
+      const button=document.createElement('button');
+      button.type='button';
+      button.className='fu-ref-chipbtn is-on';
+      button.dataset.fu='rules-remove-sit';
+      button.dataset.fuValue=box.value;
+      button.setAttribute('aria-label','Quitar '+(box.dataset.label||box.value));
+      button.textContent='✓ '+(box.dataset.label||box.value);
+      area.appendChild(button);
+    }
+    picker.replaceChildren(new Option('+ AGREGAR',''));
+    for(const box of checkboxes.filter(box=>!box.checked&&!box.disabled))
+      picker.add(new Option(box.dataset.label||box.value,box.value));
+  }
+
   function fuRuleEditor(unit,snap) {
   if(unit!=='habita'||!state.fu.ruleEdit)return '';
   const create=state.fu.ruleEdit==='__new';
@@ -2866,9 +2896,21 @@
         </select>`:`<input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled><small>Para moverla a otra etapa, creá otra regla y conservá el historial.</small>`}
       </label>
       ${invalidCatalog?'<p class="os-warn-note" role="alert">Esta situación personalizada no está disponible en la etapa elegida. Seleccioná otra o quitá la condición antes de guardar.</p>':''}
-      <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span><div class="fu-ref-classifiers" data-testid="followup-rule-situations">
-        ${labels.map(([id,label])=>`<label><input type="checkbox" name="sit" value="${esc(id)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled title="Esta etapa no admite encuesta de cierre"':''}><span>${esc(label)}</span></label>`).join('')}
-      </div></div>
+      <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span>
+        <div class="fu-ref-situation-editor" data-testid="followup-rule-situations">
+          <div class="fu-ref-situation-selected" data-fu-sit-chips>
+            ${(r.situations||[]).length
+              ?(r.situations||[]).map(id=>`<button type="button" class="fu-ref-chipbtn is-on" data-fu="rules-remove-sit" data-fu-value="${esc(id)}" aria-label="Quitar ${esc(labels.find(x=>x[0]===id)?.[1]||id)}">✓ ${esc(labels.find(x=>x[0]===id)?.[1]||id)}</button>`).join('')
+              :'<span class="fu-ref-chipbtn is-on is-static">✓ CUALQUIER SITUACIÓN</span>'}
+          </div>
+          <select class="input fu-ref-chipadd" data-fu-rule-add-sit aria-label="Agregar situación">
+            <option value="">+ AGREGAR</option>
+            ${labels.filter(([id])=>!(r.situations||[]).includes(id) && (id!=='rechazo'||allowRejection))
+               .map(([id,label])=>`<option value="${esc(id)}">${esc(label)}</option>`).join('')}
+          </select>
+          ${labels.map(([id,label])=>`<input type="checkbox" class="fu-ref-situation-hidden" name="sit" value="${esc(id)}" data-label="${esc(label)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled':''} tabindex="-1" aria-hidden="true">`).join('')}
+        </div>
+      </div>
       ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation" data-fu-rule-custom><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
       <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
         ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
@@ -3382,6 +3424,20 @@
         if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de etapa?'))break;
         ui.commercial=ds.fuStage;ui.selected=null;ui.creating=false;ui.template=null;ui.technical=null;ui.dirty=false;ui.showMenu=false;render();break;
       }
+      case 'rules-remove-sit': {
+        const form=t.closest('[data-fu-rule-form]');
+        const box=[...form?.querySelectorAll('input[name="sit"]')||[]].find(x=>x.value===ds.fuValue);
+        if(box){
+          box.checked=false;
+          const action=form.querySelector('[data-fu-rule-action]');
+          if(ds.fuValue==='rechazo'&&action?.value==='encuesta_cierre')action.value='principal';
+          const custom=form.querySelector('[data-fu-rule-custom]');
+          if(custom)custom.value='';
+          syncFuRuleSituationChips(form);
+          fuRulesState(state.unit).dirty=true;
+        }
+        break;
+      }
       case 'rules-select': {
         const ui=fuRulesState(state.unit);
         if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de regla?'))break;
@@ -3488,6 +3544,32 @@
   }, true);
   document.addEventListener('change', (e) => {
     if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rule-add-sit]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      const selection=e.target.value;
+      const boxes=[...form?.querySelectorAll('input[name="sit"]')||[]];
+      const box=boxes.find(x=>x.value===selection);
+      if(box && !box.disabled){
+        box.checked=true;
+        const custom=form.querySelector('[data-fu-rule-custom]');
+        if(custom)custom.value='';
+        const action=form.querySelector('[data-fu-rule-action]');
+        if(selection==='rechazo'){
+          boxes.forEach(other=>{if(other!==box)other.checked=false;});
+          if(action&&[...action.options].some(o=>o.value==='encuesta_cierre'))action.value='encuesta_cierre';
+          const wait=form.querySelector('input[name="after_hours"]');
+          if(wait)wait.value='0';
+          const previous=form.querySelector('select[name="after_action"]');
+          if(previous)previous.value='';
+        }else{
+          const reject=boxes.find(x=>x.value==='rechazo');
+          if(reject?.checked)reject.checked=false;
+          if(action?.value==='encuesta_cierre')action.value='principal';
+        }
+        syncFuRuleSituationChips(form);
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
     if(e.target.matches('[data-fu-rule-custom]')){
       const form=e.target.closest('[data-fu-rule-form]');
       const catalog=state.fu.n?.units?.habita?.catalog;
@@ -3506,6 +3588,7 @@
             action.value='principal';
           }
         }
+        syncFuRuleSituationChips(form);
         fuRulesState(state.unit).dirty=true;
       }
     }
@@ -3537,6 +3620,7 @@
         const wait=form.querySelector('input[name="after_hours"]');
         if(survey && wait)wait.value='0';
         if(survey && previous)previous.value='';
+        syncFuRuleSituationChips(form);
         fuRulesState(state.unit).dirty=true;
       }
     }
