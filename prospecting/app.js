@@ -2592,16 +2592,16 @@
         <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
         <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
       </div>
+      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
+      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
+      <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
+      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
       <div class="os-fu-preview-card"><strong>Información del contacto</strong><dl>
         <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd><dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
         <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
         <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
       <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
       <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
-      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
-      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
-      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
       <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
       '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
