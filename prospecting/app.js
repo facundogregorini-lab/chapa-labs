@@ -2616,7 +2616,11 @@
   const allowed=selected?.unit==='habita'
     ? (snap?.catalog?.canonical||[]).filter(o=>o.key!=='sin_respuesta')
     : Object.entries(snap?.labels?.situations||{}).filter(([key])=>key!=='sin_respuesta').map(([key,label])=>({key,label}));
-  const without=rows.filter(x=>!x.classification||x.status==='pendiente').length;
+  // Habita's native Inbox derives these cards from the queue status,
+  // not from whether a pending classification happens to be present.
+  const without=scope==='habita'
+    ? rows.filter(x=>x.status==='pendiente').length
+    : rows.filter(x=>!x.classification||x.status==='pendiente').length;
   const facu=scope==='habita'?rows.length-without:rows.filter(x=>x.status==='facu').length;
   const any=scope!=='todas';
   const opts=(snap?.labels?.situations||{});
@@ -2678,9 +2682,13 @@
     if(!classification&&!review){toast('Elegí una clasificación.',true);return;}
     if(r.unit==='habita'){
       const until=fd.get('hasta')?new Date(String(fd.get('hasta'))+'T09:00:00-03:00').toISOString():null;
-      const fields={op:'reply',id:r.replyId,clasificacion:classification,
-        facu:review,nota:String(fd.get('nota')||''),contactoNombre:String(fd.get('contactoNombre')||''),
-        contactoWhatsapp:String(fd.get('contactoWhatsapp')||''),hasta:until};
+      // Native Habita semantics: "Asignar a Facu" is a review-only
+      // operation, never an accidental classification of the reply.
+      const fields=review
+        ? {op:'reply',id:r.replyId,facu:true}
+        : {op:'reply',id:r.replyId,clasificacion:classification,
+            nota:String(fd.get('nota')||''),contactoNombre:String(fd.get('contactoNombre')||''),
+            contactoWhatsapp:String(fd.get('contactoWhatsapp')||''),hasta:until};
       if(!await fuOp(r.unit,fields,{label:review?'Enviada a revisión.':'Respuesta clasificada.'}))return;
     }else{
       if(review)return;
