@@ -7,15 +7,20 @@ const vm=require('node:vm');
 const app=fs.readFileSync(path.join(__dirname,'../prospecting/app.js'),'utf8');
 const css=fs.readFileSync(path.join(__dirname,'../prospecting/commercial-os.css'),'utf8');
 
-test('Confirming a send leaves a receipt rather than dropping to queue',()=>{
+test('One-tap confirm requires upstream persisted receipt before success',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
-  assert.match(app,/case 'confirm':\s*\{/);
-  assert.match(app,/if\(!task\|\|task\.mode!=='ejecutar'\)break/);
+  assert.match(app,/case 'confirm':\\s*\\{/);
+  assert.match(app,/if\\(!task\\|\\|task\\.mode!=='ejecutar'\\|\\|state\\.fu\\.busy\\)break/);
   assert.match(app,/op: 'confirm'/);
-  assert.match(app,/if \(r\) \{\s*\/\/ Keep the completed item/);
-  assert.match(app,/state\.fu\.task = \{\.\.\.task,mode:'confirmado',confirmedAt:new Date\(\)\.toISOString\(\)\}/);
+  assert.match(app,/r\\?\\.execution\\?\\.status==='sent'/);
+  assert.match(app,/state\\.fu\\.task=\\{\\.\\.\\.task,mode:'confirmado'/);
+  assert.match(app,/t\\.disabled=true/);
+  assert.match(app,/Guardando envío/);
+  assert.match(app,/El servidor no confirmó el guardado/);
+  assert.doesNotMatch(app,/data-fu="confirm"[^>]*data-arm=/);
+  assert.match(app,/data-testid="fu-confirm-mobile"/);
+  assert.match(app,/data-testid="fu-confirm"/);
   assert.match(app,/data-testid="fu-confirmed-receipt"/);
-  assert.match(app,/Envío confirmado/);
   assert.match(app,/data-testid="fu-next-confirmed"/);
   assert.match(app,/data-fu="next-after"/);
 });
