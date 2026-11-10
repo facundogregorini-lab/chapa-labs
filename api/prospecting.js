@@ -440,6 +440,54 @@ async function doSetup(req, res, user) {
   res.status(200).json({ ok: true, addedTabs: add, newIds: ids.length });
 }
 
+// ─── Script por unidad: HABITA usa la fuente original, TURNIA su planilla ───
+// No se duplican instrucciones: el mismo script que lee la extensión de HABITA
+// se lee/escribe en su propio panel. TURNIA no tiene script equivalente aún,
+// por eso se crea uno independiente sin contenido inventado.
+const SCRIPT_TAB = 'Script';
+const SCRIPT_HEAD = ['Script', 'Actualizado', 'Por'];
+async function doScript(req,res,user){
+  const unit=UNITS[req.method==='GET'?req.query.unit:req.body?.unit];
+  if(!unit || !['habita','turnia'].includes(unit.id))return fail(res,404,'Unidad desconocida.');
+  if(req.method!=='GET'&&req.method!=='POST')return fail(res,405,'Método no permitido.');
+  try{
+    let data;
+    if(req.method==='POST'){
+      // El script es política operativa de la extensión: no exponer su edición
+      // en instalaciones sin autenticación protegida.
+      if(session.open())return fail(res,403,'Para editar el script configurá PROSPECTING_PASSWORD en Chapa Labs.');
+      const body=req.body?.body;
+      if(typeof body!=='string'||body.length>20000)return fail(res,400,'El script debe tener hasta 20.000 caracteres.');
+      if(unit.id==='habita'){
+        if(!apiOf(unit))return fail(res,503,'La conexión de HABITA no está configurada.');
+        data=await callApi(unit,{method:'POST',body:{by:user.name,followup:{op:'script-save',body}},timeout:20000});
+      }else{
+        const sheet=sheetOf(unit);
+        if(!sheet)return fail(res,503,'La planilla de TURNIA no está configurada.');
+        const meta=await google.tabs(sheet.id);
+        if(!meta.tabs.includes(SCRIPT_TAB))await google.addTabs(sheet.id,[SCRIPT_TAB]);
+        const updated_at=new Date().toISOString();
+        await google.writeRange(sheet.id,SCRIPT_TAB,1,[SCRIPT_HEAD,[body,updated_at,user.name]]);
+        data={body,updated_at};
+      }
+    }else if(unit.id==='habita'){
+      if(!apiOf(unit))return fail(res,503,'La conexión de HABITA no está configurada.');
+      data=await callApi(unit,{query:{vista:'script'},timeout:20000});
+    }else{
+      const sheet=sheetOf(unit);
+      if(!sheet)return fail(res,503,'La planilla de TURNIA no está configurada.');
+      const meta=await google.tabs(sheet.id);
+      const rows=meta.tabs.includes(SCRIPT_TAB)?(await google.readTabs(sheet.id,[SCRIPT_TAB]))[SCRIPT_TAB]:null;
+      data={body:String(rows?.[1]?.[0]||''),updated_at:rows?.[1]?.[1]||null};
+    }
+    return res.status(200).json({
+      unit:unit.id,body:String(data?.body||''),updated_at:data?.updated_at||null,
+      source:unit.id==='habita'?'habita-original':'turnia-sheet',
+      editable:!session.open(),max_length:20000,
+    });
+  }catch(err){return fail(res,err.status&&err.status<500?err.status:502,err.message||'No se pudo consultar el script.');}
+}
+
 // ─── Follow-up: la cola de cada unidad, calculada por su app ────
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
@@ -645,6 +693,7 @@ module.exports = async (req, res) => {
     if (op === 'agencyThumb' && req.method === 'GET') return await doAgencyThumb(req, res);
     if (op === 'agency' && req.method === 'POST') return await doAgency(req, res);
     if (op === 'targets' && req.method === 'POST') return await doTargets(req, res, user);
+    if (op === 'script') return await doScript(req, res, user);
     if (op === 'followup' && req.method === 'GET') return await doFollowup(req, res);
     if (op === 'task' && req.method === 'POST') return await doTask(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
