@@ -2578,7 +2578,7 @@
       <button type="button" class="${!q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="0">Pendientes de acción</button>
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
-    ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note">Primeros contactos: ${int(snap.summary.newToday||0)} / ${int(snap.summary.cap)} registrados. Los bloqueos y horarios se aplican desde ${esc(fuName(scope))}.</div>`:''}
+    ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
     <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
     <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
     <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))} — ${int(rows.length)} ${q.closed?'NO INTERESADOS':q.kpi==='bloqueadas'?'BLOQUEADAS':rows.length===1?'LISTO':'LISTOS'}</h2><div class="os-fu-tools">
@@ -2949,6 +2949,15 @@
   const allowRejection=allowed.includes('encuesta_cierre');
   const days=[['DO',0],['LU',1],['MA',2],['MI',3],['JU',4],['VI',5],['SA',6]];
   const rank=existing?siblings.sort((a,b)=>(a.position||999)-(b.position||999)).findIndex(x=>x.key===r.key)+1:0;
+  const dayPresets=[
+    {label:'Lunes – Sábado',days:[1,2,3,4,5,6]},
+    {label:'Lunes – Viernes',days:[1,2,3,4,5]},
+    {label:'Todos los días',days:[0,1,2,3,4,5,6]},
+  ];
+  const dayPreset=dayPresets.find(p=>p.days.join(',')===[...(r.days||[])].sort((a,b)=>a-b).join(','));
+  const hourPresets=[[9,18],[9,19],[9,20],[10,19],[8,20]];
+  const hourValue=(r.hours_from??9)+'-'+(r.hours_to??19);
+  const hourOptions=hourPresets.some(([a,b])=>a+'-'+b===hourValue)?hourPresets:[[r.hours_from??9,r.hours_to??19],...hourPresets];
   const linkedVersions=F.versionRows(unit,snap).filter(v=>v.stage===key&&v.action===r.action)
     .sort((a,b)=>Number(b.version)-Number(a.version));
   const selectedPreview=linkedVersions.find(v=>v.id===state.fu.previewVersion)
@@ -2988,9 +2997,22 @@
       <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
         ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
       <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
-      <div class="fu-ref-fields">
-        <label class="field"><span>DÍAS DE ENVÍO</span><div class="fu-ref-classifiers">${days.map(([d,i])=>`<label><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}><span>${d}</span></label>`).join('')}</div></label>
-        <label class="field"><span>HORARIO</span><div class="fu-ref-hours"><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required><span>A</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></div></label>
+      <div class="fu-ref-send-window field" data-testid="followup-rule-send-window">
+        <span>HORARIO DE ENVÍO</span>
+        <div class="fu-ref-send-window-selects">
+          <select class="input" data-fu-rule-days-presets aria-label="Días">
+            ${dayPresets.map(p=>`<option value="${p.days.join(',')}" ${dayPreset?.label===p.label?'selected':''}>${p.label}</option>`).join('')}
+            ${!dayPreset?`<option value="custom" selected>${days.filter(([_,n])=>(r.days||[]).includes(n)).map(([text])=>text).join(', ')||'Sin días'}</option>`:''}
+          </select>
+          <select class="input" data-fu-rule-hours-presets aria-label="Horas">
+            ${hourOptions.map(([from,to])=>`<option value="${from}-${to}" ${hourValue===from+'-'+to?'selected':''}>${from}:00 – ${to}:00</option>`).join('')}
+          </select>
+        </div>
+        <div class="fu-ref-presets-data" hidden aria-hidden="true">
+          ${days.map(([_,n])=>`<input type="checkbox" name="days" value="${n}" ${(r.days||[]).includes(n)?'checked':''}>`).join('')}
+          <input type="hidden" name="hours_from" value="${r.hours_from??9}">
+          <input type="hidden" name="hours_to" value="${r.hours_to??19}">
+        </div>
       </div>
       ${['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?`<label class="field"><span>CONDICIÓN DE INTERACCIÓN CON LA DEMO</span><select class="input" name="min_demo_activity_level"><option value="0" ${(r.min_demo_activity_level||0)===0?'selected':''}>Cualquier nivel de interacción</option><option value="3" ${r.min_demo_activity_level===3?'selected':''}>Solo si generó una imagen</option></select></label>`:''}
     </section>
@@ -3759,6 +3781,22 @@
           const previous=form.querySelector('select[name="after_action"]');if(previous)previous.value='';
         }else if(action&&action.value==='encuesta_cierre')action.value='principal';
         fuRulesState(state.unit).dirty=true;
+      }
+    }
+    if(e.target.matches('[data-fu-rule-days-presets]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      if(form&&e.target.value!=='custom'){
+        const days=e.target.value.split(',').map(Number);
+        for(const box of form.querySelectorAll('input[name="days"]'))
+          box.checked=days.includes(Number(box.value));
+      }
+    }
+    if(e.target.matches('[data-fu-rule-hours-presets]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      const [from,to]=e.target.value.split('-').map(Number);
+      if(form&&Number.isInteger(from)&&Number.isInteger(to)){
+        form.querySelector('input[name="hours_from"]').value=String(from);
+        form.querySelector('input[name="hours_to"]').value=String(to);
       }
     }
     if(e.target.matches('[data-fu-rule-version]')){
