@@ -3631,7 +3631,7 @@
     if (!t || !main.contains(t) && !$('#drawer').contains(t)) return;
     const ds = t.dataset;
     if (ds.fu === undefined && ds.fuOpen) {
-      if (e.target.closest('button, a')) return;
+      if (e.target.closest('button, a, select, input, textarea, label')) return;
       const it = fuFind(ds.fuOpen);
       if (it) { state.fu.selectedQueueKey=it.key;render(); }
       return;
@@ -3928,6 +3928,19 @@
       default: break;
     }
   });
+  document.addEventListener('pointerover',(e)=>{
+    if(e.pointerType==='touch')return;
+    const row=e.target.closest?.('.os-fu-queue-table tr[data-fu-open]');
+    if(!row||row.contains(e.relatedTarget)||row.dataset.fuOpen===state.fu.selectedQueueKey)return;
+    state.fu.selectedQueueKey=row.dataset.fuOpen;
+    const q=fuQueueSelection(fuScope());
+    const side=main.querySelector('.os-fu-queue-grid > .os-fu-side');
+    if(side)side.outerHTML=fuRecommended(fuScope(),q.rows,q.current,q.q);
+    main.querySelectorAll('.os-fu-queue-table tr[data-fu-open]').forEach(tr=>{
+      const on=tr.dataset.fuOpen===state.fu.selectedQueueKey;
+      tr.classList.toggle('is-selected',on);tr.setAttribute('aria-selected',String(on));
+    });
+  });
   document.addEventListener('toggle', (e) => {
     const d=e.target;
     if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
@@ -4206,6 +4219,21 @@
         label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
     if(e.target.matches('[data-fu-row-field]')){
       const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
       if(!x)return;
