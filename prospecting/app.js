@@ -3939,6 +3939,9 @@
         toast('El servidor no confirmó la etapa. Revisá el estado antes de continuar.',true);return;
       }
       toast('Etapa comercial guardada.');
+      // Classification changes invalidate a claimed execution: free it so the
+      // next operator sees the corrected queue state immediately.
+      await fuOp(task.unit,{op:'release',inmobiliaria:it.id});
       // Action/claim was prepared for previous stage. Avoid a stale send.
       state.fu.task=null;
       render();
@@ -3955,6 +3958,7 @@
         toast('El servidor no confirmó la situación. Revisá el estado antes de continuar.',true);return;
       }
       toast('Situación guardada.');
+      await fuOp(task.unit,{op:'release',inmobiliaria:it.id});
       // A new situation can invalidate the proposed action; refresh queue.
       state.fu.task=null;
       render();
