@@ -3523,10 +3523,10 @@
     const rawWhatsApp=String(t.whatsappUrl||'');
     const nativeWhatsApp=window.ProspectingWhatsApp?.nativeLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
     const appWhatsApp=window.ProspectingWhatsApp?.appLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
-    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}" target="_blank" rel="noopener noreferrer"
+    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}" target="habita-followup-whatsapp"
       data-fu="open-native" data-testid="fu-open-mobile" aria-label="Abrir conversación en la aplicación de WhatsApp">
       ${icon.wa} Abrir WhatsApp</a>
-      <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="chapa-whatsapp" rel="noopener"
+      <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="habita-followup-whatsapp"
       data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
     return `${demoBanner()}
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
@@ -3534,12 +3534,20 @@
       ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
         ${whatsappActions}
         <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
+        <button type="button" class="btn os-fu-open-blank" data-fu="open-blank" data-testid="fu-open-without-text">Abrir sin texto</button>
         <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.
           ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
         </p>
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile">✓ Confirmar envío</button>
         <button type="button" class="btn os-fu-mobile-next" data-fu="next-after" data-testid="fu-next-mobile"
           aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
+        ${t.unit==='habita'? `<details class="os-fu-handoff" data-testid="fu-handoff">
+          <summary class="btn" style="cursor:pointer">Pasar a Facu - Axel</summary>
+          <div class="btns">
+            <button class="btn small" type="button" data-fu="handoff-facu">Pasar a Facu</button>
+            <button class="btn small" type="button" data-fu="handoff-axel">Pasar a Axel</button>
+          </div>
+        </details>`:''}
         <details class="os-fu-reclassify" data-testid="fu-reclassify">
           <summary class="btn os-fu-reclassify-cta" data-testid="fu-reclassify-open">Reclasificar</summary>
           <div class="os-fu-reclassify-body">
@@ -3750,10 +3758,15 @@
       case 'release': if (await fuOp(task.unit, { op: 'release', inmobiliaria: it.id }, { label: 'Quedó libre.' })) { state.fu.task = null; loadFollowup(); } break;
       case 'copy': copy(task.messages[Number(ds.fuIndex)] || task.message); break;
       case 'open-native': {
-        // Keep browser navigation synchronous with the actual user gesture:
-        // Safari/iOS won't launch universal links from an async callback.
-        // The event's default anchor navigation opens the WhatsApp app on
-        // mobile. This fetch only records "chat opened" (never "sent").
+        // Named browsing context, no noopener: successive actions reuse one tab.
+        e.preventDefault();
+        try {
+          const u=new URL(t.href);
+          if(!['wa.me','web.whatsapp.com','api.whatsapp.com'].includes(u.hostname)||u.protocol!=='https:'){
+            toast('Enlace de WhatsApp inválido.',true);break;
+          }
+          window.open(u.href,'habita-followup-whatsapp');
+        } catch {toast('Enlace de WhatsApp inválido.',true);break;}
         if(task?.mode==='ejecutar'&&it){
           fetch(API+'?op=task',{
             method:'POST',credentials:'same-origin',keepalive:true,
@@ -3764,16 +3777,35 @@
         }
         break;
       }
+      case 'open-blank': {
+        if(!task?.whatsappUrl){toast('Falta el WhatsApp del prospecto.',true);break;}
+        const mobile=window.ProspectingWhatsApp?.isMobileClient(window);
+        const native=window.ProspectingWhatsApp?.nativeLink(task.whatsappUrl,task.phone||it.phone,'');
+        try {
+          const u=new URL(mobile?(native||task.whatsappUrl):task.whatsappUrl);
+          if(!['wa.me','web.whatsapp.com','api.whatsapp.com'].includes(u.hostname)||u.protocol!=='https:')throw Error('invalid');
+          u.searchParams.delete('text');
+          window.open(u.href,'habita-followup-whatsapp');
+          void fuOp(task.unit,{op:'open',...fields()});
+        } catch {toast('Enlace de WhatsApp inválido.',true);}
+        break;
+      }
       case 'open': {
-        const native=window.ProspectingWhatsApp?.nativeLink(task.whatsappUrl,task.phone||it.phone,(task.messages||[]).join('\n\n')||task.message||'');
+        const native=window.ProspectingWhatsApp?.nativeLink(task.whatsappUrl,task.phone||it.phone,(task.messages||[]).join('\\n\\n')||task.message||'');
         const mobile=window.ProspectingWhatsApp?.isMobileClient(window);
         const target=mobile?native:task.whatsappUrl;
         if(!target){toast('Número o enlace de WhatsApp inválido.',true);break;}
-        // Backwards-compatible click path. Open before any await to avoid
-        // browsers blocking popups after network delay.
-        if(mobile)window.location.assign(target);
-        else window.open(target,'chapa-whatsapp');
+        window.open(target,'habita-followup-whatsapp');
         void fuOp(task.unit,{op:'open',...fields()});
+        break;
+      }
+      case 'handoff-facu':
+      case 'handoff-axel': {
+        if(!task||task.unit!=='habita'||state.fu.busy)break;
+        const to=ds.fu==='handoff-facu'?'Facu':'Axel';
+        if(await fuOp(task.unit,{op:'handoff',inmobiliaria:it.id,para:to},{label:`Tarea pasada a ${to}.`})){
+          state.fu.task=null;render();void loadFollowup({quiet:true});
+        }
         break;
       }
       case 'confirm': {

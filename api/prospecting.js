@@ -444,7 +444,7 @@ async function doSetup(req, res, user) {
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
 // va a la app de su unidad a nombre de quien opera.
-const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search']);
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'handoff', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search']);
 
 async function doFollowup(req, res) {
   const startedAt = Date.now();

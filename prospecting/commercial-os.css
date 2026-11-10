@@ -1836,3 +1836,11 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
   .os-fu-funnel-review-item label{font-size:10px}
   .os-fu-funnel-review-item .input{font-size:12px;padding:7px}
 }
+
+/* Execution utilities: secondary actions remain compact in mobile. */
+.os-fu-open-blank{grid-column:1/-1;min-height:40px;font-size:12px}
+.os-fu-handoff{grid-column:1/-1}
+.os-fu-handoff>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:44px}
+.os-fu-handoff>summary::-webkit-details-marker{display:none}
+.os-fu-handoff .btns{margin:8px 0;display:flex;gap:8px}
+.os-fu-handoff .btns .btn{flex:1}

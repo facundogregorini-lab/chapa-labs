@@ -39,14 +39,15 @@ test('Mobile detection covers iPhone/iPad and Android regardless of horizontal v
   assert.equal(WhatsApp.isMobileClient({navigator:{userAgent:'Android Chrome'}}),true);
   assert.equal(WhatsApp.isMobileClient({navigator:{userAgent:'Windows NT'},matchMedia:()=>({matches:false})}),false);
 });
-test('Dedicated mobile execution screen uses browser-native anchors; opening never confirms sending',()=>{
+test('Dedicated mobile execution screen reuses named WhatsApp tab; opening never confirms sending',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
   assert.match(html,/src="\/prospecting\/whatsapp-mobile\.js"/);
   assert.ok(html.indexOf('whatsapp-mobile.js')<html.indexOf('app.js'));
   assert.match(app,/state\.fu\.task && v==='hoy' && window\.ProspectingWhatsApp\?\.isMobileClient\(window\)/);
   assert.match(app,/data-testid="fu-mobile-actions"/);
   assert.match(app,/data-testid="fu-open-mobile"/);
-  assert.match(app,/href="\$\{esc\(nativeWhatsApp\|\|rawWhatsApp\)\}" target="_blank"/);
+  assert.match(app,/href="\$\{esc\(nativeWhatsApp\|\|rawWhatsApp\)\}" target="habita-followup-whatsapp"/);
+  assert.match(app,/window\.open\(u\.href,'habita-followup-whatsapp'\)/);
   assert.match(app,/data-fu="open-native"/);
   assert.match(app,/keepalive:true/);
   assert.match(app,/op:'open',\.\.\.fields\(\)/);
