@@ -261,6 +261,7 @@
           status: v.status,
           channel: v.channel,
           body: v.body,
+          notes: v.notes || '',
           trigger: v.trigger_label || v.trigger || '',
           executed,
           conversions,
@@ -277,13 +278,15 @@
   /** Las reglas (habita.: editables; Turnia: la cadencia de su panel), en filas. */
   function ruleRows(unit, snap) {
     const labels = (snap.labels && snap.labels.situations) || {};
+    const catalogLabels=Object.fromEntries((snap.catalog?.states||[]).map(s=>[s.key,s.label]));
     const titles = Object.fromEntries((snap.stages || []).map((s) => [s.key, s.title]));
     return (snap.rules || []).map((r) => ({
       unit,
       key: r.key || r.stage,
       stage: r.stage,
       stageTitle: r.title || titles[r.stage] || r.stage,
-      when: Array.isArray(r.situations) ? (r.situations.length ? r.situations.map((s) => labels[s] || s).join(', ') : 'Cualquier situación') : 'Al entrar en la etapa',
+      when: r.catalog_situation ? (catalogLabels[r.catalog_situation]||r.catalog_situation) :
+        Array.isArray(r.situations) ? (r.situations.length ? r.situations.map((s) => labels[s] || s).join(', ') : 'Cualquier situación') : 'Al entrar en la etapa',
       action: r.action_label || ACTION_LABEL[r.action] || r.action || '',
       wait: r.wait || (r.after_hours !== undefined ? (r.after_hours ? `${r.after_hours} h desde nuestro último mensaje` : 'Enseguida') : ''),
       window: r.hours_from !== undefined ? `${r.hours_from} a ${r.hours_to} h` : '',
