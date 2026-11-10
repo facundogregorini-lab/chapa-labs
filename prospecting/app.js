@@ -2648,7 +2648,7 @@
     ${scope!=='todas'&&customStages.length?`<div class="os-fu-chipbar" data-testid="followup-queue-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
       ${customStages.map(s=>`<button type="button" aria-pressed="${current?.key===s.key}" class="${current?.key===s.key?'is-on':''}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${stageCounter(s)}</b></button>`).join('')}
     </div></div>`:''}
-    <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
+    <details class="os-fu-queue-advanced" data-testid="fu-queue-advanced"><summary>Filtros y métricas ${q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed?'· activos':''}</summary><div class="os-fu-advanced-body"><div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
       <button type="button" class="${!q.situation?'is-on':''}" data-fu="queue-situation" data-fu-situation="">Todas <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))).length}</b></button>
@@ -2658,15 +2658,22 @@
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
-    <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
+    </div></details>
     <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
-    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))} — ${int(rows.length)} ${q.closed?'NO INTERESADOS':q.kpi==='bloqueadas'?'BLOQUEADAS':rows.length===1?'LISTO':'LISTOS'}</h2><div class="os-fu-tools">
+    <section class="card glass os-fu-tablecard">
+    <div class="os-fu-tablehead os-fu-tablehead-fast">
+      <div class="os-fu-queue-heading"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))}</h2>
+        <span class="os-fu-ready-count">${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':rows.length===1?'listo':'listos'}</span></div>
+      <button type="button" class="btn primary os-fu-queue-next" data-fu="next"
+        ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''}
+        data-testid="fu-take-next">EJECUTAR SIGUIENTE →</button>
+    </div>
+    <div class="os-fu-queue-compact-search"><input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto"></div>
+    <details class="os-fu-table-filters" data-testid="fu-queue-sort-options"><summary>Orden y filtros de la lista</summary><div class="os-fu-tools">
       <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
-      <input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto">
-      <button type="button" class="btn primary" data-fu="next" ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''} data-testid="fu-take-next">TOMAR LA PRÓXIMA →</button>
-    </div></div>
+    </div></details>
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
