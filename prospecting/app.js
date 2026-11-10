@@ -2658,7 +2658,7 @@
         data-testid="fu-take-next">EJECUTAR SIGUIENTE →</button>
     </div>
     <div class="os-fu-queue-compact-search"><input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto"></div>
-    <details class="os-fu-queue-advanced" data-testid="fu-queue-advanced"><summary>Filtros y métricas ${q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed?'· activos':''}</summary><div class="os-fu-advanced-body"><div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
+    <details class="os-fu-queue-advanced" data-testid="fu-queue-advanced" ${q.advancedOpen?'open':''}><summary>Filtros y métricas ${q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed?'· activos':''}</summary><div class="os-fu-advanced-body"><div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
       <button type="button" class="${!q.situation?'is-on':''}" data-fu="queue-situation" data-fu-situation="">Todas <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))).length}</b></button>
@@ -2669,7 +2669,7 @@
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
     </div></details>
-    <details class="os-fu-table-filters" data-testid="fu-queue-sort-options"><summary>Orden y filtros de la lista</summary><div class="os-fu-tools">
+    <details class="os-fu-table-filters" data-testid="fu-queue-sort-options" ${q.sortOpen?'open':''}><summary>Orden y filtros de la lista</summary><div class="os-fu-tools">
       <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
@@ -3885,6 +3885,11 @@
       default: break;
     }
   });
+  document.addEventListener('toggle', (e) => {
+    const d=e.target;
+    if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
+    if(d?.matches?.('[data-testid="fu-queue-sort-options"]'))fuQueueState().sortOpen=d.open;
+  }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
     if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
