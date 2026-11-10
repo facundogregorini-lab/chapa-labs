@@ -1807,3 +1807,32 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
   .os-fu-table-filters .os-fu-tools label{min-width:0}
   .os-fu-table-filters .os-fu-tools .input{max-width:none;width:100%}
 }
+
+/* End-of-day agency review immediately below the Habita historical funnel. */
+.os-fu-funnel-review{margin-top:18px;padding:18px;background:var(--surface,#fff);border:1px solid #d8e6da;border-radius:16px;display:grid;gap:15px;min-width:0}
+.os-fu-funnel-review-heading h2{margin:5px 0;font-size:19px;color:#19442e}
+.os-fu-funnel-review-heading p{margin:4px 0;color:#738a79;font-size:12px;line-height:1.5}
+.os-fu-funnel-review-list{display:grid;gap:9px;min-width:0}
+.os-fu-funnel-review-item{padding:13px;border:1px solid #dce9df;border-radius:13px;background:#fff;display:grid;gap:9px;min-width:0}
+.os-fu-funnel-review-item>header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.os-fu-funnel-review-item>header>div{display:grid;gap:4px;min-width:0}
+.os-fu-funnel-review-item>header strong{color:#18432e;font-size:14px;overflow-wrap:anywhere}
+.os-fu-funnel-review-item>header span{color:#637d6b;font-size:11px}
+.os-fu-funnel-review-item>form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end}
+.os-fu-funnel-review-item label{display:grid;gap:4px;font-size:11px;font-weight:750;color:#325e43;min-width:0}
+.os-fu-funnel-review-item .input{width:100%;max-width:none;min-width:0;min-height:42px}
+.os-fu-funnel-review-item .btn{min-height:42px;white-space:nowrap}
+.os-fu-funnel-wa{border:1px solid #b1d9bf;color:#086b42;flex-shrink:0}
+.os-fu-review-save{background:#0b7047;color:#fff}
+.os-fu-funnel-review-item>small{color:#859a89}
+@media(max-width:760px){
+  .os-fu-funnel-review{padding:12px;margin-top:12px;gap:11px}
+  .os-fu-funnel-review-item{padding:11px;gap:10px}
+  .os-fu-funnel-review-item>header{align-items:flex-start}
+  .os-fu-funnel-review-item>header strong{font-size:14px}
+  .os-fu-funnel-wa{font-size:11px;padding:9px!important;min-height:38px!important}
+  .os-fu-funnel-review-item>form{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .os-fu-funnel-review-item .os-fu-review-save{grid-column:1/-1;min-height:40px}
+  .os-fu-funnel-review-item label{font-size:10px}
+  .os-fu-funnel-review-item .input{font-size:12px;padding:7px}
+}

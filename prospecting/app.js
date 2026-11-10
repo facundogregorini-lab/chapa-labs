@@ -2392,11 +2392,11 @@
 
   function renderFu() {
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
-    // Mobile is a focused action screen, never a queue squeezed into a right rail.
-    if (state.fu.task && window.ProspectingWhatsApp?.isMobileClient(window))
-      return renderFuTask(state.fu.task);
-    if (state.fu.task && fuView()!=='hoy') return fuTaskWithQueue(state.fu.task);
     const v = fuView();
+    // A claimed task must not hijack unrelated tabs on mobile or desktop.
+    // Keep its reservation, but show the selected view below the navigation.
+    if (state.fu.task && v==='hoy' && window.ProspectingWhatsApp?.isMobileClient(window))
+      return renderFuTask(state.fu.task);
     const sub = '';
     if (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])) {
       const reason = state.fu.n?.errors?.[fuScope()] || state.fu.error;
@@ -2805,6 +2805,56 @@
   return state.fu.chartPeriod||(state.fu.chartPeriod={preset:'todo',from:'',to:''});
 }
 
+
+  // Historical funnel status, commercial stage and conversation situation
+  // are three independent dimensions, also for end-of-day review.
+  function fuFunnelReviewList(snap, historical, focus, chart) {
+    const n=state.fu.n;
+    const chosen=focus?historical.filter(x=>{
+      const step=Number(x.step),selected=Number(focus.step);
+      if(x.step===null)return false;
+      if(focus.mode==='lost')return step===selected&&x.lost===true;
+      if(focus.mode==='stayed')return step===selected&&!x.lost;
+      if(focus.mode==='advanced')return step>=(selected===chart.length-1?selected:selected+1);
+      return step>=selected;
+    }):historical;
+    const index=new Map([...n.queue,...n.scheduled,...n.blocked,...(n.noInteresados||[])]
+      .filter(x=>x.unit==='habita').map(x=>[x.id,x]));
+    const stages=F.commercialStages('habita',snap).filter(v=>v.technical?.length&&!v.situation);
+    const situations=Object.entries(snap.labels?.situations||{});
+    const limit=state.fu.funnelReviewLimit||80;
+    const cards=chosen.slice(0,limit).map(x=>{
+      const current=index.get(x.agencyId);
+      const commercial=stages.find(st=>st.technical.includes(current?.stage));
+      const technical=current?.stage||'';
+      const situation=current?.situation||'';
+      const digits=String(x.whatsapp||current?.phone||'').replace(/\D/g,'');
+      const webLink=digits.length>=8&&digits.length<=15?'https://web.whatsapp.com/send?phone='+digits:'';
+      const step=x.step===null?'Sin registrar':(chart[x.step]?.label||'Sin registrar');
+      const stageOpts=stages.map(st=>'<option value="'+esc(st.technical.includes(technical)?technical:st.technical[0])+'" '+(commercial?.key===st.key?'selected':'')+'>'+esc(st.title)+'</option>').join('');
+      const situOpts=situations.map(([key,label])=>'<option value="'+esc(key)+'" '+(situation===key?'selected':'')+'>'+esc(label)+'</option>').join('');
+      return '<article class="os-fu-funnel-review-item" data-testid="fu-funnel-review-item">'+
+        '<header><div><strong>'+esc(x.name||current?.name||'Inmobiliaria')+'</strong>'+
+        '<span>Estado del embudo: <b>'+esc(step)+'</b>'+(x.lost?' · Perdida':'')+'</span></div>'+
+        (webLink?'<a class="btn os-fu-funnel-wa" target="_blank" rel="noopener noreferrer" href="'+esc(webLink)+'">WhatsApp Web ↗</a>':'<span class="os-fu-caption">WhatsApp no disponible</span>')+
+        '</header><form data-fu-funnel-review data-fu-review-id="'+esc(x.agencyId)+'" data-fu-review-stage="'+esc(technical)+'" data-fu-review-situation="'+esc(situation)+'">'+
+        '<label>Etapa comercial<select name="etapa" class="input">'+
+        '<option value="" '+(!commercial?'selected':'')+'>'+(commercial?'Sin cambio':'Sin etapa asignada')+'</option>'+stageOpts+
+        '</select></label><label>Situación<select name="situacion" class="input">'+
+        '<option value="" '+(!situation?'selected':'')+'>Sin clasificar</option>'+situOpts+
+        '</select></label><button type="submit" class="btn os-fu-review-save">Guardar cambios</button></form>'+
+        (commercial&&current?.stageTitle&&current.stageTitle!==commercial.title?'<small>Actividad actual: '+esc(current.stageTitle)+'</small>':'')+
+        '</article>';
+    }).join('');
+    return '<section class="os-fu-funnel-review" data-testid="fu-funnel-review" aria-label="Inmobiliarias del embudo">'+
+      '<div class="os-fu-funnel-review-heading"><span class="os-kicker">REVISIÓN DE JORNADA</span>'+
+      '<h2>Inmobiliarias · '+int(chosen.length)+'</h2>'+
+      '<p>Estado alcanzado, etapa comercial y situación son campos distintos. Guardá las correcciones antes de continuar.</p></div>'+
+      '<div class="os-fu-funnel-review-list">'+(cards||'<p>No hay inmobiliarias para este filtro.</p>')+'</div>'+
+      (chosen.length>limit?'<button type="button" class="btn" data-fu="funnel-review-more">Ver '+int(Math.min(80,chosen.length-limit))+' más</button>':'')+
+      '</section>';
+  }
+
   function fuNativeChart(snap) {
   const chart=snap?.chart,lostAt=snap?.lostAt,rows=snap?.chartRows;
   if(!Array.isArray(chart)||!Array.isArray(lostAt)||!Array.isArray(rows))
@@ -2858,28 +2908,6 @@
         ${lost?`<small class="is-lost">${int(lost)} perdidas</small>`:''}
       </div></li>`;
   }).join('');
-  let detail='';
-  if(focus){
-    const step=Number(focus.step),mode=focus.mode;
-    const chosen=rows.filter(x=>{
-      const s=Number(x.step);
-      if(x.step===null)return false;
-      if(mode==='lost')return s===step&&x.lost===true;
-      if(mode==='stayed')return s===step&&!x.lost;
-      if(mode==='advanced')return s>=(step===chart.length-1?step:step+1);
-      return s>=step;
-    });
-    const name=chart[step]?.label||`Paso ${step+1}`;
-    const kind=mode==='lost'?'No interesadas':mode==='stayed'?'Se quedaron':mode==='advanced'?'Pasaron al siguiente paso':'Llegaron al paso';
-    detail=`<section class="card glass os-native-drilldown" data-testid="followup-funnel-drilldown"><div class="os-section-heading">
-      <div><span class="os-kicker">${esc(kind.toUpperCase())}</span><h2>${int(chosen.length)} inmobiliarias · ${esc(name)}</h2></div>
-      <button type="button" class="btn small" data-fu="funnel-reset">CERRAR FILTRO</button></div>
-      <div class="table-wrap"><table><thead><tr><th>INMOBILIARIA</th><th>SCORE</th><th>WHATSAPP</th><th>ÚLTIMO PASO ALCANZADO</th></tr></thead><tbody>
-        ${chosen.slice(0,300).map(x=>`<tr><td><strong>${esc(x.name||'Sin nombre')}</strong></td>
-          <td>${x.score==null?'—':int(x.score)}</td><td>${esc(x.whatsapp||'—')}</td>
-          <td>${esc(chart[x.step]?.label||'—')}</td></tr>`).join('')||'<tr><td colspan="4">No hay inmobiliarias para este filtro.</td></tr>'}
-      </tbody></table></div>${chosen.length>300?'<p class="os-fu-caption">Se muestran las primeras 300.</p>':''}</section>`;
-  }
   return `<section class="os-native-funnel" data-testid="followup-native-funnel">
     <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
       <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
@@ -2890,7 +2918,7 @@
       <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>Perdidas (no interesadas)</span></div>
     <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
     <p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>
-    ${detail}
+    ${fuFunnelReviewList(snap,rows,focus,chart)}
   </section>`;
 }
 
@@ -3664,9 +3692,11 @@
         const next={step:Number(ds.fuStep),mode:ds.fuMode};
         const prev=state.fu.chartFocus;
         state.fu.chartFocus=prev?.step===next.step&&prev?.mode===next.mode?null:next;
+        state.fu.funnelReviewLimit=80;
         render();break;
       }
       case 'funnel-reset':state.fu.chartFocus=null;render();break;
+      case 'funnel-review-more':state.fu.funnelReviewLimit=(state.fu.funnelReviewLimit||80)+80;render();break;
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; state.fu.pipelineSituation=null;render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
       case 'pipeline-situation': state.fu.pipelineSituation=ds.fuSituation||null;render();break;
@@ -3893,7 +3923,7 @@
   }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(form.matches('[data-fu-chart-range]')){
@@ -3915,6 +3945,56 @@
     if(form.matches('[data-fu-inbox-form], [data-fu-manual-reply-form]')) { await fuReplySubmit(form,e.submitter);return; }
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
+    if(form.matches('[data-fu-funnel-review]')){
+      const id=String(form.dataset.fuReviewId||'');
+      const unit='habita', snap=state.fu.n?.units?.habita;
+      const data=new FormData(form);
+      const stage=String(data.get('etapa')||'');
+      const situation=String(data.get('situacion')||'');
+      const oldStage=String(form.dataset.fuReviewStage||'');
+      const oldSituation=String(form.dataset.fuReviewSituation||'');
+      const changeStage=Boolean(stage&&stage!==oldStage);
+      const changeSituation=Boolean(situation&&situation!==oldSituation);
+      if(!changeStage&&!changeSituation){toast('No hay cambios para guardar.');return;}
+      if(changeStage&&!F.commercialStages(unit,snap).some(v=>!v.situation&&v.technical?.includes(stage))){
+        toast('La etapa elegida no corresponde al embudo comercial.',true);return;
+      }
+      if(changeSituation&&!Object.prototype.hasOwnProperty.call(snap?.labels?.situations||{},situation)){
+        toast('La situación elegida no es válida.',true);return;
+      }
+      if(changeSituation&&situation.startsWith('recontactar_')&&
+          (stage||oldStage)==='no-contactado'){
+        toast('Recontactar se habilita desde Contactado en adelante.',true);return;
+      }
+      const btn=form.querySelector('button[type="submit"]');
+      if(btn?.disabled)return;
+      if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+      let updated=false;
+      try{
+        if(changeStage){
+          const saved=await fuOp(unit,{op:'stage',inmobiliaria:id,etapa:stage});
+          if(!saved||saved.stage!==stage){toast('No se pudo confirmar la etapa comercial.',true);return;}
+          updated=true;
+        }
+        if(changeSituation){
+          const saved=await fuOp(unit,{op:'situation',inmobiliaria:id,situacion:situation});
+          if(!saved||saved.situation!==situation){toast('No se pudo confirmar la situación.',true);return;}
+          updated=true;
+        }
+        toast('Reclasificación guardada.');
+      }finally{
+        if(updated){
+          if(state.fu.task?.unit===unit&&state.fu.task?.item?.id===id){
+            await fuOp(unit,{op:'release',inmobiliaria:id});
+            state.fu.task=null;
+          }
+          await loadFollowup({quiet:true});
+          render();
+        }
+        if(btn?.isConnected){btn.disabled=false;btn.textContent='Guardar cambios';}
+      }
+      return;
+    }
     const fd = Object.fromEntries(new FormData(form));
     const task = state.fu.task;
     const it = task && task.item;
