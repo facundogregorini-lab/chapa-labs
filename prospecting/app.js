@@ -2113,7 +2113,7 @@
     } finally {
       state.fu.loading = false;
       // Con una tarea abierta no se redibuja: se perdería lo que se está escribiendo.
-      if (!state.fu.task) render(); else renderTopOnly();
+      if (!state.fu.task&&!fuRulesState('habita').dirty&&!fuRulesState('turnia').dirty) render(); else renderTopOnly();
     }
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
@@ -2700,6 +2700,21 @@
   </form>`;
 }
 
+  async function fuRulesMove(unit, from, to) {
+  if(unit!=='habita'||from===to)return;
+  const snap=state.fu.n?.units[unit],ui=fuRulesState(unit);
+  if(!snap||ui.dirty||ui.moving){toast('Guardá los cambios antes de reordenar.',true);return;}
+  const step=F.commercialStages(unit,snap).find(s=>s.key===ui.commercial);
+  const rows=(snap.rules||[]).filter(r=>step?.technical?.includes(r.stage)).sort((a,b)=>Number(a.position??999)-Number(b.position??999)||String(a.key).localeCompare(String(b.key)));
+  const before=rows.map(r=>r.key),start=before.indexOf(from),end=before.indexOf(to);
+  if(start<0||end<0)return;
+  const after=[...before];after.splice(start,1);after.splice(end,0,from);
+  ui.moving=true;
+  const ok=await fuOp('habita',{op:'rule-reorder',before,after},{label:'Orden de reglas actualizado.'});
+  ui.moving=false;
+  if(ok){await loadFollowup({quiet:true});render();}
+}
+
   function fuSecuencias() {
   const n=state.fu.n,unit=fuScope();
   if(unit==='todas'){
@@ -2973,7 +2988,45 @@
       case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); openDrawer(ds.fuAccount); break; }
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
-      case 'rule-edit': state.fu.ruleEdit = ds.fuRule || null; render(); break;
+      case 'rules-stage': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de etapa?'))break;
+        ui.commercial=ds.fuStage;ui.selected=null;ui.creating=false;ui.template=null;ui.technical=null;ui.dirty=false;ui.showMenu=false;render();break;
+      }
+      case 'rules-select': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de regla?'))break;
+        ui.selected=ds.fuKey;ui.creating=false;ui.template=null;ui.dirty=false;ui.showMenu=false;render();break;
+      }
+      case 'rules-add-menu': {const ui=fuRulesState(state.unit);ui.showMenu=!ui.showMenu;render();break;}
+      case 'rules-new': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos?'))break;
+        ui.creating=true;ui.template=null;ui.selected=null;ui.showMenu=false;ui.dirty=false;render();break;
+      }
+      case 'rules-pick': {const ui=fuRulesState(state.unit);ui.showMenu=false;ui.picking=true;render();break;}
+      case 'rules-pick-close': {fuRulesState(state.unit).picking=false;render();break;}
+      case 'rules-template': {
+        const ui=fuRulesState(state.unit);
+        ui.template=ds.fuKey;ui.creating=true;ui.selected=null;ui.picking=false;ui.dirty=false;render();break;
+      }
+      case 'rules-move': {
+        const ui=fuRulesState(state.unit), snap=state.fu.n?.units[state.unit];
+        const step=F.commercialStages(state.unit,snap).find(x=>x.key===ui.commercial);
+        const list=(snap?.rules||[]).filter(r=>step?.technical?.includes(r.stage)).sort((a,b)=>(a.position??999)-(b.position??999)||String(a.key).localeCompare(String(b.key)));
+        const i=list.findIndex(r=>r.key===ds.fuKey),neighbor=list[i+(ds.fuDir==='up'?-1:1)];
+        if(neighbor)await fuRulesMove(state.unit,ds.fuKey,neighbor.key);
+        break;
+      }
+      case 'rules-delete': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty){toast('Guardá o cancelá los cambios antes de eliminar.',true);break;}
+        if(!window.confirm('¿Eliminar esta regla? Se conserva el historial de envíos y métricas.'))break;
+        const result=await fuOp(state.unit,{op:'rule-delete',key:ds.fuKey},{label:'Regla eliminada; historial conservado.'});
+        if(result){ui.selected=null;ui.creating=false;await loadFollowup({quiet:true});render();}
+        break;
+      }
+      case 'rule-edit': state.fu.ruleEdit=ds.fuRule||null;fuRulesState(state.unit).dirty=false;render();break;
       case 'rule-create': state.fu.ruleEdit='__new'; state.fu.ruleDraftStage=ds.fuStage;state.fu.ruleTemplate=null;render(); break;
       case 'version-edit': state.fu.versionEdit = ds.fuVersion || null; render(); break;
       case 'rule-toggle': {
@@ -2987,9 +3040,19 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if(form.matches('[data-fu-turnia-rule-form]')){
+      const fd=new FormData(form);
+      const val={stage:form.dataset.fuStage,name:String(fd.get('name')||''),enabled:fd.has('enabled'),
+        situations:fd.getAll('sit').map(String),days:fd.getAll('days').map(Number),
+        after_hours:Number(fd.get('after_hours')),hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to'))};
+      if(await fuOp('turnia',{op:'rule-save',key:form.dataset.fuStage,valores:val},{label:'Restricciones de Turnia guardadas.'})){
+        fuRulesState('turnia').dirty=false;await loadFollowup({quiet:true});render();
+      }
+      return;
+    }
     if(form.matches('[data-fu-inbox-form], [data-fu-manual-reply-form]')) { await fuReplySubmit(form,e.submitter);return; }
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
@@ -3020,6 +3083,12 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rules-tech]')){
+      const ui=fuRulesState(state.unit);
+      if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos?')){render();return;}
+      ui.technical=e.target.value;ui.dirty=false;render();return;
+    }
     if(e.target.matches('[data-fu-rule-template]')){
       state.fu.ruleTemplate=e.target.value||null;render();return;
     }
@@ -3042,6 +3111,7 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
       clearTimeout(target._t);
