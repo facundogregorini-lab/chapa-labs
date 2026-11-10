@@ -156,3 +156,44 @@ test('Reclassify displays only commercial funnel stages, not internal technical 
   assert.match(markup,/Situación<select/);
   assert.match(markup,/fuSituationOptions\(situations,it\.stage,t\.unit\)/);
 });
+
+test('Mobile task only overrides execution queue, never funnel or other navigation tabs',()=>{
+  assert.doesNotThrow(()=>new vm.Script(app));
+  const start=app.indexOf('  function renderFu() {');
+  const end=app.indexOf('  function fuToolbar(',start);
+  const body=app.slice(start,end);
+  assert.match(body,/const v = fuView\(\)/);
+  assert.match(body,/state\.fu\.task && v==='hoy' && window\.ProspectingWhatsApp/);
+  assert.doesNotMatch(body,/state\.fu\.task && fuView\(\)!=='hoy'/);
+  assert.match(body,/pipeline: fuPipeline/);
+});
+test('Funnel review lists agencies under chart, editable commercial stage and independent situation',()=>{
+  const start=app.indexOf('  function fuFunnelReviewList(');
+  const end=app.indexOf('  function fuNativeChart(',start);
+  assert.ok(start>0 && end>start);
+  const fn=app.slice(start,end);
+  assert.match(fn,/snap\.labels\?\.situations/);
+  assert.match(fn,/F\.commercialStages\('habita',snap\)/);
+  assert.match(fn,/chart\[x\.step\]\?\.label/);
+  assert.match(fn,/data-fu-funnel-review/);
+  assert.match(fn,/data-fu-review-id/);
+  assert.match(fn,/Etapa comercial<select name="etapa"/);
+  assert.match(fn,/Situación<select name="situacion"/);
+  assert.match(fn,/https:\/\/web\.whatsapp\.com\/send\?phone=/);
+  assert.match(app,/fuFunnelReviewList\(snap,rows,focus,chart\)/);
+  assert.match(app,/data-fu="funnel-review-more"/);
+  assert.match(css,/\.os-fu-funnel-review-item>form/);
+});
+test('Funnel review changes submit, wait for verified server receipt, release stale claim',()=>{
+  const start=app.indexOf("document.addEventListener('submit'");
+  const end=app.indexOf("const fd = Object.fromEntries(new FormData(form))",start);
+  const handler=app.slice(start,end);
+  assert.match(handler,/\[data-fu-funnel-review\]/);
+  assert.match(handler,/e\.preventDefault\(\)/);
+  assert.match(handler,/op:'stage',inmobiliaria:id,etapa:stage/);
+  assert.match(handler,/op:'situation',inmobiliaria:id,situacion:situation/);
+  assert.match(handler,/saved\.stage!==stage/);
+  assert.match(handler,/saved\.situation!==situation/);
+  assert.match(handler,/op:'release',inmobiliaria:id/);
+  assert.match(handler,/await loadFollowup\(\{quiet:true\}\)/);
+});
