@@ -39,6 +39,9 @@
       stage: q.stage,
       stageTitle: q.stageTitle || titles[q.stage] || q.stage || '',
       situation: q.situation || '',
+      catalogSituation: q.catalogSituation || null,
+      productSituations: q.productSituations || [],
+      ruleKey: q.ruleKey || null,
       situationLabel: q.situationLabel || (labels.situations && labels.situations[q.situation]) || q.situation || '',
       situationNote: q.situationNote || '',
       // habita.: la acción es una clave («presentacion») con su etiqueta; Turnia manda la etiqueta.
@@ -66,18 +69,96 @@
 
   /** La cola de cada unidad ({ habita: snapshot, turnia: snapshot }) en una sola forma. */
   function normalize(units, now = Date.now()) {
-    const out = { queue: [], scheduled: [], blocked: [], errors: {}, units: {} };
+    const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], errors: {}, units: {} };
     for (const [unit, snap] of Object.entries(units || {})) {
       if (!snap || snap.error) { out.errors[unit] = (snap && snap.error) || 'Sin datos.'; continue; }
       out.units[unit] = snap;
       out.queue.push(...(snap.queue || []).map((q) => item(unit, q, snap, 'cola', now)));
       out.scheduled.push(...(snap.scheduled || []).map((q) => item(unit, q, snap, 'programada', now)));
       out.blocked.push(...(snap.blocked || []).filter((q) => q.stage).map((q) => item(unit, q, snap, 'bloqueada', now)));
+      out.noInteresados.push(...(snap.noInteresados || []).map((q) => item(unit, q, snap, 'cerrada', now)));
+
     }
     out.queue.sort(byPriority);
     out.scheduled.sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
     out.blocked.sort(byPriority);
     return out;
+  }
+
+  /**
+   * Mismo modelo de navegación de Habita: etapa comercial -> pasos técnicos.
+   * Los pasos técnicos nunca se renombran ni mutan en el motor de origen.
+   * Turnia utiliza el mismo gesto/interacción y sus etapas específicas.
+   */
+  const COMMERCIAL = {
+    habita: [
+      ['prospectado', 'Prospectado', ['no-contactado']],
+      ['contactado', 'Contactado', ['no-responde']],
+      ['interesado', 'Interesado', ['sin-demo', 'sin-enviar']],
+      ['demo-enviada', 'Demo enviada', ['no-abrio', 'sin-interaccion', 'sin-cuenta']],
+      ['cuenta-creada', 'Cuenta creada', ['sin-uso']],
+      ['cuenta-activa', 'Cuenta activa', ['sin-suscripcion']],
+      ['cliente', 'Cliente', []],
+    ],
+    turnia: [
+      ['prospectado', 'Prospectado', ['sin-saludo']],
+      ['saludado', 'Saludado', ['saludo-sin-demo']],
+      ['demo-enviada', 'Demo enviada', ['demo-sin-abrir']],
+      ['demo-visitada', 'Demo visitada', ['abrio-sin-conversar']],
+      ['converso', 'Conversó con Sofi', ['converso-sin-cuenta']],
+      ['cuenta-creada', 'Cuenta creada', ['cuenta-sin-actividad']],
+      ['cuenta-activa', 'Cuenta activa', ['activa-sin-pago']],
+      ['cliente', 'Cliente', []],
+    ],
+  };
+
+  function commercialStages(unit, snap) {
+    if (!snap) return [];
+    const funnel = snap.funnel || [];
+    const stageBase = COMMERCIAL[unit] || (snap.stages || []).map(s => [s.key, s.title, [s.key]]);
+    const last = funnel.at(-1);
+    const clientReached = last && last.rate != null ? Math.round(Number(last.reached || 0) * last.rate) : 0;
+    const stages = stageBase.map(([key, title, technical], index) => {
+      const first = funnel.find(s => s.key === technical[0]);
+      const reached = first ? Number(first.reached || 0) : clientReached;
+      const waiting = technical.length
+        ? technical.reduce((n,k)=>n + Number(funnel.find(s=>s.key===k)?.waiting || 0),0) : reached;
+      const nextTechnical = stageBase[index+1]?.[2]?.[0];
+      const nextReached = nextTechnical ? Number(funnel.find(s=>s.key===nextTechnical)?.reached || 0) : null;
+      return { key, title, technical, reached, waiting, rate: nextReached===null || !reached ? null : Math.min(1,nextReached/reached) };
+    });
+    if (unit === 'habita') {
+      for(const s of (snap.catalog?.stages || []))
+        stages.push({ key:s.key, title:s.label, technical:[s.technical_stage],
+          waiting:Number(s.waiting||0), reached:0, rate:null, situation:s.entry_situation });
+    }
+    return stages;
+  }
+
+  /** Misma estructura de inbox en ambas unidades; el texto siempre proviene del motor de origen. */
+  function inboxItems(normalized, scope = 'todas') {
+    if (!normalized) return [];
+    const out=[];
+    for(const [unit,snap] of Object.entries(normalized.units||{})){
+      if(scope!=='todas' && scope!==unit)continue;
+      for(const r of snap.inbox || []){
+        if(unit==='habita')out.push({
+          unit, key:unit+':reply:'+r.id, replyId:r.id, id:r.agency_id,
+          name:r.name||'Inmobiliaria', phone:r.phone||'', stage:r.stage||'',
+          body:r.body||'', receivedAt:r.received_at||'', status:r.status||'pendiente',
+          classification:r.classification||'', confidence:r.confidence,
+          note:r.note||'', situation:r.situation||'', actionable:true,
+        });
+        else out.push({
+          unit, key:unit+':reply:'+r.id, replyId:null, id:r.id,
+          name:r.name||'Contacto', phone:r.phone||'', stage:r.stage||'',
+          body:r.latestReply||r.situationNote||'', receivedAt:r.latestReplyAt||r.lastContactAt||r.since||'',
+          status:'pendiente', classification:r.situation||'', confidence:null,
+          note:r.situationNote||'', situation:r.situation||'', actionable:true,
+        });
+      }
+    }
+    return out.sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)));
   }
 
   /** Prioridad, grupo, lo que nadie tomó, los que pagan anuncios y los que esperan hace más. */
@@ -237,5 +318,5 @@
     return { unit, never: false, at: r.at, trigger: r.trigger || '', totals: r.totals || {}, lines, pending };
   }
 
-  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });

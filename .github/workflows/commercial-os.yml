@@ -1,0 +1,33 @@
+name: Commercial OS - smoke tests
+on:
+  push:
+    branches: [main, 'feat/followup-interaction-parity-20261109']
+    paths:
+      - 'prospecting/**'
+      - 'api/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/commercial-os.yml'
+  pull_request:
+    paths:
+      - 'prospecting/**'
+      - 'api/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/commercial-os.yml'
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
