@@ -69,3 +69,17 @@ test('Desktop original table and next action stay available',()=>{
   assert.match(app,/data-testid="fu-confirm-mobile"/);
   assert.match(css,/\.os-fu-mobile-list\{display:none\}/);
 });
+
+test('Execution hides legacy menu and presents compact reclasificar action',()=>{
+  assert.match(app,/document\.body\.dataset\.executing = state\.fu\?\.task/);
+  assert.match(app,/state\.fu\?\.task \? '' : legacy\.map/);
+  assert.doesNotMatch(app,/Soltar sin hacer nada/);
+  assert.match(app,/data-testid="fu-reclassify"/);
+  assert.match(app,/data-testid="fu-reclassify-open">Reclasificar/);
+  assert.match(app,/data-fu-change-stage/);
+  assert.match(app,/data-fu-change-situation/);
+  assert.match(app,/op:'stage',inmobiliaria:it\.id,etapa:fd\.etapa/);
+  assert.match(app,/op:'situation',inmobiliaria:it\.id,situacion:fd\.situacion/);
+  assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
+  assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
+});

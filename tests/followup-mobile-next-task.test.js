@@ -14,7 +14,7 @@ test('mobile execution provides distinct Confirmar envío and Siguiente tarea CT
   assert.match(app, /data-testid="fu-next-mobile"/);
   assert.match(app, /data-fu="next-after" data-testid="fu-next-mobile"/);
   assert.match(app, /Siguiente tarea →/);
-  assert.match(app, /Si no enviaste el mensaje, esta tarea queda libre sin marcarla como enviada/);
+  assert.match(app, /data-testid="fu-reclassify-open">Reclasificar/);
   assert.match(css, /\.os-fu-mobile-send \.os-fu-mobile-next\s*\{/);
   assert.match(css, /min-height:50px/);
 });
