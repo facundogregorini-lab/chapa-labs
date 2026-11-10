@@ -83,3 +83,16 @@ test('Execution hides legacy menu and presents compact reclasificar action',()=>
   assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
   assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
 });
+
+test('Mobile stage icon cards remain intact and only lower filters collapse',()=>{
+  assert.match(app,/data-testid="followup-reference-stage-cards"/);
+  assert.match(app,/fuStageGlyph\('todas'\)/);
+  assert.match(app,/commercialStages\.map\(s=>/);
+  assert.match(app,/class="os-fu-situation-picker"/);
+  assert.match(app,/class="os-fu-mobile-advanced"/);
+  assert.match(app,/Buscar y filtrar/);
+  assert.match(app,/data-fu="claim"/);
+  assert.match(app,/data-testid="fu-mobile-execute"/);
+  assert.match(css,/\.os-fu-mobile-advanced \[data-testid="fu-take-next"\]\{display:none!important\}/);
+  assert.match(css,/\.os-fu-mobile-list\{padding-top:3px!important\}/);
+});
