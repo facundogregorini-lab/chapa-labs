@@ -197,3 +197,19 @@ test('Funnel review changes submit, wait for verified server receipt, release st
   assert.match(handler,/op:'release',inmobiliaria:id/);
   assert.match(handler,/await loadFollowup\(\{quiet:true\}\)/);
 });
+
+test('WhatsApp opens one named tab without noopener and permits no-text mode',()=>{
+  assert.match(app,/window\.open\(u\.href,'habita-followup-whatsapp'\)/);
+  assert.match(app,/u\.searchParams\.delete\('text'\)/);
+  assert.match(app,/data-testid="fu-open-without-text"/);
+  assert.doesNotMatch(app,/target="chapa-whatsapp" rel="noopener"/);
+  assert.match(app,/data-fu="open-native"/);
+});
+
+test('Handoff moves execution to Facu or Axel via durable API operation',()=>{
+  assert.match(app,/data-testid="fu-handoff"/);
+  assert.match(app,/data-fu="handoff-facu"/);
+  assert.match(app,/data-fu="handoff-axel"/);
+  assert.match(app,/op:'handoff',inmobiliaria:it\.id,para:to/);
+  assert.match(app,/Tarea pasada a/);
+});
