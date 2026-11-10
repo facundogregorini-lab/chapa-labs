@@ -451,7 +451,12 @@ async function doFollowup(req, res) {
   await Promise.all(want.map(async (unit) => {
     if (!unit.api || !apiOf(unit)) { out[unit.id] = { error: `Falta la clave de la API de ${unit.name} (${(unit.api && unit.api.secretEnvs || []).join(' o ')}).` }; return; }
     try {
-      out[unit.id] = await callApi(unit, { query: { vista: 'followup' }, timeout: 45000 });
+      const chartParams=unit.id==='habita'?{
+        periodo: ['hoy','7','30','mes','todo'].includes(req.query.periodo)?req.query.periodo:'todo',
+        ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.desde||'')?{desde:req.query.desde}:{}),
+        ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta||'')?{hasta:req.query.hasta}:{}),
+      }:{};
+      out[unit.id] = await callApi(unit, { query: { vista: 'followup', ...chartParams }, timeout: 45000 });
     } catch (err) {
       out[unit.id] = { error: err.status === 404 || err.status === 400 ? `${unit.name} todavía no tiene la cola de Follow-up publicada.` : err.message };
     }
