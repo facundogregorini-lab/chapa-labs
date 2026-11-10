@@ -141,6 +141,7 @@
     if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
   function go(unit, view, { replace } = {}) {
+    if (unit!==state.unit && state.fu?.queueView) state.fu.queueView={...state.fu.queueView,commercial:null,situation:null,rule:null,tech:null,closed:false,limit:25};
     if (unit !== state.unit && window.ProspectingAgencies && unit !== 'todas')
       state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
     state.unit = unit;
@@ -2129,7 +2130,7 @@
 
   function fuFind(key) {
     const n = state.fu.n;
-    return n ? [...n.queue, ...n.scheduled, ...n.blocked].find((x) => x.key === key) : null;
+    return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.noInteresados||[])].find((x) => x.key === key) : null;
   }
 
   async function fuClaim(it) {
@@ -2143,12 +2144,18 @@
   }
 
   async function fuNext() {
-    const cur = state.fu.task && state.fu.task.item && state.fu.task.item.key;
-    state.fu.task = null;
-    await loadFollowup({ quiet: true });
-    const me = state.session && state.session.user && state.session.user.name;
-    const next = F.filter(state.fu.n ? state.fu.n.queue : [], { unit: fuScope(), owner: state.fu.f.owner, priority: state.fu.f.priority, group: state.fu.f.group })
-      .find((x) => x.key !== cur && (!x.claim || x.claim.by === me));
+    const previous=state.fu.task;
+    const cur=previous?.item?.key;
+    // No dejar un claim abierto al pasar al siguiente (es distinto a confirmar un envío).
+    if(previous?.mode==='ejecutar'){
+      const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
+      if(!released)return;
+    }
+    state.fu.task=null;
+    await loadFollowup({quiet:true});
+    const me=state.session?.user?.name;
+    const next=fuQueueSelection(fuScope()).rows
+      .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me));
     if (next) await fuClaim(next);
     else { toast('No quedan tareas libres en la cola.'); render(); }
   }
@@ -2630,6 +2637,21 @@
     const fields = () => ({ ...F.taskFields(it), ...(task.versionId ? { version: task.versionId } : {}), ...(task.actionKey ? { tarea: task.actionKey } : {}), ...(task.stage ? { etapa: task.stage } : {}) });
     switch (ds.fu) {
       case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); go(state.unit, state.fu.sub); break;
+      case 'queue-stage': {
+        const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
+      }
+      case 'queue-kpi': {
+        const q=fuQueueState();
+        if(ds.fuKpi==='respuestas'&&q.kpi==='respuestas'&&state.unit!=='todas'){go(state.unit,'responder');break;}
+        q.kpi=ds.fuKpi;q.group=null;q.closed=false;q.limit=25;render();break;
+      }
+      case 'queue-situation': {
+        const q=fuQueueState();q.situation=ds.fuSituation||null;q.limit=25;render();break;
+      }
+      case 'queue-closed': {
+        const q=fuQueueState();q.closed=ds.fuClosed==='1';q.rule=null;q.group=null;q.situation=null;q.limit=25;render();break;
+      }
+      case 'queue-more': fuQueueState().limit+=25;render();break;
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
       case 'catalog-stage': state.fu.catalogStage=ds.fuStage;state.fu.catalogEdit=null;state.fu.newStage=false;render();break;
@@ -2659,7 +2681,11 @@
       }
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
       case 'next': await fuNext(); break;
-      case 'back': state.fu.task = null; render(); loadFollowup({ quiet: true }); break;
+      case 'back':
+        if(task?.mode==='ejecutar'){
+          if(!await fuOp(task.unit,{op:'release',inmobiliaria:it.id},{label:'Tarea liberada sin confirmar envío.'}))break;
+        }
+        state.fu.task=null;render();loadFollowup({quiet:true});break;
       case 'release': if (await fuOp(task.unit, { op: 'release', inmobiliaria: it.id }, { label: 'Quedó libre.' })) { state.fu.task = null; loadFollowup(); } break;
       case 'copy': copy(task.messages[Number(ds.fuIndex)] || task.message); break;
       case 'open':
@@ -2729,11 +2755,20 @@
   }, true);
   document.addEventListener('change', (e) => {
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+    if(e.target.matches('[data-fu-queue-select]')){
+      const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
+    }
   });
   document.addEventListener('toggle', (e) => {
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
+    if(e.target.matches('[data-fu-queue-search]')){
+      const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
+      clearTimeout(target._t);
+      target._t=setTimeout(()=>{const pos=target.selectionStart;render();const next=$('[data-fu-queue-search]');if(next){next.focus();next.setSelectionRange(pos,pos)}},230);
+      return;
+    }
     if (!e.target.matches('[data-fu-search]')) return;
     state.fu.f.q = e.target.value;
     clearTimeout(e.target._t);
