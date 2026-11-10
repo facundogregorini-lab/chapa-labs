@@ -2765,7 +2765,9 @@
     min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?(tpl?.min_demo_activity_level||0):0,
     position:defaults.position,
     name:tpl?.name?`Copia de ${tpl.name}`.slice(0,80):''};
-  const stageCommercial=F.commercialStages(unit,snap).find(s=>s.technical.includes(key))?.key;
+  const commercialStep=F.commercialStages(unit,snap).find(s=>s.technical.includes(key));
+  const stageCommercial=commercialStep?.key;
+  const availableTechnical=commercialStep?.technical||[key];
   const overrides=(snap.catalog?.overrides||[]).filter(s=>s.commercial_stage===stageCommercial&&s.removed);
   const labels=Object.entries(snap.labels?.situations||{}).filter(([s])=>{
     const cat=snap.catalog?.canonical?.find(x=>x.key===s);
@@ -2787,7 +2789,11 @@
     </header>
     <section class="fu-ref-when" data-testid="followup-part-when"><h3>◷ CUÁNDO SE EJECUTA</h3>
       ${create&&tpl?'<p class="os-warn-note">Regla copiada: revisá y adaptá la situación, el mensaje y la etapa antes de guardarla.</p>':''}
-      <label class="field"><span>ETAPA DEL EMBUDO</span><input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled></label>
+      <label class="field"><span>ETAPA DEL EMBUDO</span>
+        ${create?`<select class="input" data-fu-rules-tech aria-label="Etapa del embudo de la regla">
+          ${availableTechnical.map(stageKey=>`<option value="${esc(stageKey)}" ${stageKey===key?'selected':''}>${esc(snap.stages?.find(x=>x.key===stageKey)?.title||stageKey)}</option>`).join('')}
+        </select>`:`<input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled><small>Para moverla a otra etapa, creá otra regla y conservá el historial.</small>`}
+      </label>
       ${invalidCatalog?'<p class="os-warn-note" role="alert">Esta situación personalizada no está disponible en la etapa elegida. Seleccioná otra o quitá la condición antes de guardar.</p>':''}
       <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span><div class="fu-ref-classifiers" data-testid="followup-rule-situations">
         ${labels.map(([id,label])=>`<label><input type="checkbox" name="sit" value="${esc(id)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled title="Esta etapa no admite encuesta de cierre"':''}><span>${esc(label)}</span></label>`).join('')}
@@ -2887,7 +2893,7 @@
   function fuRulesState(unit) {
   state.fu.rulesWorkspace ||= {};
   return state.fu.rulesWorkspace[unit] ||= {
-    commercial: 'prospectado',
+    commercial: 'contactado',
     selected: null, creating: false, template: null, showMenu: false, picking: false,
     technical: null, dirty: false, moving: false,
   };
@@ -3063,7 +3069,6 @@
         <details class="fu-ref-classifier-link"><summary>Administrar clasificaciones de WhatsApp</summary><p class="os-view-caption">Las situaciones existentes y personalizadas se configuran en el mismo catálogo por etapa.</p><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></details>
       </aside>
       <div class="fu-ref-detail" data-testid="followup-rule-detail">
-        ${ui.creating && tech.length>1?`<div class="card glass fu-ref-step-switch"><label class="field"><span>PASO TÉCNICO DE LA REGLA</span><select class="input" data-fu-rules-tech>${tech.map(key=>`<option value="${esc(key)}" ${stage===key?'selected':''}>${esc(snap.stages.find(s=>s.key===key)?.title||key)}</option>`).join('')}</select></label></div>`:''}
         ${form}
         ${message}
         ${preview}
