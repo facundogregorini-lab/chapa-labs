@@ -17,6 +17,8 @@
 const google = require('./_google');
 const authFetch = require('./_authfetch');
 const session = require('./_session');
+const { createFollowupCache } = require('./_followup-cache');
+const followupCache = createFollowupCache();
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
 
@@ -445,6 +447,7 @@ async function doSetup(req, res, user) {
 const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search']);
 
 async function doFollowup(req, res) {
+  const startedAt = Date.now();
   const want = req.query.unit && req.query.unit !== 'todas' ? [UNITS[req.query.unit]].filter(Boolean) : Object.values(UNITS);
   if (!want.length) return fail(res, 404, 'No existe esa unidad.');
   const out = {};
@@ -456,11 +459,19 @@ async function doFollowup(req, res) {
         ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.desde||'')?{desde:req.query.desde}:{}),
         ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta||'')?{hasta:req.query.hasta}:{}),
       }:{};
-      out[unit.id] = await callApi(unit, { query: { vista: 'followup', ...chartParams }, timeout: 45000 });
+      const cacheKey = unit.id + '|' + new URLSearchParams(chartParams).toString();
+      const result = await followupCache.get(cacheKey,
+        () => callApi(unit, { query: { vista: 'followup', ...chartParams }, timeout: 20_000 }));
+      out[unit.id] = {
+        ...result.data,
+        __freshness: { stale: result.source === 'stale', ageMs: result.ageMs, source: result.source },
+        ...(result.warning ? { __warning: result.warning } : {}),
+      };
     } catch (err) {
       out[unit.id] = { error: err.status === 404 || err.status === 400 ? `${unit.name} todavía no tiene la cola de Follow-up publicada.` : err.message };
     }
   }));
+  res.setHeader('Server-Timing', 'followup;dur=' + (Date.now() - startedAt));
   return res.status(200).json({ units: out, readAt: new Date().toISOString() });
 }
 
@@ -492,6 +503,8 @@ async function doTask(req, res, user) {
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
     const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: f.op === 'whatsapp-sync' || f.op === 'whatsapp-search' ? 280000 : 45000 });
+    if (f.op !== 'queue' && f.op !== 'replies' && f.op !== 'whatsapp-search')
+      followupCache.invalidate(unit.id + '|');
     return res.status(200).json({ result: out });
   } catch (err) {
     return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);

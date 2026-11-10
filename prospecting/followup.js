@@ -76,11 +76,33 @@
     };
   }
 
+  /**
+   * Preserve a previously verified snapshot only when a transient upstream error
+   * occurs. The caller limits the previous snapshot's age before passing it in.
+   * No fabricated queue or empty catalog is ever substituted for a failed read.
+   */
+  function mergeUnits(previous, incoming) {
+    const next = { ...(previous || {}) };
+    for (const [unit, snapshot] of Object.entries(incoming || {})) {
+      if (snapshot?.error && next[unit] && !next[unit].error) {
+        next[unit] = {
+          ...next[unit],
+          __warning: snapshot.error,
+          __freshness: { stale: true, source: 'previous', ageMs: null },
+        };
+      } else {
+        next[unit] = snapshot;
+      }
+    }
+    return next;
+  }
+
   /** La cola de cada unidad ({ habita: snapshot, turnia: snapshot }) en una sola forma. */
   function normalize(units, now = Date.now()) {
     const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], errors: {}, units: {} };
     for (const [unit, snap] of Object.entries(units || {})) {
       if (!snap || snap.error) { out.errors[unit] = (snap && snap.error) || 'Sin datos.'; continue; }
+      if (snap.__warning) out.errors[unit] = 'Mostrando datos anteriores (no actualizados): ' + snap.__warning;
       out.units[unit] = snap;
       out.queue.push(...(snap.queue || []).map((q) => item(unit, q, snap, 'cola', now)));
       out.scheduled.push(...(snap.scheduled || []).map((q) => item(unit, q, snap, 'programada', now)));
@@ -330,5 +352,5 @@
     return { unit, never: false, at: r.at, trigger: r.trigger || '', totals: r.totals || {}, lines, pending };
   }
 
-  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });
