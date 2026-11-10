@@ -2162,9 +2162,25 @@
   }
 
   // ── Las vistas ──
+  function fuTaskWithQueue(t) {
+  const scope=t.unit,rows=fuQueueSelection(scope).rows;
+  const selected=t.item;
+  return `<section class="os-fu-task-layout" data-testid="followup-task-context">
+    <aside class="os-fu-task-sidebar"><span class="os-kicker">COLA DE EJECUCIÓN · ${esc(fuName(scope).toUpperCase())}</span>
+      <h2 style="margin:8px 0 3px">Trabajá sin perder el contexto.</h2>
+      <p>La tarea seleccionada queda a la vista. Para cambiar a otra, liberá primero la toma o confirmá la acción.</p>
+      <div class="os-fu-reply-bubble"><strong>${esc(selected.name||t.name)}</strong>
+        <small>${esc(selected.stageTitle||'')} · ${esc(selected.situationLabel||'')}</small></div>
+      <h3 style="font-size:12px;margin:17px 0 6px">Siguientes acciones</h3><ul>
+        ${rows.slice(0,12).map(x=>`<li class="${x.key===selected.key?'is-on':''}"><b>${esc(x.name)}</b>
+          <small>${esc(x.action||'Sin acción')} · ${esc(x.situationLabel||'')}</small></li>`).join('')||'<li>La cola no tiene otras acciones libres.</li>'}
+      </ul>
+    </aside><div class="os-fu-task-detail">${renderFuTask(t)}</div></section>`;
+}
+
   function renderFu() {
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
-    if (state.fu.task) return renderFuTask(state.fu.task);
+    if (state.fu.task) return fuTaskWithQueue(state.fu.task);
     const v = fuView();
     const sub = '';
     if (!state.fu.n) {
@@ -2461,7 +2477,7 @@
   const selectedSituation=state.fu.pipelineSituation||selected?.situation||null;
   const all=[...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope);
   const matchStage=x=>selected?.technical?.includes(x.stage)&&(!selected.situation||selected.situation===x.situation);
-  const situationRows=all.filter(matchStage&&(x=>true));
+  const situationRows=all.filter(matchStage);
   const canonical=Object.entries(snap.labels?.situations||{});
   const hidden=(snap.catalog?.overrides||[]).filter(o=>o.commercial_stage===selected?.key&&o.removed);
   const situations=canonical.filter(([key])=>!hidden.some(h=>h.key===key)).map(([key,label])=>({key,label}));
