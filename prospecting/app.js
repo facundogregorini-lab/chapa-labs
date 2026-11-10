@@ -494,11 +494,12 @@
 }
 
   async function submitCatalog(form) {
-  if(state.unit!=='habita')return;
+  const unit=state.unit;
+  if(!['habita','turnia'].includes(unit)||state.session?.open||!state.fu.n?.units?.[unit]?.catalog?.available)return;
   const fd=new FormData(form);
   if(form.matches('[data-fu-stage-form]')){
     const values={label:String(fd.get('label')||''),technical_stage:fd.get('technical_stage'),entry_situation:fd.get('entry_situation')};
-    if(await fuOp('habita',{op:'stage-create',valores:values},{label:'Etapa creada en Habita.'})){
+    if(await fuOp(unit,{op:'stage-create',valores:values},{label:'Etapa creada en '+fuName(unit)+'.'})){
       state.fu.newStage=false;await loadFollowup({quiet:true});render();
     }
   } else if(form.matches('[data-fu-state-form]')){
@@ -510,7 +511,7 @@
       maps_to:isBase||fd.get('source')==='product'?null:(fd.get('maps_to')||null),
       product_stage:isBase||fd.get('source')!=='product'?null:(fd.get('product_stage')||null),
       active:isBase?true:fd.has('active')};
-    if(await fuOp('habita',{op:'state-save',valores:values},{label:'Situación guardada en Habita.'})){
+    if(await fuOp(unit,{op:'state-save',valores:values},{label:'Situación guardada en '+fuName(unit)+'.'})){
       state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();
     }
   }
