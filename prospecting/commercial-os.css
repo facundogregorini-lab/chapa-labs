@@ -477,3 +477,37 @@ body[data-unit="turnia"] { --accent:#138378; }
 @media(max-width:760px){.fu-ref-stage-head{display:block}.fu-ref-flowrow{padding:10px}.fu-ref-flowstep{flex:0 0 130px}.fu-ref-rule-list{gap:9px}.fu-ref-fields{grid-template-columns:1fr}.fu-ref-list{padding:11px}.fu-ref-detail .fu-ref-editor,.fu-ref-detail [data-fu-rule-form]{padding:15px}.os-fu-queue-grid{display:flex;flex-direction:column}.os-fu-queue-grid>.os-fu-side{order:-1;width:100%}.os-fu-queue-grid>.os-fu-tablecard{width:100%}}
 :root[data-theme="dark"] :is(.fu-ref-flowrow,.fu-ref-stage-head,.fu-ref-list,.fu-ref-rule,.fu-ref-message,.fu-ref-version,.fu-ref-detail [data-fu-rule-form],.fu-ref-editor,.os-fu-side){background:#1b3426;color:#e2f3e4;border-color:#355642}
 :root[data-theme="dark"] :is(.fu-ref-stage-title h2,.fu-ref-rule-label strong,.fu-ref-edit-head h3,.os-fu-side-ident h3){color:#e3f5e6}
+
+
+/* Habita RuleEditor: internal conditions/message columns and anchored footer. */
+.fu-ref-detail{grid-template-columns:minmax(285px,.9fr) minmax(360px,1.1fr);align-items:start;gap:13px}
+.fu-ref-detail>.fu-ref-rule-form{grid-column:1}
+.fu-ref-detail>.fu-ref-message{grid-column:2}
+.fu-ref-detail>.fu-ref-step-switch,.fu-ref-detail>.fu-ref-buttons,.fu-ref-detail>.os-warn-note{grid-column:1/-1}
+.fu-ref-detail>.fu-ref-editor:not(.fu-ref-rule-form){grid-column:1}
+.fu-ref-rule-form{display:grid;gap:13px;padding:17px!important}
+.fu-ref-rule-form header{display:flex;justify-content:space-between;gap:10px;align-items:start}
+.fu-ref-titleline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fu-ref-titleline .field{flex:1;min-width:160px}
+.fu-ref-titleline .input{border:0;border-bottom:1px solid #dce6df;border-radius:0;font-size:16px;font-weight:800;color:#1e4830;padding:6px 3px;background:transparent}
+.fu-ref-titleline .input:focus-visible{border-color:#2f9260;outline:2px solid #8ccea3}
+.fu-ref-when,.fu-ref-what{display:grid;gap:13px;background:#f8fbf8;border:1px solid #e1eae2;padding:15px;border-radius:13px}
+.fu-ref-when h3,.fu-ref-what h3{font-size:13px;font-weight:800;color:#28563c;margin:0}
+.fu-ref-when .field,.fu-ref-what .field{display:grid;gap:5px}
+.fu-ref-when .field>span,.fu-ref-what .field>span{font-size:10.5px;font-weight:800;color:#526d57}
+.fu-ref-rule-form .fu-ref-buttons{border-top:1px solid #e2ebe3;padding-top:14px;margin:0}
+.fu-ref-rule-form .fu-ref-classifiers>label{border-radius:9px;padding:7px 9px}
+.fu-ref-rule-form .fu-ref-classifiers{gap:5px}
+.fu-ref-rule-form .fu-ref-classifiers input{accent-color:#218655}
+.fu-ref-rule-form .fu-ref-fields{grid-template-columns:minmax(140px,1fr) minmax(130px,1fr)}
+.fu-ref-hours{display:flex;align-items:center;gap:8px}
+.fu-ref-hours input{width:min(85px,43%)}
+.fu-ref-wait{display:flex;align-items:center;gap:8px}
+.fu-ref-wait input{width:100px}
+.fu-ref-wait small{font-size:10px;color:#718874}
+.fu-ref-rule.drag-target{border-color:#23a36b!important;box-shadow:inset 0 3px #2e9b62;background:#e4f7e9}
+.fu-ref-rule[draggable="true"]{cursor:grab}
+.fu-ref-rule[draggable="true"]:active{cursor:grabbing}
+@media(max-width:1550px){.fu-ref-detail{grid-template-columns:1fr}.fu-ref-detail>.fu-ref-rule-form,.fu-ref-detail>.fu-ref-message{grid-column:1}}
+@media(max-width:760px){.fu-ref-rule-form .fu-ref-fields{grid-template-columns:1fr}.fu-ref-rule-form{padding:13px!important}}
+:root[data-theme="dark"] .fu-ref-when,:root[data-theme="dark"] .fu-ref-what{background:#203c2c;border-color:#376144}
