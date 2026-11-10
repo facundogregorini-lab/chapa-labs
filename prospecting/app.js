@@ -3162,10 +3162,45 @@
   if(ok){await loadFollowup({quiet:true});render();}
 }
 
+  // Update versions and preview without rerendering the full rule form.
+  function syncFuLinkedRulePanel(form) {
+    if(!form||!state.fu.n?.units?.habita)return;
+    const action=form.querySelector('[data-fu-rule-action]')?.value||'principal';
+    const previous=form.dataset.fuRenderedAction||action;
+    if(action===previous)return;
+    const message=main.querySelector('[data-testid="followup-rule-message"]');
+    const changed=message&&[...message.querySelectorAll('textarea')].some(el=>el.value!==el.defaultValue&&el.value.trim());
+    if(changed&&!window.confirm('Hay texto sin guardar en el mensaje. ¿Cambiar la acción y descartar ese borrador?')){
+      form.querySelector('[data-fu-rule-action]').value=previous;
+      return;
+    }
+    const snap=state.fu.n.units.habita;
+    const ui=fuRulesState('habita'),stage=form.dataset.fuStage;
+    const original=(snap.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
+    const updated={...(original||{}),action};
+    state.fu.previewVersion=null;
+    const versions=F.versionRows('habita',snap).filter(v=>v.stage===stage&&v.action===action)
+      .sort((a,b)=>Number(b.version)-Number(a.version));
+    const picker=form.querySelector('[data-fu-rule-version]');
+    if(picker){
+      picker.replaceChildren();
+      const active=versions.find(v=>v.status==='active')||versions[0];
+      if(versions.length) for(const v of versions)
+        picker.add(new Option('V'+v.version+' ('+(v.status==='active'?'activa':v.status==='test'?'en prueba':'archivada')+')',v.id,false,v.id===active?.id));
+      else picker.add(new Option('Sin versiones',''));
+      picker.disabled=!versions.length;
+    }
+    if(message)message.outerHTML=fuRulesMessage('habita',snap,updated,stage,ui.creating);
+    const preview=main.querySelector('[data-testid="followup-preview"]');
+    if(preview)preview.outerHTML=fuRulePreview('habita',snap,updated,stage,ui.creating);
+    form.dataset.fuRenderedAction=action;
+  }
+
   function fuRulePreview(unit,snap,rule,stage,create) {
   const action=unit==='turnia'?'principal':rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
-  const active=versions.find(v=>v.status==='active')||versions[0];
+  const active=versions.find(v=>v.id===state.fu.previewVersion)
+    ||versions.find(v=>v.status==='active')||versions[0];
   const sample=[...state.fu.n.queue,...state.fu.n.scheduled].find(x=>x.unit===unit&&x.stage===stage&&x.action);
   const org=unit==='habita'?'Inmobiliaria de ejemplo':'Consultorio de ejemplo';
   const name=sample?.shortName||sample?.name||org;
