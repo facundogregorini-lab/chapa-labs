@@ -26,9 +26,9 @@ test('No se pierde el comportamiento de actividad del producto ni reglas por sit
     'fu-catalog-rule-count','data-fu-catalog-source'])
     assert.ok(app.includes(marker),marker);
 });
-test('Catálogo y lectura son responsive, y los controles se ocultan sin acceso protegido',()=>{
+test('Catálogo responsive: Habita experimental editable, Turnia protegido',()=>{
   for(const marker of ['.fu-catalog-layout','.fu-catalog-nav','.fu-catalog-toggle',
     '.fu-catalog-icon-btn','@media(max-width:850px)'])
     assert.ok(css.includes(marker),marker);
-  assert.match(app,/db\.available===true&&!state\.session\?\.open/);
+  assert.match(app,/db\.available===true&&\(unit==='habita'\|\|!state\.session\?\.open\)/);
 });
