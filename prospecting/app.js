@@ -1076,6 +1076,37 @@
     return { row, a, options, picked, text, parts, open, lineOk, demo, digits, waUrl: digits ? C.waWebLink(a.phone, parts[0] || text) : '', demoUrl: (u.demoLink && u.demoLink(a)) || '' };
   }
 
+  // Buscar en el historial de WhatsApp (Turnia): la lectura diaria guarda solo el último mensaje de cada
+  // chat; esto le pide a Turnia que lea los últimos 100 de cada uno en las dos líneas. Solo lee.
+  // En el modo ejemplo se busca en lo último que escribió cada uno (los datos de ejemplo no tienen historial).
+  function demoHistory(q) {
+    const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const terms = [...new Set(fold(q).split(/[\s,|]+/).filter((t) => t.length >= 3))];
+    const matches = [];
+    for (const a of (state.data[state.unit] || {}).accounts || []) {
+      for (const c of a.chats || []) if (c.inText && !C.isAutomaticReply(c.inText) && terms.some((t) => fold(c.inText).includes(t))) matches.push({ code: a.id, name: a.name, line: c.line, at: c.inAt, text: c.inText });
+    }
+    const chats = {};
+    for (const a of (state.data[state.unit] || {}).accounts || []) for (const c of a.chats || []) chats[c.line] = (chats[c.line] || 0) + 1;
+    return { query: q, terms, lines: Object.keys(chats).sort().map((line) => ({ line, status: 'ok', chats: chats[line], read: chats[line] })), matches: matches.sort((x, y) => String(y.at).localeCompare(String(x.at))) };
+  }
+  function historySearchHtml() {
+    const h = state.hist || (state.hist = { q: 'precio costo cuanto valor', busy: false, result: null, unit: null });
+    const r = h.unit === state.unit ? h.result : null;
+    const people = r ? new Set(r.matches.map((m) => m.code)).size : 0;
+    const lineInfo = r ? r.lines.map((l) => `${l.line}: ${l.status === 'ok' ? `${int(l.read)} de ${int(l.chats)} chats` : esc(l.problem || 'sin configurar')}`).join(' · ') : '';
+    const rows = r ? r.matches.map((m) => {
+      const a = findAccount(m.code, state.unit);
+      return `<div class="arow" data-testid="history-match" data-account-id="${esc(m.code)}" data-line="${esc(m.line)}" data-open-account="${esc(a ? a.id : '')}" tabindex="0" role="button"><div class="who"><strong>${esc(m.name)}</strong><div class="meta"><span>${esc(when(m.at))}</span><span class="badge plain">${esc(m.line)}</span>${a ? `<span>${esc(unitOf(state.unit).stageLabel(a.stage))}</span>` : ''}</div><div class="meta" style="white-space:pre-wrap">«${esc(m.text)}»</div></div></div>`;
+    }).join('') : '';
+    return `<section class="card glass" data-testid="history-search">
+        <form data-history-search>
+          <strong>Buscar en el historial de WhatsApp</strong> <span class="sub">· lo que escribieron en las dos líneas, en los últimos 100 mensajes de cada chat (sin las respuestas automáticas). Palabras separadas por espacios: alcanza con que aparezca una.</span>
+          <div class="btns" style="margin-top:8px"><input class="input" type="search" name="q" value="${esc(h.q)}" aria-label="Palabras a buscar en el historial" data-testid="history-q" style="flex:1 1 220px" ${h.busy ? 'disabled' : ''}><button class="btn" type="submit" ${h.busy ? 'disabled' : ''}>${h.busy ? 'Leyendo los chats…' : 'Buscar'}</button></div>
+        </form>
+        ${r ? `<p class="sub" style="margin:10px 0 6px" data-testid="history-summary">${r.matches.length ? `${int(people)} ${people === 1 ? 'persona' : 'personas'} · ${int(r.matches.length)} ${r.matches.length === 1 ? 'mensaje' : 'mensajes'}` : 'Nadie escribió esas palabras'} · ${lineInfo}</p><div class="rows">${rows}</div>` : ''}
+      </section>`;
+  }
   function renderResponder(id) {
     const u = unitOf(id);
     const d = state.data[id];
@@ -1110,6 +1141,7 @@
       ${bots.length ? `<details class="card glass" data-testid="reply-bots"><summary><strong>Respuestas automáticas</strong> <span class="count num">${bots.length}</span> <span class="sub">· el bot del consultorio contestó, no una persona: no cuentan como «Respondió» y no se contestan.</span></summary>
         <div class="rows">${bots.map((r) => `<div class="arow" data-testid="reply-bot" data-account-id="${esc(r.a.id)}" data-state="bot" data-phone="${esc(C.waDigits(r.a.phone))}" data-line="${esc(r.lines.join(' '))}" data-open-account="${esc(r.a.orphan ? '' : r.a.id)}" tabindex="0" role="button"><div class="who"><strong>${esc(r.a.name)}</strong><div class="meta"><span>${esc(when(r.inbound.at))}</span>${r.lines.map((l) => `<span class="badge plain">${esc(l)}</span>`).join('')}</div><div class="meta" style="white-space:pre-wrap">«${esc(r.inbound.text)}»</div></div></div>`).join('')}</div>
         <p class="sub" style="margin:8px 0 0">${u.inbox === 'bandeja' ? 'Siguen en la bandeja de habita.: clasificalas ahí.' : 'La próxima lectura de WhatsApp las corrige sola en Turnia (vuelven a «Contactado» con su seguimiento).'}</p></details>` : ''}
+      ${u.inbox !== 'bandeja' ? historySearchHtml() : ''}
       <section class="card glass">
         <details><summary><strong>Instrucciones para el agente de IA · Responder</strong> <span class="sub">· distintas de las de Enviar: acá se contesta en cualquier orden</span></summary>
           <pre class="tpl" data-testid="reply-instructions" style="margin-top:10px">${esc(replyInstructions(u))}</pre>
@@ -2504,7 +2536,7 @@
         <span class="os-fu-conv-text">«${esc(r.body||'Mensaje sin texto guardado')}»</span>
         <span class="os-fu-conv-status">${esc(r.status==='facu'?'PARA FACU':opts[r.classification]||r.classification||'SIN CLASIFICAR')}</span>
       </button>`).join('')||'<p class="empty">No hay respuestas pendientes.</p>'}
-    </div><div class="os-fu-reply-detail" data-testid="followup-reply-detail">${item}</div></section>`;
+    </div><div class="os-fu-reply-detail" data-testid="followup-reply-detail">${item}</div></section>${scope==='turnia'?historySearchHtml():''}`;
 }
 
   async function fuReplySubmit(form,submitter) {
@@ -3796,6 +3828,23 @@
   document.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
+    if (form.matches('[data-history-search]')) {
+      const h = state.hist;
+      const q = String(new FormData(form).get('q') || '').trim();
+      if (!h || h.busy || !q) return;
+      h.q = q; h.busy = true; render();
+      try {
+        if (state.demo) h.result = demoHistory(q);
+        else {
+          const { result } = await api('task', { method: 'POST', body: { unit: state.unit, followup: { op: 'whatsapp-search', q } } });
+          h.result = result && result.search ? result.search : null;
+        }
+        h.unit = state.unit;
+      } catch (err) { toast(err.message, true); }
+      h.busy = false;
+      render();
+      return;
+    }
     if (form.id === 'login') {
       const fd = new FormData(form);
       const err = $('#login-error');

@@ -130,6 +130,8 @@ La bandeja de quienes escribieron último, en las dos unidades. **Enviar** traba
   - `reply-copy`, `reply-open`, `reply-sent`, `reply-refer`, `reply-pick`.
   - En la vista hay un bloque propio, **«Instrucciones para el agente de IA · Responder»**. Explica cómo abrir el chat con la búsqueda nativa por teléfono (WhatsApp Web ignora los clics simulados), cómo verificar que es el chat correcto antes de escribir y cómo registrar el envío.
 
+- **Buscar en el historial de WhatsApp (Turnia, 10/11):** al pie de Respuestas y de la bandeja de WhatsApp anterior. Busca palabras («precio costo cuanto») en lo que escribieron las personas en las dos líneas, en los últimos 100 mensajes de cada chat; la lectura diaria guarda solo el último. Sin tildes ni mayúsculas y sin las respuestas automáticas. Turnia la hace (tiene las claves de WAHA) y solo lee. En habita. no hace falta: su bandeja ya guarda cada respuesta.
+
 **En todo el panel (09/11):**
 - **Buscador global**, arriba: por nombre, consultorio o inmobiliaria, código (el de la demo, `perez-a1b`) o teléfono (alcanzan los últimos 3 números). Encuentra a cualquiera, esté o no en la cola del día, y abre su ficha.
 - **Las filas de Hoy** llevan `data-phone`, `data-wa-url` (con el mensaje que le toca), `data-demo-url`, `data-state` y `data-line`. Muestran los mensajes usados (x/3), la línea y si comparten el número.
