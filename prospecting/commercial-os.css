@@ -1228,3 +1228,171 @@ body[data-unit="habita"] .fu-ref-send-window-selects select:focus-visible{
     gap:6px;
   }
 }
+
+
+/* Native Habita ResultsView — identical information hierarchy as original
+   follow-up: conversion window, 4 KPIs, weekly and blockers, versions, cohorts. */
+body[data-unit="habita"] .fu-native-results{
+  display:grid;gap:15px;min-width:0;color:#18372a;
+}
+body[data-unit="habita"] .fu-native-results-filters{
+  display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+  padding:4px 0;
+}
+body[data-unit="habita"] .fu-native-results-filters>span{
+  font-size:10px;font-weight:850;letter-spacing:.055em;
+  color:#607a68;margin-right:8px;text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-native-results-filters button,
+body[data-unit="habita"] .fu-native-cohort-header nav button{
+  border:1px solid #dce8dd;border-radius:9px;
+  padding:8px 12px;min-height:34px;background:#fff;
+  color:#326246;font-size:10.5px;font-weight:750;
+  font-family:inherit;cursor:pointer;
+}
+body[data-unit="habita"] .fu-native-results-filters button.is-on,
+body[data-unit="habita"] .fu-native-cohort-header nav button.is-on{
+  background:#126b47;color:#fff;border-color:#126b47;
+}
+body[data-unit="habita"] .fu-native-results-kpis{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+}
+body[data-unit="habita"] .fu-native-results-kpi{
+  border:1px solid #dce8de;background:#fff;
+  border-radius:15px;padding:16px;min-width:0;
+  display:grid;gap:8px;align-content:start;
+  box-shadow:0 5px 18px #153a2708;
+}
+body[data-unit="habita"] .fu-native-results-kpi span{
+  color:#587360;font-size:10px;letter-spacing:.025em;
+  text-transform:uppercase;font-weight:750;
+}
+body[data-unit="habita"] .fu-native-results-kpi strong{
+  font-size:26px;font-weight:850;color:#163f2b;line-height:1;
+}
+body[data-unit="habita"] .fu-native-results-kpi small{
+  color:#748879;font-size:10px;line-height:1.4;
+}
+body[data-unit="habita"] .fu-native-results-columns{
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:13px;
+  align-items:stretch;
+}
+body[data-unit="habita"] .fu-native-results-card{
+  background:#fff;border:1px solid #dce8de;border-radius:15px;
+  padding:18px;min-width:0;box-shadow:0 5px 18px #153a2708;
+}
+body[data-unit="habita"] .fu-native-results-card h2{
+  margin:0 0 12px;font-size:13px;line-height:1.35;
+  color:#1d4931;font-weight:800;text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-native-results-legend{
+  display:flex;gap:15px;align-items:center;flex-wrap:wrap;
+  color:#687c6d;font-size:10px;margin-bottom:12px;
+}
+body[data-unit="habita"] .fu-native-results-legend span{
+  display:inline-flex;align-items:center;gap:6px;
+}
+body[data-unit="habita"] .fu-native-results-legend i{
+  display:inline-block;width:11px;height:11px;border-radius:3px;
+}
+body[data-unit="habita"] .fu-native-results .is-ex{
+  background:#d88c48;
+}
+body[data-unit="habita"] .fu-native-results .is-cv{
+  background:#1d8a59;
+}
+body[data-unit="habita"] .fu-native-weekly{
+  display:flex;justify-content:space-around;align-items:flex-end;
+  gap:10px;overflow-x:auto;padding:10px 2px 4px;
+}
+body[data-unit="habita"] .fu-native-week{
+  display:grid;justify-items:center;align-content:end;
+  gap:7px;flex:1 0 49px;min-width:49px;
+}
+body[data-unit="habita"] .fu-native-week small{
+  font-size:10px;color:#6b806e;white-space:nowrap;
+}
+body[data-unit="habita"] .fu-native-bar-pair{
+  display:flex;justify-content:center;align-items:flex-end;
+  gap:4px;height:145px;width:100%;
+  border-bottom:1px solid #dce9dd;
+}
+body[data-unit="habita"] .fu-native-bar-pair>span{
+  display:block;max-width:22px;width:38%;min-height:0;
+  border-radius:5px 5px 0 0;
+}
+body[data-unit="habita"] .fu-native-blocks{
+  list-style:none;display:grid;gap:12px;margin:0;padding:0;
+}
+body[data-unit="habita"] .fu-native-blocks li{
+  display:grid;gap:5px;min-width:0;
+}
+body[data-unit="habita"] .fu-native-blocks li>span{
+  display:flex;gap:9px;justify-content:space-between;
+  font-size:11px;color:#49664f;line-height:1.4;
+}
+body[data-unit="habita"] .fu-native-blocks li i{
+  display:block;max-width:100%;height:7px;
+  border-radius:99px;background:#d6a16b;
+}
+body[data-unit="habita"] .fu-native-table-scroll{
+  overflow:auto;max-width:100%;scrollbar-width:thin;
+}
+body[data-unit="habita"] .fu-native-table-scroll table{
+  border-collapse:collapse;min-width:800px;width:100%;font-size:11px;
+}
+body[data-unit="habita"] .fu-native-table-scroll th{
+  background:#f7faf7;text-align:left;font-size:9.5px;
+  font-weight:800;color:#5d7462;letter-spacing:.025em;
+  padding:11px 9px;border-bottom:1px solid #dce8df;
+}
+body[data-unit="habita"] .fu-native-table-scroll td{
+  color:#2b4733;padding:12px 9px;
+  border-bottom:1px solid #e6eee7;vertical-align:top;
+  font-variant-numeric:tabular-nums;
+}
+body[data-unit="habita"] .fu-native-table-scroll td small{
+  display:block;margin-top:3px;font-size:9.5px;
+  color:#7a907f;line-height:1.4;
+}
+body[data-unit="habita"] .fu-native-version-status{
+  display:inline-block;margin-left:5px;padding:3px 6px;
+  background:#eef2ef;border-radius:5px;color:#536b59;
+  font-size:9px;font-weight:750;
+}
+body[data-unit="habita"] .fu-native-version-status.is-active{
+  color:#11693c;background:#e3f4e8;
+}
+body[data-unit="habita"] .fu-native-best{
+  background:#e2f6e8;color:#0d7045;padding:5px 7px;
+  border-radius:6px;font-size:9px;font-weight:850;
+}
+body[data-unit="habita"] .fu-native-muted{
+  color:#677c6e;font-size:10.5px;line-height:1.65;margin:11px 0 0;
+}
+body[data-unit="habita"] .fu-native-cohort-header{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:11px;flex-wrap:wrap;margin-bottom:12px;
+}
+body[data-unit="habita"] .fu-native-cohort-header h2{
+  margin:0;
+}
+body[data-unit="habita"] .fu-native-cohort-header nav{
+  display:flex;flex-wrap:wrap;gap:6px;
+}
+@media(max-width:1150px){
+  body[data-unit="habita"] .fu-native-results-columns{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .fu-native-results-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body[data-unit="habita"] .fu-native-results-card{
+    padding:13px;
+  }
+  body[data-unit="habita"] .fu-native-results-filters button{
+    flex:0 0 auto;min-height:38px;
+  }
+}
