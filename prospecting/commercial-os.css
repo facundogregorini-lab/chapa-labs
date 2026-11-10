@@ -304,3 +304,6 @@ body[data-unit="turnia"] { --accent:#138378; }
   .os-fu-tools .btn { flex:1 0 100%; }
   .os-fu-stage-grid { margin-inline:-10px; padding-inline:10px; }
 }
+
+/* Hidden source-specific fields remain genuinely hidden (grid CSS must not override [hidden]). */
+.os-fu-conditional[hidden], [data-catalog-products][hidden], [data-catalog-mapping][hidden] { display:none!important; }
