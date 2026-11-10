@@ -3487,6 +3487,7 @@
     const u = unitOf(t.unit);
     const snap = state.fu.n && state.fu.n.units[t.unit];
     const situations = (snap && snap.labels && snap.labels.situations) || {};
+    const commercialStage = F.commercialStages(t.unit,snap).find(v=>!v.situation&&v.technical.includes(it.stage));
     const exec = t.mode === 'ejecutar';
     const acc = fuAccount(t.unit, it);
     const me = state.session && state.session.user && state.session.user.name;
@@ -3501,7 +3502,7 @@
       data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
     return `${demoBanner()}
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
-      <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>${esc(it.stageTitle || '')}${it.situationLabel ? ` · ${esc(it.situationLabel)}` : ''}${t.actionLabel || it.action ? ` · ${esc(t.actionLabel || it.action)}` : ''}</p></div></section>
+      <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${commercialStage && it.stageTitle && commercialStage.title !== it.stageTitle ? `<p class="os-fu-technical-context">Actividad: ${esc(it.stageTitle)}</p>` : ''}</div></section>
       ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
         ${whatsappActions}
         <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
