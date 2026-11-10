@@ -3388,7 +3388,7 @@
     const otherClaim = it.claim && it.claim.by !== me;
     const rawWhatsApp=String(t.whatsappUrl||'');
     const nativeWhatsApp=window.ProspectingWhatsApp?.nativeLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
-    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}"
+    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}" target="_blank" rel="noopener noreferrer"
       data-fu="open-native" data-testid="fu-open-mobile" aria-label="Abrir conversación en la aplicación de WhatsApp">
       ${icon.wa} Abrir WhatsApp</a>
       <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="chapa-whatsapp" rel="noopener"
