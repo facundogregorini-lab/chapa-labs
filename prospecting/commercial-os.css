@@ -307,3 +307,67 @@ body[data-unit="turnia"] { --accent:#138378; }
 
 /* Hidden source-specific fields remain genuinely hidden (grid CSS must not override [hidden]). */
 .os-fu-conditional[hidden], [data-catalog-products][hidden], [data-catalog-mapping][hidden] { display:none!important; }
+
+
+/* FIDELIDAD HABITA 2a067b1: icono 32px, etiqueta y número en tarjeta compacta. */
+[data-testid="followup-reference-stage-cards"],
+[data-testid="followup-funnel-stages"] {
+  display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:9px;
+  align-items:stretch;overflow-x:auto;padding:0 0 4px;margin:0;
+}
+[data-testid="followup-reference-stage-cards"] .os-fu-stage,
+[data-testid="followup-funnel-stages"] .os-fu-stage {
+  display:grid;grid-template-columns:33px minmax(0,1fr);grid-template-rows:18px 26px;
+  column-gap:7px;align-items:center;min-height:65px;min-width:0;padding:11px 10px;
+  border-radius:13px;border:1px solid #e0eae2;background:#fff;
+  box-shadow:0 5px 15px #173f2a0b;gap:0;color:#1a3227;
+  flex:initial;position:relative;
+}
+[data-testid="followup-reference-stage-cards"] .os-fu-stage::before,
+[data-testid="followup-funnel-stages"] .os-fu-stage::before { display:none; }
+.os-fu-stage-icon {
+  grid-column:1;grid-row:1/3;width:32px;height:32px;display:grid;place-items:center;
+  border-radius:50%;background:#e4f6ea;color:#168d54;
+}
+.os-fu-stage.is-prospectado .os-fu-stage-icon {background:#eaf0fe;color:#3260bf}
+.os-fu-stage.is-contactado .os-fu-stage-icon,
+.os-fu-stage.is-saludado .os-fu-stage-icon {background:#eaf0ff;color:#3162b7}
+.os-fu-stage.is-interesado .os-fu-stage-icon,
+.os-fu-stage.is-converso .os-fu-stage-icon {background:#fff0e3;color:#ff7923}
+.os-fu-stage.is-demo-enviada .os-fu-stage-icon,
+.os-fu-stage.is-demo-visitada .os-fu-stage-icon {background:#e7f7fa;color:#17a8ad}
+.os-fu-stage.is-cuenta-creada .os-fu-stage-icon {background:#f4edfc;color:#7a54a4}
+.os-fu-stage.is-cuenta-activa .os-fu-stage-icon {background:#fff5de;color:#c28b0b}
+.os-fu-stage-label {
+  grid-column:2;grid-row:1;display:block;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:#344b3e;font-size:9px;font-weight:750;line-height:1.25;letter-spacing:-.01em;
+}
+[data-testid="followup-reference-stage-cards"] .os-fu-stage strong,
+[data-testid="followup-funnel-stages"] .os-fu-stage strong {
+  grid-column:2;grid-row:2;color:#132e20;font-size:23px;line-height:1.05;
+  letter-spacing:-.05em;font-weight:850;margin:0;
+}
+[data-testid="followup-reference-stage-cards"] .os-fu-stage.is-on,
+[data-testid="followup-funnel-stages"] .os-fu-stage.is-on {
+  background:#edf8f1;border:1.5px solid #168856;
+  box-shadow:0 4px 16px #086c3b17;padding:11px 10px;color:#1a3227;
+}
+.os-fu-reference-spark{position:absolute;right:10px;bottom:11px;display:flex;gap:3px;align-items:end;height:24px;opacity:.6}
+.os-fu-reference-spark i{display:block;background:#74d4a0;width:4px;height:10px;border-radius:8px}
+.os-fu-reference-spark i:nth-child(2){height:16px}
+.os-fu-reference-spark i:nth-child(3){height:13px}
+.os-fu-reference-spark i:nth-child(4){height:22px}
+[data-testid="followup-funnel-stages"] .os-fu-stage {min-width:120px}
+[data-testid="followup-funnel-stages"] {grid-template-columns:repeat(8,minmax(125px,1fr))}
+@media(max-width:1150px){
+ [data-testid="followup-reference-stage-cards"] {grid-template-columns:repeat(8,minmax(120px,1fr))}
+}
+@media(max-width:900px){
+ [data-testid="followup-reference-stage-cards"],[data-testid="followup-funnel-stages"]{display:flex;gap:8px;overflow-x:auto;padding:5px 2px 12px}
+ [data-testid="followup-reference-stage-cards"] .os-fu-stage,
+ [data-testid="followup-funnel-stages"] .os-fu-stage{flex:0 0 144px;min-width:144px}
+}
+:root[data-theme="dark"] [data-testid="followup-reference-stage-cards"] .os-fu-stage,
+:root[data-theme="dark"] [data-testid="followup-funnel-stages"] .os-fu-stage{background:#203a2d;border-color:#3e6249}
+:root[data-theme="dark"] .os-fu-stage-label,:root[data-theme="dark"] [data-testid="followup-reference-stage-cards"] .os-fu-stage strong,
+:root[data-theme="dark"] [data-testid="followup-funnel-stages"] .os-fu-stage strong{color:#e8f6eb}
