@@ -2602,45 +2602,87 @@
     </article>`;
   }
 
-  function fuRecommended(scope,rows,selected,q) {
-  const safe=rows.find(x=>x.action&&!x.claim&&!x.blocked&&!x.dueAt&&!q.closed)||null;
-  const snap=safe?state.fu.n.units[safe.unit]:null;
-  const rule=safe&&(snap.rules||[]).find(x=>x.key===safe.ruleKey);
-  const version=safe&&F.versionRows(safe.unit,snap).find(x=>x.id===safe.versionId);
-  if(!safe)return `<aside class="os-fu-side" data-testid="followup-recommended"><div class="os-fu-side-head"><span>◎ SIGUIENTE EN LA COLA</span></div><p class="os-fu-caption">No queda ningún contacto libre con los filtros elegidos.</p></aside>`;
-  const checks=[
-    ['Número de WhatsApp validado',Boolean(safe.wa)&&!safe.needsReview],
-    ['Situación: '+(safe.situationLabel||'Sin clasificar'),true],
-    ['Regla: '+(rule?.name||rule?.action_label||safe.action||'Revisión manual'),Boolean(safe.ruleKey)],
-    ['Horario y bloqueos controlados por '+fuName(safe.unit),!safe.blocked&&!safe.dueAt],
-  ];
-  return `<aside class="os-fu-side" data-testid="followup-recommended" data-prospect="${esc(safe.id)}">
-    <div class="os-fu-side-head"><span>◎ SIGUIENTE RECOMENDADA</span><span class="os-tag">${esc(safe.stageTitle||safe.stage)}</span></div>
-    <div class="os-fu-side-ident"><h3>${esc(safe.name)}</h3><p>${esc(safe.zone||'Sin ciudad')} · SCORE ${safe.score==null?'—':esc(String(safe.score))}</p>
-      <div><span>WHATSAPP</span><strong>${esc(safe.phone||'Sin WhatsApp')}</strong></div></div>
-    <div class="os-fu-side-rule" data-testid="followup-applied-rule"><span>◇ REGLA APLICADA</span><strong>${esc(rule?.name||safe.action||'No hay regla activa')}</strong>
-      <p>${esc(rule?.situations?.map(s=>snap.labels?.situations?.[s]||s).join(', ')||safe.situationLabel||'Revisar situación actual')}</p></div>
-    <button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="${esc(safe.key)}" data-testid="followup-recommended-execute">↗ EJECUTAR ESTA</button>
-    <div class="os-fu-side-status"><span>SITUACIÓN ACTUAL</span><span class="os-fu-pill">${esc(safe.situationLabel||'—')}</span></div>
-    <details class="os-fu-side-details" data-testid="followup-recommended-context"><summary>ANTECEDENTES Y NOTAS</summary>
-      <div class="os-fu-side-detail"><b>CONTEXTO</b><p>${esc(safe.website||'Sin web')}${safe.properties!=null?' · '+int(safe.properties)+' propiedades':''}</p>${safe.address?`<p>${esc(safe.address)}</p>`:''}<p>En el mensaje: «${esc(safe.shortName||safe.name)}»</p>
-      <b>ÚLTIMA ACCIÓN</b><p>${esc(safe.lastText||'Sin acciones anteriores')} · ${esc(ago(safe.since)||'')}</p></div></details>
-    <details class="os-fu-side-details" data-testid="followup-recommended-flow"><summary>PRÓXIMO PASO DEL FLUJO</summary>
-      <div class="os-fu-side-detail"><p>Ejecutar ${esc(safe.action||'acción pendiente')}. ${esc(safe.actionReason||'El motor del producto determina la próxima etapa al confirmar.')}</p></div></details>
-    <details class="os-fu-side-details" data-testid="followup-recommended-preparation"><summary>VALIDACIONES Y MENSAJE</summary>
-      <div class="os-fu-side-detail"><b>ANTES DE ENVIAR</b>
-      <ul>${checks.map(([label,ok])=>`<li><span>${ok?'✓':'!'}</span>${esc(label)}</li>`).join('')}</ul>
-      <b>MENSAJE (${esc(safe.action||'Seguimiento')}${version?' · V'+int(version.version):''})</b>
-      <p class="os-fu-side-preview">${esc(version?.body?
-        version.body.replaceAll('{{inmobiliaria}}',safe.shortName||safe.name).replaceAll('{{decisor}}',safe.person||''):
-        'El texto personalizado se prepara al tomar la tarea. Revisalo antes de enviar.')}</p></div></details>
-    <p class="os-fu-caption">Al tomarla, la reserva dura 10 minutos. Abrir WhatsApp no confirma el envío; tenés que confirmarlo después.</p>
-  </aside>`;
-}
+  // Desktop uses the same confirmed, copied and next-step operations as mobile.
+  // A row selection is only a preview; claiming still goes through the server.
+  function fuDesktopQueueAside(scope,rows,q) {
+    const selected=rows.find(x=>x.key===state.fu.queueSelected)||rows[0]||null;
+    const task=state.fu.task?.mode==='ejecutar'||state.fu.task?.mode==='confirmado' ? state.fu.task : null;
+    if(task?.mode==='confirmado')return '<aside class="os-fu-side os-fu-desktop-detail" data-testid="followup-recommended">'
+      +renderFuTask(task)+'</aside>';
+    const x=task?.item||selected;
+    if(!x)return '<aside class="os-fu-side os-fu-desktop-detail" data-testid="followup-recommended"><p class="os-fu-caption">No quedan contactos con estos filtros.</p></aside>';
+    const snap=state.fu.n?.units?.[x.unit];
+    const commercial=fuQueueStageChoices(x).find(v=>v.technical.includes(x.stage));
+    const version=x.versionId ? F.versionRows(x.unit,snap||{}).find(v=>v.id===x.versionId) : null;
+    const active=task?.mode==='ejecutar'&&task.item?.key===x.key;
+    const rawMessages=active?(task.messages||[]).filter(Boolean):[];
+    if(active&&!rawMessages.length&&task.message)rawMessages.push(task.message);
+    const preview=version?.body
+      ? version.body.replaceAll('{{inmobiliaria}}',x.shortName||x.name)
+        .replaceAll('{{decisor}}',x.person||'').replaceAll('{{sdr}}',x.owner&&x.owner!=='Todos'&&x.owner!=='Extensión'?x.owner:(state.session?.user?.name||''))
+      : '';
+    const messages=active?rawMessages:preview?[preview]:[];
+    const notes=[x.situationNote,active?task.notes:version?.notes].filter(Boolean);
+    const uniqueNotes=[...new Set(notes)];
+    const digits=String(x.phone||'').replace(/\D/g,'');
+    const waUrl=active?task.whatsappUrl:(digits.length>=8&&digits.length<=15?'https://web.whatsapp.com/send?phone='+digits:'');
+    const me=state.session?.user?.name,locked=x.claim&&x.claim.by!==me;
+    const executable=!q.closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
+    const status=x.blocked?'BLOQUEADA: '+x.blocked:x.dueAt?'PROGRAMADA: '+dayTime(x.dueAt):locked?'TOMADA POR '+x.claim.by:'';
+    const wa=waUrl
+      ? '<a class="btn primary os-fu-desktop-wa" href="'+esc(waUrl)+'" target="chapa-whatsapp" '+(active?'data-fu="open-native"':'')+' title="Abrir WhatsApp en la misma pestaña">'+icon.wa+' WhatsApp</a>'
+      : '<span class="os-fu-muted">Sin número de WhatsApp</span>';
+    const messageHtml=messages.length
+      ? messages.map((m,i)=>'<div class="os-fu-desktop-message"><div class="os-fu-message-top">'
+        +(messages.length>1?'<small>Mensaje '+(i+1)+'</small>':active?'<small>MENSAJE PARA ENVIAR</small>':'<small>VISTA PREVIA · se completa al tomar la tarea</small>')
+        +(active?'<button class="btn small" type="button" data-fu="copy" data-fu-index="'+i+'">'+icon.copy+' Copiar</button>':'')
+        +'</div><p>'+esc(m)+'</p></div>').join('')
+      : '<p class="os-fu-desktop-muted">Todavía no hay un mensaje preparado para esta acción. Tomá la tarea para revisarlo.</p>';
+    return '<aside class="os-fu-side os-fu-desktop-detail" data-testid="followup-recommended" data-prospect="'+esc(x.id)+'">'
+      +'<header class="os-fu-desktop-head"><span class="os-kicker">● '+esc(fuName(x.unit).toUpperCase())+'</span>'
+      +'<h2>'+esc(x.name)+'</h2><div class="os-fu-desktop-pills">'
+      +'<span>ETAPA: '+esc(commercial?.title||x.stageTitle||'—')+'</span>'
+      +'<span>SITUACIÓN: '+esc(x.situationLabel||'—')+'</span>'
+      +'<span>QUIÉN LO TOMA: '+esc(x.owner||'Todos')+'</span></div></header>'
+      +'<div class="os-fu-desktop-edit">'
+      +'<label>CAMBIAR ETAPA'+fuQueueStageSelect(x,true)+'</label>'
+      +'<label>CAMBIAR SITUACIÓN'+fuQueueSituationSelect(x,true)+'</label>'
+      +'<label>QUIÉN LO TOMA'+fuQueueOwnerSelect(x)+'</label></div>'
+      +'<div class="os-fu-desktop-actions">'+wa
+      +(active?'<button type="button" class="btn os-fu-confirm" data-fu="confirm" data-testid="fu-confirm-desktop">✓ Confirmar envío</button>'
+        +'<button type="button" class="btn primary os-fu-confirm-next" data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop">✓ Confirmar envío y siguiente →</button>'
+        +'<button type="button" class="btn os-fu-next-without" data-fu="next-after">Siguiente sin confirmar →</button>'
+        :executable?'<button type="button" class="btn primary os-fu-claim" data-fu="claim" data-fu-key="'+esc(x.key)+'">EJECUTAR ESTA →</button>':'')
+      +'</div>'
+      +(status?'<p class="os-fu-desktop-alert">'+esc(status)+'</p>':'')
+      +'<section class="os-fu-desktop-card os-fu-desktop-info"><h3>Información del contacto</h3>'
+      +'<dl><dt>WhatsApp</dt><dd>'+esc(x.phone||'—')+'</dd><dt>Último contacto</dt><dd>'+esc(ago(x.since)||'—')+'</dd>'
+      +'<dt>Actividad</dt><dd>'+esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'—')+'</dd>'
+      +'<dt>Prioridad</dt><dd>'+esc(F.PRIORITY_LABEL[x.priority]||'—')+'</dd><dt>Zona</dt><dd>'+esc(x.zone||'—')+'</dd></dl></section>'
+      +'<section class="os-fu-desktop-card os-fu-desktop-next"><h3>◎ Próxima acción</h3>'
+      +'<strong>'+esc(x.action||x.actionReason||'Sin acción pendiente')+'</strong></section>'
+      +'<section class="os-fu-desktop-card" data-testid="fu-desktop-message"><h3>Mensaje de WhatsApp '+(active?'':'· vista previa')+'</h3>'
+      +messageHtml+'</section>'
+      +'<section class="os-fu-desktop-card" data-testid="fu-desktop-observations"><h3>Observaciones</h3>'
+      +(uniqueNotes.length?uniqueNotes.map(v=>'<p class="os-fu-desktop-observation">'+esc(v)+'</p>').join(''):'<p class="os-fu-desktop-muted">Sin observaciones registradas.</p>')
+      +'</section>'
+      +(x.situationNote?'<section class="os-fu-desktop-card"><h3>Qué dijo</h3><p class="os-fu-desktop-observation">'+esc(x.situationNote)+'</p></section>':'')
+      +(active?'<details class="os-fu-desktop-advanced"><summary>Otras acciones · registrar fallo o reprogramar</summary>'
+        +'<form class="section" data-fu-fail><label>Si no salió el mensaje<input class="input" name="motivo" placeholder="Motivo"></label>'
+        +'<select class="input" name="tipo"><option value="">Otro motivo</option><option value="sin_whatsapp">Sin WhatsApp</option><option value="numero_incorrecto">Número incorrecto</option></select>'
+        +'<button class="btn small" type="submit">Registrar que no salió</button></form>'
+        +'<form class="section" data-fu-snooze><label>Reprogramar<input class="input" type="date" name="hasta" required></label>'
+        +'<input class="input" name="motivo" placeholder="Motivo (opcional)"><button class="btn small" type="submit">Reprogramar</button></form></details>'
+        +'<p class="os-fu-desktop-disclaimer">Abrir WhatsApp no confirma el envío. Confirmá únicamente después de enviarlo.</p>'
+        :'<p class="os-fu-desktop-disclaimer">La vista previa no reemplaza el mensaje final: al ejecutar se validan los datos y las reglas.</p>')
+      +'</aside>';
+  }
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
   const {q,snap,stages,current,rows}=fuQueueSelection(scope);
+  const firstSelected=rows.find(x=>x.key===state.fu.queueSelected)||rows[0]||null;
+  state.fu.queueSelected=firstSelected?.key||null;
   const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
   const customStages=stages.filter(x=>customStageKeys.has(x.key));
@@ -2710,15 +2752,15 @@
     </div></details>
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
-    <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
-    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table class="os-fu-table os-fu-desktop-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
+    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="8" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
     <div class="os-fu-mobile-list" data-testid="fu-mobile-queue">
       ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||'<p class="os-fu-mobile-empty">No hay tareas con estos filtros.</p>'}
     </div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
     <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
     </section>
-    ${q.kpi==='bloqueadas'?'':(state.fu.task?'<aside class="os-fu-side" data-testid="followup-execution-aside">'+renderFuTask(state.fu.task)+'</aside>':fuRecommended(scope,rows,current,q))}
+    ${q.kpi==='bloqueadas'?'':fuDesktopQueueAside(scope,rows,q)}
     </div>
     <details class="card glass" data-fu-details="sched" ${state.fu.open.sched?'open':''}><summary><strong>Programadas</strong> <span class="count">${int(n.scheduled.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
       ${n.scheduled.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin programadas.</p>'}</div></details>
