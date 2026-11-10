@@ -2692,11 +2692,23 @@
       after_hours:Number(fd.get('after_hours')),after_action:fd.get('after_action')||null,
       hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),
       days:fd.getAll('days').map(Number),enabled:fd.has('enabled')};
+    const draft=document.querySelector('[data-fu-new-rule-message]');
+    const messageBody=create?String(draft?.querySelector('textarea[name="body"]')?.value||'').trim():'';
+    const messageNotes=create?String(draft?.querySelector('textarea[name="notes"]')?.value||'').trim():'';
+    if(create&&messageBody&&(snap?.stages||[]).flatMap(s=>s.versions||[]).some(v=>v.stage===values.stage&&v.action===action&&v.status==='active')){
+      if(!window.confirm('Esta acción ya tiene un mensaje activo que otras reglas pueden usar. ¿Crear una nueva versión activa igualmente?'))return;
+    }
     const saved=await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'});
     if(saved){
       const ui=fuRulesState(unit);
       ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=saved.key||rule?.key||null;
-      state.fu.ruleEdit=null; await loadFollowup({quiet:true});render();
+      state.fu.ruleEdit=null;
+      if(create&&messageBody){
+        const result=await fuOp(unit,{op:'version-create',valores:{stage:values.stage,action,channel:'whatsapp',trigger:'',body:messageBody,notes:messageNotes,
+          ctas:['whatsapp','demo','copy'],status:'active'}},{label:'Mensaje creado y vinculado a la acción.'});
+        if(!result)toast('La regla quedó guardada, pero el mensaje no. Creá una nueva versión desde el editor.',true);
+      }
+      await loadFollowup({quiet:true});render();
     }
     return;
   }
@@ -2721,8 +2733,14 @@
 }
 
   function fuRulesMessage(unit, snap, rule, stage, create) {
-  if(create)return `<section class="fu-ref-message"><h3>Mensaje de esta acción</h3>
-    <p class="os-view-caption">Primero guardá la nueva regla. Después vas a poder asociarle un mensaje o reutilizar las versiones existentes de esa acción.</p></section>`;
+  if(create)return `<section class="fu-ref-message" data-fu-new-rule-message data-testid="followup-rule-message">
+  <div class="os-section-heading"><div><span class="os-kicker">QUÉ SE EJECUTA</span><h3>Mensaje de la nueva regla</h3></div></div>
+  <p class="os-view-caption">Prepará el texto junto con la regla. Guardar crea la regla y, si escribís un mensaje, una versión activa para su acción.</p>
+  <label class="field"><span>MENSAJE A ENVIAR</span><textarea class="input" name="body" rows="9" maxlength="4000" placeholder="Escribí el mensaje o adaptá la plantilla…"></textarea></label>
+  <p class="os-view-caption">Podés usar {{inmobiliaria}} y las variables que reconoce Habita. No se envía ningún mensaje al guardar esta pantalla.</p>
+  <label class="field"><span>OBSERVACIONES (OPCIONAL)</span><textarea class="input" name="notes" rows="3" maxlength="2000" placeholder="Notas para el equipo…"></textarea></label>
+  <p class="os-warn-note">Las versiones anteriores se conservan. Si esta acción ya tiene una versión activa, revisá lo existente antes de crear otra.</p>
+</section>`;
   const action=unit==='turnia'?'principal':rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
   const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
@@ -3154,7 +3172,7 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
-    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-rule-form] input[name="sit"][value="rechazo"]')){
       const form=e.target.closest('[data-fu-rule-form]');
       if(form){
@@ -3207,7 +3225,7 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
-    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
       clearTimeout(target._t);
