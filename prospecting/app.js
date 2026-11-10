@@ -2278,18 +2278,20 @@
     ['cuenta-creada','CUENTA CREADA',['sin-uso']],
     ['cuenta-activa','CUENTA ACTIVA',['sin-suscripcion']],
     ['cliente','CLIENTE',[]],
+    ...(snap.catalog?.stages||[]).map(s=>[s.key,s.label.toUpperCase(),[s.technical_stage]]),
   ] : stages.map(s=>[s.key,s.title.toUpperCase(),[s.key]]);
   const all=[...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===unit);
   const groups=sourceGroups.map(([key,title,keys])=>{
     const steps=keys.map(k=>raw.find(s=>s.key===k)).filter(Boolean);
-    const waiting=keys.length?steps.reduce((sum,s)=>sum+(Number(s.waiting)||0),0):Math.max(0,Number(raw.at(-1)?.reached||0)*Number(raw.at(-1)?.rate||0));
+    const custom=(snap.catalog?.stages||[]).find(s=>s.key===key);
+    const waiting=custom?Number(custom.waiting||0):keys.length?steps.reduce((sum,s)=>sum+(Number(s.waiting)||0),0):Math.max(0,Number(raw.at(-1)?.reached||0)*Number(raw.at(-1)?.rate||0));
     const reached=steps[0]?.reached||0;
     const rate=steps.at(-1)?.rate??null;
-    return {key,title,keys,waiting,reached,rate};
+    return {key,title,keys,waiting,reached,rate,filterSituation:custom?.entry_situation||null};
   });
   const selected=groups.find(g=>g.key===state.fu.pipelineStage)||groups[0];
   const stage=selected.keys.includes(state.fu.technicalStage)?state.fu.technicalStage:null;
-  const matched=all.filter(x=>selected.keys.includes(x.stage) && (!stage||x.stage===stage));
+  const matched=all.filter(x=>selected.keys.includes(x.stage) && (!stage||x.stage===stage) && (!selected.filterSituation||x.situation===selected.filterSituation));
   const filtered=F.filter(matched,{...state.fu.f,unit});
   const selectedTechnical=stage||selected.keys[0];
   const currentStep=raw.find(s=>s.key===selectedTechnical);
