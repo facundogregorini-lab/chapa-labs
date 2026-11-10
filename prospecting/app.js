@@ -2325,22 +2325,31 @@
   }
 
   function fuRuleEditor(unit, snap) {
-  if(unit!=='habita' || !state.fu.ruleEdit)return '';
-  const r=(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
-  if(!r)return '';
-  return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key)}" data-fu-unit-id="${unit}">
-    <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE HABITA</span><h2>Editar regla</h2></div><button type="button" class="btn small" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
-    <p class="os-view-caption">Guardás en el motor original, sin alterar los envíos históricos ni las otras etapas.</p>
+  if(unit!=='habita'||!state.fu.ruleEdit)return '';
+  const create=state.fu.ruleEdit==='__new';
+  const stage=create?state.fu.ruleDraftStage:null;
+  const existing=create?null:(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
+  if(!create&&!existing)return '';
+  const r=existing||{stage,action:'principal',situations:['sin_respuesta'],after_hours:0,after_action:null,
+    position:1000,enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:''};
+  const options=snap.catalog?.actions?.[r.stage]||[{key:'principal',label:'Acción principal'}];
+  const days=['DO','LU','MA','MI','JU','VI','SA'];
+  return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}" data-fu-unit-id="${unit}" data-fu-stage="${esc(r.stage)}">
+    <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE REGLAS · HABITA</span><h2>${create?'Crear regla':'Editar regla'}</h2></div><button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
+    <p class="os-view-caption">Gana la primera regla compatible en orden; el motor original valida y guarda el cambio, sin tocar ejecuciones históricas.</p>
     <div class="grid cols-2" style="margin-top:12px">
       <label class="field"><span>Nombre</span><input class="input" name="name" maxlength="120" value="${esc(r.name||'')}"></label>
-      <label class="field"><span>Horas de espera</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${r.after_hours??0}" required></label>
+      <label class="field"><span>Acción</span><select class="input" name="action" ${create?'':'disabled'}>${options.map(x=>`<option value="${esc(x.key)}" ${r.action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
+      <label class="field"><span>Esperar desde el último mensaje (horas)</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${r.after_hours??0}" required></label>
+      <label class="field"><span>Acción previa requerida</span><select class="input" name="after_action"><option value="">Ninguna</option>${options.map(x=>`<option value="${esc(x.key)}" ${r.after_action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
       <label class="field"><span>Horario desde</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required></label>
       <label class="field"><span>Horario hasta</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></label>
     </div>
-    <h3 style="margin-top:14px">Situaciones que disparan la regla</h3>
-    <div class="os-quick-links" style="margin-top:8px">${Object.entries(snap.labels?.situations||{}).filter(([key])=>{ const x=snap.catalog?.canonical?.find(x=>x.key===key);return !x||!x.permanent_stop||key==='rechazo'; }).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
+    <h3 style="margin-top:14px">Situaciones que disparan esta regla</h3><div class="os-quick-links" style="margin-top:8px">
+      ${Object.entries(snap.labels?.situations||{}).filter(([key])=>{const x=snap.catalog?.canonical?.find(x=>x.key===key);return !x||!x.permanent_stop||key==='rechazo';}).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
+    <h3 style="margin-top:14px">Días habilitados</h3><div class="os-quick-links" style="margin-top:8px">${days.map((d,i)=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
     <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''}>Regla activa</label>
-    <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">GUARDAR CAMBIOS</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
+    <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
   </form>`;
 }
 
@@ -2360,11 +2369,15 @@
   async function handleFuEditorSubmit(form) {
   const unit=form.dataset.fuUnitId, snap=state.fu.n?.units[unit], fd=new FormData(form);
   if(form.matches('[data-fu-rule-form]')){
-    const rule=(snap?.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
-    if(!rule)return;
-    const values={...rule,name:String(fd.get('name')||''),situations:fd.getAll('sit').map(String),
-      after_hours:Number(fd.get('after_hours')),hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),enabled:fd.has('enabled')};
-    if(await fuOp(unit,{op:'rule-save',key:rule.key,valores:values},{label:'Regla actualizada en Habita.'})){
+    const create=!form.dataset.fuRuleKey;
+    const rule=create?null:(snap?.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
+    if(!create&&!rule)return;
+    const values={...(rule||{stage:form.dataset.fuStage,action:String(fd.get('action')||'principal'),position:1000,min_demo_activity_level:0}),
+      name:String(fd.get('name')||''),situations:fd.getAll('sit').map(String),
+      after_hours:Number(fd.get('after_hours')),after_action:fd.get('after_action')||null,
+      hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),
+      days:fd.getAll('days').map(Number),enabled:fd.has('enabled')};
+    if(await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'})){
       state.fu.ruleEdit=null; await loadFollowup({quiet:true});render();
     }
     return;
@@ -2397,6 +2410,7 @@
           ${stages.map((s) => {
             const vs = versions.filter((v) => v.stage === s.key);
             return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
+              ${u.id==='habita'&&!state.session?.open?`<button class="btn small" style="margin-top:10px" type="button" data-fu="rule-create" data-fu-stage="${esc(s.key)}">+ NUEVA REGLA PARA ESTA ETAPA</button>`:''}
               ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
                 ${!state.session?.open && v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${!state.session?.open && v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${!state.session?.open && v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
                 <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' && !state.session?.open ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
@@ -2583,6 +2597,7 @@
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
       case 'rule-edit': state.fu.ruleEdit = ds.fuRule || null; render(); break;
+      case 'rule-create': state.fu.ruleEdit='__new'; state.fu.ruleDraftStage=ds.fuStage; render(); break;
       case 'version-edit': state.fu.versionEdit = ds.fuVersion || null; render(); break;
       case 'rule-toggle': {
         const snap = state.fu.n.units[ds.fuUnitId];
