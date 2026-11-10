@@ -2944,8 +2944,13 @@
   const allowRejection=allowed.includes('encuesta_cierre');
   const days=[['DO',0],['LU',1],['MA',2],['MI',3],['JU',4],['VI',5],['SA',6]];
   const rank=existing?siblings.sort((a,b)=>(a.position||999)-(b.position||999)).findIndex(x=>x.key===r.key)+1:0;
+  const linkedVersions=F.versionRows(unit,snap).filter(v=>v.stage===key&&v.action===r.action)
+    .sort((a,b)=>Number(b.version)-Number(a.version));
+  const selectedPreview=linkedVersions.find(v=>v.id===state.fu.previewVersion)
+    ||linkedVersions.find(v=>v.status==='active')||linkedVersions[0];
   return `<form class="card glass fu-ref-editor fu-ref-rule-form" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}"
-    data-fu-unit-id="habita" data-fu-stage="${esc(key)}" data-fu-position="${Number(r.position)||10}" data-testid="followup-rule-form">
+    data-fu-unit-id="habita" data-fu-stage="${esc(key)}" data-fu-position="${Number(r.position)||10}"
+    data-fu-rendered-action="${esc(r.action)}" data-testid="followup-rule-form">
     <header class="fu-ref-edit-head"><div><div class="fu-ref-titleline"><span class="os-tag">${create?'NUEVA REGLA':'PRIORIDAD P'+rank}</span>
       <label class="field"><span class="sr-only">NOMBRE DE LA REGLA</span><input class="input fu-ref-rule-name" name="name" maxlength="80" value="${esc(r.name||'')}" placeholder="${esc(actions.find(a=>a.key===r.action)?.label||'Nombre de la regla')}" data-testid="followup-rule-name"></label></div>
       <p class="os-view-caption">Gana la primera regla compatible. Los cambios se guardan en el motor de Habita.</p></div>
@@ -2987,7 +2992,12 @@
     <section class="fu-ref-what" data-testid="followup-part-what"><h3>◇ QUÉ SE EJECUTA</h3>
       <label class="field"><span>ACCIÓN DE LA REGLA</span><select class="input" name="action" data-fu-rule-action data-testid="followup-rule-action">
         ${actions.map(a=>`<option value="${esc(a.key)}" ${r.action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
-      <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'La acción utiliza la versión de mensaje vinculada a esta etapa. Podés editarla en el panel contiguo.'}</p>
+      <label class="field"><span>VERSIÓN DEL MENSAJE</span><select class="input" data-fu-rule-version aria-label="Versión del mensaje vinculada a la acción" ${linkedVersions.length?'':'disabled'}>
+        ${linkedVersions.map(v=>`<option value="${esc(v.id)}" ${selectedPreview?.id===v.id?'selected':''}>V${int(v.version)} (${v.status==='active'?'activa':v.status==='test'?'en prueba':'archivada'})</option>`).join('')||'<option value="">Sin versiones</option>'}
+      </select></label>
+      <div class="fu-ref-what-actions"><button type="button" class="btn small" data-fu="rules-message-focus">✎ EDITAR VERSIONES</button>
+        <button type="button" class="btn small" data-fu="rules-version-new">＋ NUEVA VERSIÓN</button></div>
+      <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'Las versiones del mensaje se conservan con su historial y su estado A/B.'}</p>
     </section>
     <footer class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-cancel">CANCELAR</button>
       <button type="submit" class="btn primary" data-testid="followup-rule-save" ${state.session?.open?'disabled title="Requiere sesión protegida"':''}>${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button></footer>
