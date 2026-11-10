@@ -3333,6 +3333,11 @@
   function fuRendimiento() {
     const n = state.fu.n;
     const scope = fuScope();
+    if(scope==='habita'&&window.ProspectingHabitaResults)
+      return window.ProspectingHabitaResults.render(
+        n.units.habita,
+        state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'})
+      );
     const actors = F.actorRows(n, scope);
     return `<section class="hero"><div><span class="eyebrow">Rendimiento</span><h1>Qué mensajes y quién convierten</h1><p>Conversión: que la persona o la inmobiliaria avanzó de etapa después del envío, con la definición de cada producto. Con menos de 30 envíos, la muestra es chica.</p></div></section>
       ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
@@ -3464,6 +3469,14 @@
           setTimeout(()=>main.querySelector('[data-fu-situation]')?.scrollIntoView({block:'start',behavior:'smooth'}),0);
         }
         break;
+      }
+      case 'results-window': {
+        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        r.windowKey=ds.fuWindow;render();break;
+      }
+      case 'results-cohort': {
+        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        r.cohortBy=ds.fuCohort;render();break;
       }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
