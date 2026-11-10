@@ -2271,10 +2271,17 @@
       if(!released)return;
     }
     state.fu.task=null;
-    await loadFollowup({quiet:true});
+    // The product validates eligibility again when claiming. A full snapshot
+    // between releasing and claiming the next row added several seconds to
+    // each click; use the visible queue and refresh after the new claim.
     const me=state.session?.user?.name;
-    const next=fuQueueSelection(fuScope()).rows
-      .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me));
+    let next=state.fu.n?fuQueueSelection(fuScope()).rows
+      .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me)):null;
+    if (!next) {
+      await loadFollowup({quiet:true});
+      next=state.fu.n?fuQueueSelection(fuScope()).rows
+        .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me)):null;
+    }
     if (next) await fuClaim(next);
     else { toast('No quedan tareas libres en la cola.'); render(); }
   }
