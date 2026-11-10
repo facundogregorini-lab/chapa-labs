@@ -2323,7 +2323,7 @@
   const version=safe&&F.versionRows(safe.unit,snap).find(x=>x.id===safe.versionId);
   if(!safe)return `<aside class="os-fu-side" data-testid="followup-recommended"><div class="os-fu-side-head"><span>◎ SIGUIENTE EN LA COLA</span></div><p class="os-fu-caption">No queda ningún contacto libre con los filtros elegidos.</p></aside>`;
   const checks=[
-    ['Número de WhatsApp registrado',Boolean(safe.phone)],
+    ['Número de WhatsApp validado',Boolean(safe.wa)&&!safe.needsReview],
     ['Situación: '+(safe.situationLabel||'Sin clasificar'),true],
     ['Regla: '+(rule?.name||rule?.action_label||safe.action||'Revisión manual'),Boolean(safe.ruleKey)],
     ['Horario y bloqueos controlados por '+fuName(safe.unit),!safe.blocked&&!safe.dueAt],
@@ -2337,7 +2337,7 @@
     <button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="${esc(safe.key)}" data-testid="followup-recommended-execute">↗ EJECUTAR ESTA</button>
     <div class="os-fu-side-status"><span>SITUACIÓN ACTUAL</span><span class="os-fu-pill">${esc(safe.situationLabel||'—')}</span></div>
     <details class="os-fu-side-details" data-testid="followup-recommended-context"><summary>ANTECEDENTES Y NOTAS</summary>
-      <div class="os-fu-side-detail"><b>CONTEXTO</b><p>${esc(safe.sub||safe.zone||'Sin información adicional')}</p>
+      <div class="os-fu-side-detail"><b>CONTEXTO</b><p>${esc(safe.website||'Sin web')}${safe.properties!=null?' · '+int(safe.properties)+' propiedades':''}</p>${safe.address?`<p>${esc(safe.address)}</p>`:''}<p>En el mensaje: «${esc(safe.shortName||safe.name)}»</p>
       <b>ÚLTIMA ACCIÓN</b><p>${esc(safe.lastText||'Sin acciones anteriores')} · ${esc(ago(safe.since)||'')}</p></div></details>
     <details class="os-fu-side-details" data-testid="followup-recommended-flow"><summary>PRÓXIMO PASO DEL FLUJO</summary>
       <div class="os-fu-side-detail"><p>Ejecutar ${esc(safe.action||'acción pendiente')}. ${esc(safe.actionReason||'El motor del producto determina la próxima etapa al confirmar.')}</p></div></details>
@@ -2345,7 +2345,9 @@
       <div class="os-fu-side-detail"><b>ANTES DE ENVIAR</b>
       <ul>${checks.map(([label,ok])=>`<li><span>${ok?'✓':'!'}</span>${esc(label)}</li>`).join('')}</ul>
       <b>MENSAJE (${esc(safe.action||'Seguimiento')}${version?' · V'+int(version.version):''})</b>
-      <p class="os-fu-side-preview">${esc(version?.body||'El texto personalizado se prepara al tomar la tarea. Revisalo antes de enviar.')}</p></div></details>
+      <p class="os-fu-side-preview">${esc(version?.body?
+        version.body.replaceAll('{{inmobiliaria}}',safe.shortName||safe.name).replaceAll('{{decisor}}',safe.person||''):
+        'El texto personalizado se prepara al tomar la tarea. Revisalo antes de enviar.')}</p></div></details>
     <p class="os-fu-caption">Al tomarla, la reserva dura 10 minutos. Abrir WhatsApp no confirma el envío; tenés que confirmarlo después.</p>
   </aside>`;
 }
