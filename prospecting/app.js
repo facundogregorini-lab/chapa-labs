@@ -2322,12 +2322,11 @@
     )||null : null;
   }
 
-  async function fuNext() {
+  async function fuNext(clicked) {
     if(state.fu.busy||state.fu.advancing)return;
     state.fu.advancing=true;
     const previous=state.fu.task;
     const cur=previous?.item?.key;
-    const clicked=document.activeElement;
     if(clicked?.dataset?.fu==='next-after'){
       clicked.disabled=true;
       clicked.textContent='Abriendo siguiente…';
@@ -3668,7 +3667,7 @@
         break;
       }
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
-      case 'next': await fuNext(); break;
+      case 'next': await fuNext(t); break;
       case 'back':
         if(task?.mode==='ejecutar'){
           if(!await fuOp(task.unit,{op:'release',inmobiliaria:it.id},{label:'Tarea liberada sin confirmar envío.'}))break;
@@ -3731,7 +3730,7 @@
         }
         break;
       }
-      case 'next-after': await fuNext(); break;
+      case 'next-after': await fuNext(t); break;
       case 'priority': if (await fuOp(task.unit, { op: 'priority', inmobiliaria: it.id, prioridad: ds.fuPriority || null }, { label: 'Prioridad guardada.' })) { it.priority = ds.fuPriority || it.priority; it.priorityManual = Boolean(ds.fuPriority); render(); loadFollowup({ quiet: true }); } break;
       case 'snooze-days': {
         const d = new Date(Date.now() + Number(ds.fuDays) * 86400000);
