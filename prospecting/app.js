@@ -179,6 +179,91 @@
     else if (!state.demo) ensureLoaded().then(render);
   });
 
+
+  // One source of truth per product: HABITA = /admin/script, TURNIA = its own
+  // Script tab. Never substitute a hardcoded copy when the source is unavailable.
+  async function loadScript(unit,{quiet=false}={}){
+    if(!['habita','turnia'].includes(unit)||state.demo)return;
+    if(!quiet){state.scripts[unit]={...(state.scripts[unit]||{}),loading:true,error:null};render();}
+    try{
+      const result=await api('script',{query:{unit}});
+      const old=state.scripts[unit]||{};
+      if(state.scriptDrafts[unit]===undefined||state.scriptDrafts[unit]===old.body)
+        state.scriptDrafts[unit]=result.body||'';
+      state.scripts[unit]={...result,loading:false,error:null};
+    }catch(error){
+      state.scripts[unit]={...(state.scripts[unit]||{}),loading:false,error:error.message};
+    }
+    if(state.unit===unit&&state.view==='script')render();
+  }
+  function renderScript(unit){
+    if(!['habita','turnia'].includes(unit))return '<section class="card glass">Elegí HABITA o TURNIA.</section>';
+    if(!state.scripts[unit]){
+      state.scripts[unit]={loading:true};
+      if(!state.demo)setTimeout(()=>loadScript(unit,{quiet:true}),0);
+    }
+    const d=state.scripts[unit],body=state.scriptDrafts[unit]??d.body??'';
+    const habita=unit==='habita',dirty=body!==(d.body||'');
+    const date=d.updated_at&&!Number.isNaN(Date.parse(d.updated_at))
+      ?new Date(d.updated_at).toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'})
+      :null;
+    const title=habita?'HABITA':'TURNIA';
+    return '<section class="os-script-workspace" data-testid="commercial-script" data-script-unit="'+unit+'">'
+      +'<header class="os-script-heading"><div><span class="os-kicker">'+title+' · GUÍA DE EJECUCIÓN</span><h2>SCRIPT COMERCIAL</h2>'
+      +'<p>'+(habita?'El mismo documento operativo del panel original de HABITA y su extensión. Los cambios se sincronizan en ambas vistas.':'Documento de TURNIA, separado de HABITA. Registrá acá las instrucciones reales de su equipo.')+'</p></div>'
+      +'<span class="os-script-source"><span class="os-script-source-dot"></span> '+(habita?'SINCRONIZADO CON HABITA':'SCRIPT DE TURNIA')+'</span></header>'
+      +(d.loading?'<p class="os-script-loading" role="status">Cargando script…</p>'
+        :d.error?'<div class="os-script-error" role="alert">No se pudo leer el script: '+esc(d.error)+' <button class="btn small" type="button" data-script-refresh>Reintentar</button></div>'
+        :'<form class="os-script-editor" data-script-form>'
+          +'<div class="os-script-editor-top"><div><h3>GUÍA DE TRABAJO</h3><p>'+(habita?'Fuente oficial: HABITA · /admin/script':'El texto queda guardado en la planilla operativa de TURNIA')+'</p></div>'
+          +'<button class="btn os-script-reload" type="button" data-script-refresh '+(dirty?'disabled':'')+'>↻ Actualizar</button></div>'
+          +'<textarea name="body" data-script-body maxlength="20000" rows="21" aria-label="Script comercial de '+title+'"'
+          +(!d.editable||state.demo?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
+          +'<footer class="os-script-bottom"><div class="os-script-meta"><span data-script-dirty>'+(dirty?'Cambios sin guardar':date?'Guardado el '+esc(date):'Todavía sin guardar')+'</span>'
+          +'<span data-script-count>'+int(body.length)+' / 20.000 caracteres</span></div><div class="os-script-actions">'
+          +(dirty?'<button class="btn" type="button" data-script-discard>Descartar</button>':'')
+          +(d.editable&&!state.demo?'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar script')+'</button>'
+            :'<span class="os-script-readonly">Solo lectura · configurá una sesión protegida para editar.</span>')
+          +'</div></footer></form>')
+      +(habita?'<p class="os-script-original-link">Fuente: <a href="https://www.habitaia.app/admin/script" target="_blank" rel="noopener noreferrer">Abrir script original en HABITA ↗</a></p>':'')
+      +'</section>';
+  }
+  document.addEventListener('input',(e)=>{
+    if(!e.target?.matches?.('[data-script-body]'))return;
+    const unit=state.unit,src=state.scripts[unit];
+    if(!src)return;
+    const body=e.target.value,dirty=body!==(src.body||'');
+    state.scriptDrafts[unit]=body;
+    const form=e.target.closest('[data-script-form]');
+    const note=form?.querySelector('[data-script-dirty]');
+    const count=form?.querySelector('[data-script-count]');
+    const save=form?.querySelector('button[type="submit"]');
+    if(note)note.textContent=dirty?'Cambios sin guardar':'Sin cambios';
+    if(count)count.textContent=int(body.length)+' / 20.000 caracteres';
+    if(save)save.disabled=!dirty||state.scriptSaving;
+  });
+  document.addEventListener('click',(e)=>{
+    const button=e.target.closest?.('[data-script-refresh],[data-script-discard]');
+    if(!button||!main.contains(button))return;
+    const unit=state.unit,src=state.scripts[unit];if(!src)return;
+    if(button.hasAttribute('data-script-discard')){state.scriptDrafts[unit]=src.body||'';render();}
+    else if(state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
+  });
+  document.addEventListener('submit',async(e)=>{
+    if(!e.target?.matches?.('[data-script-form]'))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const unit=state.unit,src=state.scripts[unit],body=state.scriptDrafts[unit]??'';
+    if(!src?.editable||state.demo||state.scriptSaving||body===(src.body||''))return;
+    state.scriptSaving=true;render();
+    try{
+      const saved=await api('script',{method:'POST',body:{unit,body}});
+      if(saved.body!==body)throw Error('El servidor no confirmó el contenido del script.');
+      state.scripts[unit]={...saved,loading:false,error:null};state.scriptDrafts[unit]=saved.body;
+      toast('Script guardado en '+(unit==='habita'?'HABITA':'TURNIA')+'.');
+    }catch(err){toast(err.message||'No se pudo guardar el script.',true);}
+    finally{state.scriptSaving=false;if(state.unit===unit&&state.view==='script')render();}
+  });
+
   // ─── Período ────────────────────────────────────────────────
   const PERIODS = [['all', 'Histórico'], ['7', '7 días'], ['30', '30 días'], ['mes', 'Este mes']];
   function periodRange() {
