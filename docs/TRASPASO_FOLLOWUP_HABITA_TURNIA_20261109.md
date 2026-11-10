@@ -1,3 +1,14 @@
+## Hallazgo de QA visual del 09/11 — REGLAS Y MENSAJES NO tiene paridad
+
+El usuario envió una captura de Chapa y señaló que **Reglas y mensajes se ve completamente diferente del panel original de Habita**. Confirmado revisando código publicado:
+- **Habita** `src/components/admin-followup.tsx` `RulesWorkspace`: selector horizontal de 7 etapas comerciales; cabecera de etapa; DOS COLUMNAS con listado de reglas de la etapa a la izquierda y editor completo (regla + mensaje) a la derecha; prioridad P1, reordenamiento drag-and-drop, agregar nueva o usar regla existente como plantilla; selector de etapa y situación, validación y versiones de mensajes asociadas.
+- **Chapa en producción** `prospecting/app.js` `fuSecuencias()`: una TABLA global de reglas seguida de muchos acordeones por paso técnico, con formularios separados. **No es literalmente igual**. Ni PR #60 (ya integrado y desplegado) ni PR #61 (catálogo Turnia) corrigen por sí mismos esta diferencia.
+- **Prioridad P0 pendiente**: reconstruir específicamente `fuSecuencias()` de ambos espacios tomando el JSX actual de `RulesWorkspace` como fuente exacta. Habita con paridad 100% visual y de interacción; Turnia con misma distribución/interacciones pero reglas y cadencia nativas. Los cambios deben probarse con capturas y tests antes de merge.
+- Para reordenamiento real y seguro, Habita ya dispone de `reorderRules` en `src/lib/followup/server.ts` y PATCH `src/app/api/admin/follow-up/reglas/route.ts`, **pero Chapa todavía NO expone una operación de API de reordenamiento**; incorporarla a `src/lib/followup/chapa.ts` y al proxy `api/prospecting.js` (protegida con contraseña), con pruebas. No simular reordenamiento solo local.
+- Turnia PR #167 `https://github.com/axellaban/turniasalud/pull/167` tenía Vercel y CI fallando en última consulta; no publicar todavía. Chapa PR #61 `https://github.com/facundogregorini-lab/chapa-labs/pull/61` está sin merge y contiene interfaz para catálogo Turnia, **no para Reglas**.
+- Nunca afirmar que el Follow-up ya es literal/paridad completa mientras esta pantalla siga distinta.
+
+
 # TRASPASO A CLAUDE CODE — CHAPA COMMERCIAL OS / HABITA / TURNIA
 Fecha: 2026-11-09 (Argentina). Estado comprobado al inicio del traspaso: **NO TODO ESTÁ EN PRODUCCIÓN**.
 
