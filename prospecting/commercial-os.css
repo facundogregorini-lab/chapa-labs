@@ -829,3 +829,82 @@ body[data-unit="habita"] .fu-ref-situation-hidden{
     min-height:34px;
   }
 }
+
+
+/* Habita's native historical funnel: bar palette, hatched "stayed" segments,
+   dense labels, and original chart proportions. Scoped to Habita only. */
+body[data-unit="habita"] .os-native-funnel{
+  border:1px solid #d9e5dc;background:#fff;box-shadow:none;
+  border-radius:16px;padding:25px;margin-bottom:16px;
+}
+body[data-unit="habita"] .os-native-head h2{
+  font-size:19px;color:#153c2b;font-weight:800;
+}
+body[data-unit="habita"] .os-native-head p{
+  color:#60766a;font-size:12px;
+}
+body[data-unit="habita"] .os-native-head .os-native-period{
+  min-width:min(100%,475px);
+}
+body[data-unit="habita"] .os-native-legend{
+  margin:20px 0 11px;
+}
+body[data-unit="habita"] .os-native-legend .is-went{background:#206d4b}
+body[data-unit="habita"] .os-native-legend .is-stayed{background:#e5a045}
+body[data-unit="habita"] .os-native-legend .is-lost{background:#b8b9b3}
+body[data-unit="habita"] .os-native-chart{
+  grid-template-columns:repeat(9,minmax(108px,1fr));
+  gap:7px;
+}
+body[data-unit="habita"] .os-native-step{
+  grid-template-rows:70px 310px minmax(90px,auto);
+}
+body[data-unit="habita"] .os-native-step-top strong{
+  font-size:25px;color:#123b29;
+}
+body[data-unit="habita"] .os-native-step-label{
+  text-align:center;gap:5px;padding:7px 3px;
+}
+body[data-unit="habita"] .os-native-step-label b{
+  color:#113d28;font-weight:800;font-size:12px;
+}
+body[data-unit="habita"] .os-native-step-label small{
+  font-size:11px;line-height:1.4;color:#ba6b26;
+}
+body[data-unit="habita"] .os-native-step-label small.is-lost{
+  color:#84776a;
+}
+body[data-unit="habita"] .os-native-step-label small.is-went{
+  color:#116943;
+}
+body[data-unit="habita"] .os-native-step-plot{
+  border-color:#e0e8e0;
+  background:repeating-linear-gradient(to top,#e4ebe5 0px,#e4ebe5 1px,transparent 1px,transparent 62px);
+}
+body[data-unit="habita"] .os-native-bar{
+  border-radius:7px 7px 0 0;
+}
+body[data-unit="habita"] .os-native-segment{
+  border-radius:0;min-height:21px;
+}
+body[data-unit="habita"] .os-native-segment.is-advanced{
+  background:#206d4b;color:#fff;
+}
+body[data-unit="habita"] .os-native-segment.is-stayed{
+  background:repeating-linear-gradient(135deg,#e8a348 0px,#e8a348 8px,#f3b36b 8px,#f3b36b 15px);
+  color:#55380e;
+}
+body[data-unit="habita"] .os-native-segment.is-lost{
+  background:#b8b9b3;color:#4b493f;
+}
+body[data-unit="habita"] .os-native-segment.is-advanced.is-last{
+  background:#206d4b;
+}
+body[data-unit="habita"] .os-native-note{
+  font-size:11px;color:#63776a;line-height:1.6;
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .os-native-funnel{padding:14px}
+  body[data-unit="habita"] .os-native-head .os-native-period{min-width:100%}
+  body[data-unit="habita"] .os-native-step{grid-template-rows:65px 250px minmax(88px,auto)}
+}
