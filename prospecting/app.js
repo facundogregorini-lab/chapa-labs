@@ -209,6 +209,7 @@
   ).join('');
   const legacy = state.unit === 'todas' ? [] : [
     ['adquisicion','ADQUISICIÓN ANTERIOR'],
+    ['responder-legado','BANDEJA DE WHATSAPP ANTERIOR'], 
     ['embudo','EMBUDO DE PRODUCTO'],
     ['cuentas','FICHAS DE CUENTAS'],
     ['enviar','ENVÍOS Y AUDIOS'],
@@ -253,12 +254,12 @@
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
     if (isFu() && !state.demo && !state.fu.n && !state.fu.loading && !state.fu.error) setTimeout(() => loadFollowup(), 0);
     if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
-    else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup') main.innerHTML = renderFu();
+    else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder') main.innerHTML = renderFu();
     else {
       const d = state.data[state.unit];
       if (!d || d.loading) main.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       else if (d.error) main.innerHTML = unitError(state.unit, d);
-      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
+      else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
     after();
   }
@@ -2067,10 +2068,10 @@
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
   const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
-  const UNIT_VIEWS = ['hoy', 'responder', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_VIEWS = ['hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0, f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
-  const isFu = () => (state.unit === 'todas' ? [...FU_VIEWS,'resumen'].includes(state.view) : UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup');
+  const isFu = () => (state.unit === 'todas' ? [...FU_VIEWS,'resumen'].includes(state.view) : UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder');
   const fuView = () => state.view === 'followup' ? (state.fu.sub || 'hoy') : state.view;
   const fuScope = () => (state.unit === 'todas' ? state.fu.f.unit || 'todas' : state.unit);
   const fuUnits = () => units().filter((u) => fuScope() === 'todas' || u.id === fuScope());
@@ -2172,7 +2173,7 @@
     }
     const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
       .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('');
-    const body = { hoy: fuHoy, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
+    const body = { hoy: fuHoy, responder: fuReplies, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
     return sub + errors + body();
   }
 
@@ -2338,6 +2339,68 @@
       ${n.blocked.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin bloqueadas.</p>'}</div></details>
   </section>`;
 }
+  function fuReplyState() {
+  return state.fu.replyView || (state.fu.replyView={selected:null,manual:false});
+}
+
+  function fuReplies() {
+  const scope=fuScope(), n=state.fu.n;
+  const rows=F.inboxItems(n,scope);
+  const stateReply=fuReplyState();
+  const selected=rows.find(r=>r.key===stateReply.selected)||rows[0]||null;
+  const snap=selected?n.units[selected.unit]:n.units[scope];
+  const allowed=selected?.unit==='habita'
+    ? (snap?.catalog?.canonical||[]).filter(o=>o.key!=='sin_respuesta')
+    : Object.entries(snap?.labels?.situations||{}).filter(([key])=>key!=='sin_respuesta').map(([key,label])=>({key,label}));
+  const without=rows.filter(x=>!x.classification||x.status==='pendiente').length;
+  const facu=rows.filter(x=>x.status==='facu').length;
+  const any=scope!=='todas';
+  const opts=(snap?.labels?.situations||{});
+  const newManual=stateReply.manual&&any?`<form class="card glass os-fu-manual-form" data-fu-manual-reply-form>
+    <div class="os-section-heading"><h2>Registrar una respuesta manual</h2><button type="button" class="btn small" data-fu="reply-manual">CERRAR</button></div>
+    <p class="os-fu-caption">Usá este formulario cuando recibiste un mensaje que no quedó registrado por la extensión o la lectura de WhatsApp.</p>
+    <label class="field"><span>Contacto</span><select class="input" name="id" required><option value="">Elegí un contacto</option>
+    ${[...new Map([...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope).map(x=>[x.id,x])).values()].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.stageTitle||'')}</option>`).join('')}</select></label>
+    <label class="field"><span>Texto original</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió…"></textarea></label>
+    <label class="field"><span>Clasificación</span><select class="input" name="clase"><option value="">Clasificar más tarde</option>
+    ${allowed.map(x=>`<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('')}</select></label>
+    <button class="btn primary" type="submit">REGISTRAR RESPUESTA</button></form>`:'';
+  const item=selected?`
+    <div class="os-fu-conversation-head"><div><span class="os-kicker">CONVERSACIÓN SELECCIONADA</span><h2>${esc(selected.name)}</h2><p class="os-fu-caption">${esc(selected.phone||'')} · ${esc(selected.stage||'')}</p></div><span class="os-tag">${esc(fuName(selected.unit))}</span></div>
+    <div class="os-fu-reply-bubble">${esc(selected.body||'No hay texto original registrado. Consultá WhatsApp antes de clasificar.')}<small>${esc(dayTime(selected.receivedAt)||'')}</small></div>
+    ${selected.note?`<p class="os-fu-caption">Nota: ${esc(selected.note)}</p>`:''}
+    <form data-fu-inbox-form data-fu-reply-key="${esc(selected.key)}">
+      <fieldset class="os-fu-reply-classes"><legend>CLASIFICACIÓN ${selected.confidence!=null?' · sugerida '+Math.round(selected.confidence*100)+'%':''}</legend>
+      <div class="os-fu-chips">${allowed.map(o=>`<label><input type="radio" name="clase" value="${esc(o.key)}" ${selected.classification===o.key?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div></fieldset>
+      ${selected.unit==='habita'?`<div class="os-fu-conditional" data-reply-condition="mas_adelante" hidden>
+        <label class="field"><span>Retomar el contacto (opcional)</span><input class="input" type="date" name="hasta"></label></div>
+      <div class="os-fu-conditional" data-reply-condition="derivo" hidden>
+        <label class="field"><span>Nombre de la nueva persona</span><input class="input" name="contactoNombre" maxlength="120"></label>
+        <label class="field"><span>WhatsApp del referido</span><input class="input" name="contactoWhatsapp" maxlength="40"></label></div>`:''}
+      <label class="field" style="margin-top:14px"><span>Observación (opcional)</span><textarea class="input" name="nota" rows="2" maxlength="700" placeholder="Contexto para la siguiente acción…"></textarea></label>
+      <div class="os-fu-actions"><button type="submit" class="btn primary" ${!selected.body?'disabled title="No hay texto para clasificar."':''}>APLICAR CLASIFICACIÓN</button>
+      ${selected.unit==='habita'?'<button type="submit" class="btn" name="facu" value="1">ENVIAR A REVISIÓN</button>':''}
+      <button type="button" class="btn" data-fu="reply-to-queue" data-fu-id="${esc(selected.id)}">VER EN COLA →</button></div>
+      <p class="os-fu-caption">Las bajas y solicitudes de no contactar quedan protegidas por el motor de cada producto. La clasificación no envía WhatsApp por sí sola.</p>
+    </form>`:'<p class="empty">No hay respuestas pendientes.</p>';
+  return `<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
+    <h1>Conversaciones que importan.</h1><p>La misma bandeja del Follow-up de Habita: mensaje original, clasificación, contexto y siguiente acción. La conversación pertenece al producto.</p></div>
+    ${any?`<button class="btn" type="button" data-view="responder-legado">BANDEJA DE WHATSAPP ↗</button>`:''}</section>
+    <section class="os-fu-kpis" data-testid="followup-inbox">
+      <div class="os-fu-kpi"><span>SIN CLASIFICAR</span><strong>${int(without)}</strong><small>Requieren revisión</small></div>
+      <div class="os-fu-kpi"><span>PARA FACU</span><strong>${int(facu)}</strong><small>Respuestas especiales</small></div>
+      <div class="os-fu-kpi"><span>CONFIANZA MÍNIMA</span><strong>${scope==='habita'?'70%':'—'}</strong><small>${scope==='habita'?'Clasificación automática':'Clasificación por el equipo'}</small></div>
+      <button type="button" class="os-fu-kpi" data-fu="reply-manual" ${!any?'disabled':''} aria-expanded="${stateReply.manual}"><span>¿LLEGÓ UNA RESPUESTA?</span><strong>+</strong><small>Registrala a mano</small></button>
+    </section>${newManual}
+    <section class="card glass os-fu-inbox-grid"><div class="os-fu-conversation-list" aria-label="Respuestas pendientes">
+      ${rows.map(r=>`<button type="button" class="os-fu-conversation ${selected?.key===r.key?'is-on':''}" data-fu="reply-select" data-fu-key="${esc(r.key)}">
+        <span class="os-fu-conv-head"><strong>${esc(r.name)}</strong><time>${esc(dayTime(r.receivedAt)||'')}</time></span>
+        <span class="os-fu-conv-text">«${esc(r.body||'Mensaje sin texto guardado')}»</span>
+        <span class="os-fu-conv-status">${esc(r.status==='facu'?'PARA FACU':opts[r.classification]||r.classification||'SIN CLASIFICAR')}</span>
+      </button>`).join('')||'<p class="empty">No hay respuestas pendientes.</p>'}
+    </div><div class="os-fu-reply-detail" data-testid="followup-reply-detail">${item}</div></section>`;
+}
+
   function fuBlockReasons(list) {
     const c = {};
     for (const x of list) { const k = String(x.blocked || '').split(':')[0].split('(')[0].trim(); c[k] = (c[k] || 0) + 1; }
@@ -2637,6 +2700,9 @@
     const fields = () => ({ ...F.taskFields(it), ...(task.versionId ? { version: task.versionId } : {}), ...(task.actionKey ? { tarea: task.actionKey } : {}), ...(task.stage ? { etapa: task.stage } : {}) });
     switch (ds.fu) {
       case 'sub': state.fu.sub = ds.fuSub; store('fu-sub', state.fu.sub); go(state.unit, state.fu.sub); break;
+      case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
+      case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
+      case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
       }
