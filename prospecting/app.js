@@ -2410,6 +2410,9 @@
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
   const {q,snap,stages,current,rows}=fuQueueSelection(scope);
+  const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
+  const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
+  const customStages=stages.filter(x=>customStageKeys.has(x.key));
   const summary=F.summary(n,scope);
   const cards=[
     ['listas','ACCIONES LISTAS',summary.ready,'Disponibles para ejecutar'],
@@ -2441,8 +2444,11 @@
     ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
       `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
         <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong><span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
-        ${stages.map(s=>`<button class="os-fu-stage is-${esc(s.key)} ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${stageCounter(s)}</strong></button>`).join('')}
+        ${commercialStages.map(s=>`<button class="os-fu-stage is-${esc(s.key)} ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${stageCounter(s)}</strong></button>`).join('')}
       </div>`}
+    ${scope!=='todas'&&customStages.length?`<div class="os-fu-chipbar" data-testid="followup-queue-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
+      ${customStages.map(s=>`<button type="button" aria-pressed="${current?.key===s.key}" class="${current?.key===s.key?'is-on':''}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${stageCounter(s)}</b></button>`).join('')}
+    </div></div>`:''}
     <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
@@ -2671,6 +2677,9 @@
   const snap=n.units[scope];
   if(!snap)return `<section class="card glass"><p>El embudo de ${esc(fuName(scope))} no está disponible.</p></section>`;
   const stages=F.commercialStages(scope,snap);
+  const customStageKeys=new Set((snap.catalog?.stages||[]).map(x=>x.key));
+  const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
+  const customStages=stages.filter(x=>customStageKeys.has(x.key));
   const selected=stages.find(s=>s.key===state.fu.pipelineStage)||stages[0];
   const tech=(selected?.technical||[]).includes(state.fu.technicalStage)?state.fu.technicalStage:null;
   const activeTech=tech||selected?.technical?.[0]||null;
@@ -2694,8 +2703,11 @@
     ${scope==='habita'?fuNativeChart(snap):''}
     <section class="card glass" data-testid="followup-funnel"><div class="os-funnel-title"><div><span class="os-kicker">EMBUDO COMERCIAL</span><h2>${esc(fuName(scope))} · ${stages.length} etapas</h2></div><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></div>
     <div class="os-fu-stage-grid" data-testid="followup-funnel-stages">
-      ${stages.map(s=>`<button type="button" class="os-fu-stage is-${esc(s.key)} ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${int(s.waiting)}</strong></button>`).join('')}
+      ${commercialStages.map(s=>`<button type="button" class="os-fu-stage is-${esc(s.key)} ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${int(s.waiting)}</strong></button>`).join('')}
     </div>
+    ${customStages.length?`<div class="os-fu-chipbar" data-testid="followup-funnel-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
+      ${customStages.map(s=>`<button type="button" aria-pressed="${selected?.key===s.key}" class="${selected?.key===s.key?'is-on':''}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${int(s.waiting)}</b></button>`).join('')}
+    </div></div>`:''}
     ${selected?.technical?.length>1?`<div class="os-fu-chipbar" data-testid="followup-funnel-substages"><strong>ETAPA TÉCNICA</strong><div class="os-fu-chips">
       <button type="button" class="${!tech?'is-on':''}" data-fu="pipeline-technical" data-fu-stage="">Todas <b>${int(selected.waiting)}</b></button>
       ${selected.technical.map(key=>{const s=snap.stages.find(x=>x.key===key);return `<button type="button" class="${tech===key?'is-on':''}" data-fu="pipeline-technical" data-fu-stage="${esc(key)}">${esc(s?.title||key)} <b>${int(s?.waiting||0)}</b></button>`}).join('')}
