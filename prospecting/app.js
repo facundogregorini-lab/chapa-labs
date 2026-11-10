@@ -3528,6 +3528,7 @@
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
       case 'rules-stage': {
+        state.fu.previewVersion=null;
         const ui=fuRulesState(state.unit);
         if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de etapa?'))break;
         ui.commercial=ds.fuStage;ui.selected=null;ui.creating=false;ui.template=null;ui.technical=null;ui.dirty=false;ui.showMenu=false;render();break;
@@ -3542,11 +3543,24 @@
           const custom=form.querySelector('[data-fu-rule-custom]');
           if(custom)custom.value='';
           syncFuRuleSituationChips(form);
+          syncFuLinkedRulePanel(form);
           fuRulesState(state.unit).dirty=true;
         }
         break;
       }
+      case 'rules-message-focus': {
+        const message=main.querySelector('[data-testid="followup-rule-message"]');
+        if(message){message.scrollIntoView({block:'center',behavior:'smooth'});}
+        break;
+      }
+      case 'rules-version-new': {
+        const details=main.querySelector('[data-testid="followup-rule-message"] .fu-ref-new-message');
+        if(details){details.open=true;details.scrollIntoView({block:'center',behavior:'smooth'});}
+        else toast('Seleccioná la regla y la acción para crear la nueva versión.',true);
+        break;
+      }
       case 'rules-select': {
+        state.fu.previewVersion=null;
         const ui=fuRulesState(state.unit);
         if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de regla?'))break;
         ui.selected=ds.fuKey;ui.creating=false;ui.template=null;ui.dirty=false;ui.showMenu=false;render();break;
