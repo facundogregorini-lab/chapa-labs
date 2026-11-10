@@ -442,7 +442,7 @@ async function doSetup(req, res, user) {
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
 // va a la app de su unidad a nombre de quien opera.
-const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'whatsapp-sync']);
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync']);
 
 async function doFollowup(req, res) {
   const want = req.query.unit && req.query.unit !== 'todas' ? [UNITS[req.query.unit]].filter(Boolean) : Object.values(UNITS);
@@ -483,7 +483,7 @@ async function doTask(req, res, user) {
   if (!f || !FOLLOWUP_OPS.has(f.op)) return fail(res, 400, 'Operación de Follow-up desconocida.');
   // Catalog and full rule/message editing are sensitive: the legacy open-name session
   // is not sufficient authorization for changing outbound automation.
-  if (new Set(['rule-save', 'rule-delete', 'rule-reorder', 'version-create', 'version-update', 'version-status', 'stage-create', 'state-save', 'state-delete']).has(f.op) && session.open())
+  if (new Set(['rule-save', 'rule-delete', 'rule-reorder', 'version-create', 'version-update', 'version-status', 'stage-create', 'state-save', 'state-delete', 'state-toggle']).has(f.op) && session.open())
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
     const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: f.op === 'whatsapp-sync' ? 280000 : 45000 });
