@@ -430,7 +430,7 @@
     ...(db.states||[]).filter(x=>x.commercial_stage===key).map(x=>({...x,base:false,removed:false}))
   ]:bases.map(([id,label])=>({key:id,label,base:true,removed:false}));
   const active=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
-  const allowedClassifications=db.canonical||bases.map(([key,label])=>({key,label}));
+  const allowedClassifications=(db.canonical||bases.map(([key,label])=>({key,label}))).filter(x=>bases.some(([k])=>k===x.key));
   const current=active?.create?{key:'',label:'',description:'',examples:'',base:false,source:'whatsapp',maps_to:'neutro',active:true}:rows.find(x=>x.key===active?.key&&x.base===active?.base);
   const canEdit=habita&&db.available===true&&!state.session?.open;
   const stageForm=canEdit&&state.fu.newStage?`<form class="section" data-fu-stage-form>
