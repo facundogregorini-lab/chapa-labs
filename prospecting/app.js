@@ -2340,7 +2340,9 @@
       const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
       if(!released)return;
     }
-    state.fu.task=null;
+    // Keep the confirmed receipt until the next claim succeeds. If the
+    // backend rejects this claim, the user still sees their prior confirmation.
+    if(previous?.mode!=='confirmado')state.fu.task=null;
     await fuClaim(next);
   }
 
