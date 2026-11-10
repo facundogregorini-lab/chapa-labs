@@ -2113,7 +2113,7 @@
     } finally {
       state.fu.loading = false;
       // Con una tarea abierta no se redibuja: se perdería lo que se está escribiendo.
-      if (!state.fu.task) render(); else renderTopOnly();
+      if (!state.fu.task&&!fuRulesState('habita').dirty&&!fuRulesState('turnia').dirty) render(); else renderTopOnly();
     }
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
@@ -2185,7 +2185,7 @@
 
   function renderFu() {
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
-    if (state.fu.task) return fuTaskWithQueue(state.fu.task);
+    if (state.fu.task && fuView()!=='hoy') return fuTaskWithQueue(state.fu.task);
     const v = fuView();
     const sub = '';
     if (!state.fu.n) {
@@ -2316,6 +2316,42 @@
   </tr>`;
 }
 
+  function fuRecommended(scope,rows,selected,q) {
+  const safe=rows.find(x=>x.action&&!x.claim&&!x.blocked&&!x.dueAt&&!q.closed)||null;
+  const snap=safe?state.fu.n.units[safe.unit]:null;
+  const rule=safe&&(snap.rules||[]).find(x=>x.key===safe.ruleKey);
+  const version=safe&&F.versionRows(safe.unit,snap).find(x=>x.id===safe.versionId);
+  if(!safe)return `<aside class="os-fu-side" data-testid="followup-recommended"><div class="os-fu-side-head"><span>◎ SIGUIENTE EN LA COLA</span></div><p class="os-fu-caption">No queda ningún contacto libre con los filtros elegidos.</p></aside>`;
+  const checks=[
+    ['Número de WhatsApp validado',Boolean(safe.wa)&&!safe.needsReview],
+    ['Situación: '+(safe.situationLabel||'Sin clasificar'),true],
+    ['Regla: '+(rule?.name||rule?.action_label||safe.action||'Revisión manual'),Boolean(safe.ruleKey)],
+    ['Horario y bloqueos controlados por '+fuName(safe.unit),!safe.blocked&&!safe.dueAt],
+  ];
+  return `<aside class="os-fu-side" data-testid="followup-recommended" data-prospect="${esc(safe.id)}">
+    <div class="os-fu-side-head"><span>◎ SIGUIENTE RECOMENDADA</span><span class="os-tag">${esc(safe.stageTitle||safe.stage)}</span></div>
+    <div class="os-fu-side-ident"><h3>${esc(safe.name)}</h3><p>${esc(safe.zone||'Sin ciudad')} · SCORE ${safe.score==null?'—':esc(String(safe.score))}</p>
+      <div><span>WHATSAPP</span><strong>${esc(safe.phone||'Sin WhatsApp')}</strong></div></div>
+    <div class="os-fu-side-rule" data-testid="followup-applied-rule"><span>◇ REGLA APLICADA</span><strong>${esc(rule?.name||safe.action||'No hay regla activa')}</strong>
+      <p>${esc(rule?.situations?.map(s=>snap.labels?.situations?.[s]||s).join(', ')||safe.situationLabel||'Revisar situación actual')}</p></div>
+    <button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="${esc(safe.key)}" data-testid="followup-recommended-execute">↗ EJECUTAR ESTA</button>
+    <div class="os-fu-side-status"><span>SITUACIÓN ACTUAL</span><span class="os-fu-pill">${esc(safe.situationLabel||'—')}</span></div>
+    <details class="os-fu-side-details" data-testid="followup-recommended-context"><summary>ANTECEDENTES Y NOTAS</summary>
+      <div class="os-fu-side-detail"><b>CONTEXTO</b><p>${esc(safe.website||'Sin web')}${safe.properties!=null?' · '+int(safe.properties)+' propiedades':''}</p>${safe.address?`<p>${esc(safe.address)}</p>`:''}<p>En el mensaje: «${esc(safe.shortName||safe.name)}»</p>
+      <b>ÚLTIMA ACCIÓN</b><p>${esc(safe.lastText||'Sin acciones anteriores')} · ${esc(ago(safe.since)||'')}</p></div></details>
+    <details class="os-fu-side-details" data-testid="followup-recommended-flow"><summary>PRÓXIMO PASO DEL FLUJO</summary>
+      <div class="os-fu-side-detail"><p>Ejecutar ${esc(safe.action||'acción pendiente')}. ${esc(safe.actionReason||'El motor del producto determina la próxima etapa al confirmar.')}</p></div></details>
+    <details class="os-fu-side-details" data-testid="followup-recommended-preparation"><summary>VALIDACIONES Y MENSAJE</summary>
+      <div class="os-fu-side-detail"><b>ANTES DE ENVIAR</b>
+      <ul>${checks.map(([label,ok])=>`<li><span>${ok?'✓':'!'}</span>${esc(label)}</li>`).join('')}</ul>
+      <b>MENSAJE (${esc(safe.action||'Seguimiento')}${version?' · V'+int(version.version):''})</b>
+      <p class="os-fu-side-preview">${esc(version?.body?
+        version.body.replaceAll('{{inmobiliaria}}',safe.shortName||safe.name).replaceAll('{{decisor}}',safe.person||''):
+        'El texto personalizado se prepara al tomar la tarea. Revisalo antes de enviar.')}</p></div></details>
+    <p class="os-fu-caption">Al tomarla, la reserva dura 10 minutos. Abrir WhatsApp no confirma el envío; tenés que confirmarlo después.</p>
+  </aside>`;
+}
+
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
   const {q,snap,stages,current,rows}=fuQueueSelection(scope);
@@ -2326,7 +2362,13 @@
     ['demos','DEMOS PENDIENTES',summary.demos,'Por crear o enviar'],
     ['bloqueadas','BLOQUEADAS',summary.blocked,`${summary.scheduled} programadas`],
   ];
-  const stageCounter=(stage)=>F.filter(n.queue,{unit:scope,q:q.search}).filter(x=>!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation)).length;
+  const baseStageRows=q.closed?n.noInteresados:q.kpi==='bloqueadas'?n.blocked:
+    q.kpi==='respuestas'?n.queue.filter(x=>x.group==='respuestas'):
+    q.kpi==='demos'?n.queue.filter(x=>x.group==='demos'):n.queue;
+  const stageCounter=(stage)=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
+    (!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation))&&
+    (!q.situation||x.situation===q.situation||x.catalogSituation===q.situation||x.productSituations?.includes(q.situation))&&
+    (!q.rule||x.ruleKey===q.rule)).length;
   const canonical=Object.entries(snap?.labels?.situations||{});
   const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
   const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed)).map(([key,label])=>{
@@ -2340,8 +2382,7 @@
     const k=String(x.blocked||'').split(':')[0].trim()||'Sin motivo';obj[k]=(obj[k]||0)+1;return obj;
   },{})).sort((a,b)=>b[1]-a[1]).slice(0,4);
   return `<section class="os-fu-center" data-testid="followup-queue">
-    <section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / COLA DE EJECUCIÓN</span><h1>Tu próxima mejor acción.</h1>
-      <p>El mismo recorrido del Follow-up de Habita: etapa → situación → regla → contacto → QA → confirmar. Cada producto decide qué se puede enviar.</p></div></section>
+
     ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
       `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
         <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong><span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
@@ -2358,6 +2399,7 @@
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note">Primeros contactos: ${int(snap.summary.newToday||0)} / ${int(snap.summary.cap)} registrados. Los bloqueos y horarios se aplican desde ${esc(fuName(scope))}.</div>`:''}
     <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
+    <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
     <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':'en este filtro'}</h2><div class="os-fu-tools">
       <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
@@ -2370,7 +2412,10 @@
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
     <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
+    <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
     </section>
+    ${q.kpi==='bloqueadas'?'':(state.fu.task?'<aside class="os-fu-side" data-testid="followup-execution-aside">'+renderFuTask(state.fu.task)+'</aside>':fuRecommended(scope,rows,current,q))}
+    </div>
     <details class="card glass" data-fu-details="sched" ${state.fu.open.sched?'open':''}><summary><strong>Programadas</strong> <span class="count">${int(n.scheduled.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
       ${n.scheduled.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin programadas.</p>'}</div></details>
     <details class="card glass" data-fu-details="blocked" ${state.fu.open.blocked?'open':''}><summary><strong>Bloqueadas</strong> <span class="count">${int(n.blocked.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
@@ -2553,49 +2598,69 @@
       </tbody></table></div>${all.length > shown ? `<div style="text-align:center;padding:8px"><button class="btn small" type="button" data-more-block="fu-prospectos">Ver los ${int(all.length - shown)} restantes</button></div>` : ''}</section>`;
   }
 
-  function fuRuleEditor(unit, snap) {
+  function fuRuleEditor(unit,snap) {
   if(unit!=='habita'||!state.fu.ruleEdit)return '';
   const create=state.fu.ruleEdit==='__new';
   const stage=create?state.fu.ruleDraftStage:null;
   const existing=create?null:(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
   if(!create&&!existing)return '';
-  const options=snap.catalog?.actions?.[stage||existing?.stage]||[{key:'principal',label:'Acción principal'}];
-  const compatible=options.map(x=>x.key);
-  const template=create? (snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate) : null;
-  const defaults={stage,action:'principal',situations:['sin_respuesta'],after_hours:0,after_action:null,
-    position:1000,enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:''};
-  const r=existing || (template?{
-    ...defaults,
-    ...template,
-    key:null,
-    stage,
-    action:compatible.includes(template.action)?template.action:compatible[0],
-    after_action:compatible.includes(template.after_action)?template.after_action:null,
-    min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(stage)?template.min_demo_activity_level||0:0,
-    catalog_situation:null,
-    name:template.name ? 'Copia de '+template.name : 'Copia de '+template.action,
-  }:defaults);
-  const days=['DO','LU','MA','MI','JU','VI','SA'];
-  return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}" data-fu-unit-id="${unit}" data-fu-stage="${esc(r.stage)}">
-    <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE REGLAS · HABITA</span><h2>${create?'Crear regla':'Editar regla'}</h2></div><button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
-    <p class="os-view-caption">Gana la primera regla compatible en orden; el motor original valida y guarda el cambio, sin tocar ejecuciones históricas.</p>
-    ${create?`<label class="field" style="margin:12px 0"><span>USAR UNA REGLA EXISTENTE COMO PLANTILLA</span>
-      <select class="input" data-fu-rule-template><option value="">Empezar desde cero</option>
-        ${(snap.rules||[]).map(x=>`<option value="${esc(x.key)}" ${state.fu.ruleTemplate===x.key?'selected':''}>${esc((snap.stages||[]).find(z=>z.key===x.stage)?.title||x.stage)} · ${esc(x.name||x.action)}</option>`).join('')}
-      </select></label><p class="os-tutorial-note">Podés elegir cualquier regla para copiar sus condiciones. Las acciones incompatibles se adaptan a esta etapa y el motor valida todo al guardar.</p>`:''}
-    <div class="grid cols-2" style="margin-top:12px">
-      <label class="field"><span>Nombre</span><input class="input" name="name" maxlength="120" value="${esc(r.name||'')}"></label>
-      <label class="field"><span>Acción</span><select class="input" name="action" ${create?'':'disabled'}>${options.map(x=>`<option value="${esc(x.key)}" ${r.action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
-      <label class="field"><span>Esperar desde el último mensaje (horas)</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${r.after_hours??0}" required></label>
-      <label class="field"><span>Acción previa requerida</span><select class="input" name="after_action"><option value="">Ninguna</option>${options.map(x=>`<option value="${esc(x.key)}" ${r.after_action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
-      <label class="field"><span>Horario desde</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required></label>
-      <label class="field"><span>Horario hasta</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></label>
-    </div>
-    <h3 style="margin-top:14px">Situaciones que disparan esta regla</h3><div class="os-quick-links" style="margin-top:8px">
-      ${Object.entries(snap.labels?.situations||{}).filter(([key])=>{const x=snap.catalog?.canonical?.find(x=>x.key===key);return !x||!x.permanent_stop||key==='rechazo';}).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
-    <h3 style="margin-top:14px">Días habilitados</h3><div class="os-quick-links" style="margin-top:8px">${days.map((d,i)=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''}>Regla activa</label>
-    <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
+  const key=stage||existing.stage;
+  const actions=snap.catalog?.actions?.[key]||[{key:'principal',label:'Mensaje de la etapa'}];
+  const allowed=actions.map(a=>a.key);
+  const tpl=create?(snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate):null;
+  const siblings=(snap.rules||[]).filter(r=>r.stage===key);
+  const defaults={stage:key,action:allowed[0],situations:[key==='no-contactado'?'sin_respuesta':key==='no-responde'?'confirmo_numero':'interesado'],
+    after_hours:48,after_action:null,position:Math.max(0,...siblings.map(r=>Number(r.position)||0))+10,
+    enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:'',catalog_situation:null,min_demo_activity_level:0};
+  const r=existing||{...defaults,...(tpl||{}),key:null,stage:key,
+    action:tpl&&allowed.includes(tpl.action)?tpl.action:defaults.action,
+    after_action:tpl&&allowed.includes(tpl.after_action)?tpl.after_action:null,
+    catalog_situation:tpl?.catalog_situation||null,
+    min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?(tpl?.min_demo_activity_level||0):0,
+    position:defaults.position,
+    name:tpl?.name?`Copia de ${tpl.name}`.slice(0,80):''};
+  const stageCommercial=F.commercialStages(unit,snap).find(s=>s.technical.includes(key))?.key;
+  const overrides=(snap.catalog?.overrides||[]).filter(s=>s.commercial_stage===stageCommercial&&s.removed);
+  const labels=Object.entries(snap.labels?.situations||{}).filter(([s])=>{
+    const cat=snap.catalog?.canonical?.find(x=>x.key===s);
+    return (!cat||!cat.permanent_stop||s==='rechazo')&&!overrides.some(x=>x.key===s);
+  });
+  const custom=(snap.catalog?.states||[]).filter(s=>s.active&&(s.maps_to||s.product_stage===key)
+    &&(s.commercial_stage===stageCommercial||(snap.catalog?.stages||[]).some(x=>x.key===s.commercial_stage&&x.technical_stage===key)));
+  const surveyed=r.action==='encuesta_cierre';
+  const allowRejection=allowed.includes('encuesta_cierre');
+  const days=[['DO',0],['LU',1],['MA',2],['MI',3],['JU',4],['VI',5],['SA',6]];
+  const rank=existing?siblings.sort((a,b)=>(a.position||999)-(b.position||999)).findIndex(x=>x.key===r.key)+1:0;
+  return `<form class="card glass fu-ref-editor fu-ref-rule-form" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}"
+    data-fu-unit-id="habita" data-fu-stage="${esc(key)}" data-fu-position="${Number(r.position)||10}" data-testid="followup-rule-form">
+    <header class="fu-ref-edit-head"><div><div class="fu-ref-titleline"><span class="os-tag">${create?'NUEVA REGLA':'PRIORIDAD P'+rank}</span>
+      <label class="field"><span class="sr-only">NOMBRE DE LA REGLA</span><input class="input fu-ref-rule-name" name="name" maxlength="80" value="${esc(r.name||'')}" placeholder="${esc(actions.find(a=>a.key===r.action)?.label||'Nombre de la regla')}" data-testid="followup-rule-name"></label></div>
+      <p class="os-view-caption">Gana la primera regla compatible. Los cambios se guardan en el motor de Habita.</p></div>
+      <label class="fu-ref-switch"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''} data-testid="followup-rule-enabled">ACTIVA</label>
+    </header>
+    <section class="fu-ref-when" data-testid="followup-part-when"><h3>◷ CUÁNDO SE EJECUTA</h3>
+      ${create&&tpl?'<p class="os-warn-note">Regla copiada: revisá y adaptá la situación, el mensaje y la etapa antes de guardarla.</p>':''}
+      <label class="field"><span>ETAPA DEL EMBUDO</span><input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled></label>
+      <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span><div class="fu-ref-classifiers" data-testid="followup-rule-situations">
+        ${labels.map(([id,label])=>`<label><input type="checkbox" name="sit" value="${esc(id)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled title="Esta etapa no admite encuesta de cierre"':''}><span>${esc(label)}</span></label>`).join('')}
+      </div></div>
+      ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation"><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
+      <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
+        ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+      <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
+      <div class="fu-ref-fields">
+        <label class="field"><span>DÍAS DE ENVÍO</span><div class="fu-ref-classifiers">${days.map(([d,i])=>`<label><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}><span>${d}</span></label>`).join('')}</div></label>
+        <label class="field"><span>HORARIO</span><div class="fu-ref-hours"><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required><span>A</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></div></label>
+      </div>
+      ${['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?`<label class="field"><span>CONDICIÓN DE INTERACCIÓN CON LA DEMO</span><select class="input" name="min_demo_activity_level"><option value="0" ${(r.min_demo_activity_level||0)===0?'selected':''}>Cualquier nivel de interacción</option><option value="3" ${r.min_demo_activity_level===3?'selected':''}>Solo si generó una imagen</option></select></label>`:''}
+    </section>
+    <section class="fu-ref-what" data-testid="followup-part-what"><h3>◇ QUÉ SE EJECUTA</h3>
+      <label class="field"><span>ACCIÓN DE LA REGLA</span><select class="input" name="action" data-fu-rule-action data-testid="followup-rule-action">
+        ${actions.map(a=>`<option value="${esc(a.key)}" ${r.action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+      <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'La acción utiliza la versión de mensaje vinculada a esta etapa. Podés editarla en el panel contiguo.'}</p>
+    </section>
+    <footer class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-cancel">CANCELAR</button>
+      <button type="submit" class="btn primary" data-testid="followup-rule-save" ${state.session?.open?'disabled title="Requiere sesión protegida"':''}>${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button></footer>
   </form>`;
 }
 
@@ -2618,13 +2683,34 @@
     const create=!form.dataset.fuRuleKey;
     const rule=create?null:(snap?.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
     if(!create&&!rule)return;
-    const values={...(rule||{stage:form.dataset.fuStage,action:String(fd.get('action')||'principal'),position:1000,min_demo_activity_level:0}),
-      name:String(fd.get('name')||''),situations:fd.getAll('sit').map(String),
+    const action=String(fd.get('action')||rule?.action||'principal');
+    const situations=fd.getAll('sit').map(String);
+    if(action==='encuesta_cierre'&&!situations.includes('rechazo')){toast('La encuesta de cierre requiere la situación No interesado.',true);return;}
+    if(action!=='encuesta_cierre'&&situations.includes('rechazo')){toast('Para No interesado elegí la acción Encuesta de cierre.',true);return;}
+    const values={...(rule||{stage:form.dataset.fuStage,position:Number(form.dataset.fuPosition)||10}),
+      action, name:String(fd.get('name')||'').slice(0,80),situations,
+      catalog_situation:fd.get('catalog_situation')||null,
+      min_demo_activity_level:Number(fd.get('min_demo_activity_level')||0),
       after_hours:Number(fd.get('after_hours')),after_action:fd.get('after_action')||null,
       hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),
       days:fd.getAll('days').map(Number),enabled:fd.has('enabled')};
-    if(await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'})){
-      state.fu.ruleEdit=null; await loadFollowup({quiet:true});render();
+    const draft=document.querySelector('[data-fu-new-rule-message]');
+    const messageBody=create?String(draft?.querySelector('textarea[name="body"]')?.value||'').trim():'';
+    const messageNotes=create?String(draft?.querySelector('textarea[name="notes"]')?.value||'').trim():'';
+    if(create&&messageBody&&(snap?.stages||[]).flatMap(s=>s.versions||[]).some(v=>v.stage===values.stage&&v.action===action&&v.status==='active')){
+      if(!window.confirm('Esta acción ya tiene un mensaje activo que otras reglas pueden usar. ¿Crear una nueva versión activa igualmente?'))return;
+    }
+    const saved=await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'});
+    if(saved){
+      const ui=fuRulesState(unit);
+      ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=saved.key||rule?.key||null;
+      state.fu.ruleEdit=null;
+      if(create&&messageBody){
+        const result=await fuOp(unit,{op:'version-create',valores:{stage:values.stage,action,channel:'whatsapp',trigger:'',body:messageBody,notes:messageNotes,
+          ctas:['whatsapp','demo','copy'],status:'active'}},{label:'Mensaje creado y vinculado a la acción.'});
+        if(!result)toast('La regla quedó guardada, pero el mensaje no. Creá una nueva versión desde el editor.',true);
+      }
+      await loadFollowup({quiet:true});render();
     }
     return;
   }
@@ -2639,33 +2725,160 @@
   }
 }
 
+  function fuRulesState(unit) {
+  state.fu.rulesWorkspace ||= {};
+  return state.fu.rulesWorkspace[unit] ||= {
+    commercial: unit === 'habita' ? 'contactado' : 'saludado',
+    selected: null, creating: false, template: null, showMenu: false, picking: false,
+    technical: null, dirty: false, moving: false,
+  };
+}
+
+  function fuRulesMessage(unit, snap, rule, stage, create) {
+  if(create)return `<section class="fu-ref-message" data-fu-new-rule-message data-testid="followup-rule-message">
+  <div class="os-section-heading"><div><span class="os-kicker">QUÉ SE EJECUTA</span><h3>Mensaje de la nueva regla</h3></div></div>
+  <p class="os-view-caption">Prepará el texto junto con la regla. Guardar crea la regla y, si escribís un mensaje, una versión activa para su acción.</p>
+  <label class="field"><span>MENSAJE A ENVIAR</span><textarea class="input" name="body" rows="9" maxlength="4000" placeholder="Escribí el mensaje o adaptá la plantilla…"></textarea></label>
+  <p class="os-view-caption">Podés usar {{inmobiliaria}} y las variables que reconoce Habita. No se envía ningún mensaje al guardar esta pantalla.</p>
+  <label class="field"><span>OBSERVACIONES (OPCIONAL)</span><textarea class="input" name="notes" rows="3" maxlength="2000" placeholder="Notas para el equipo…"></textarea></label>
+  <p class="os-warn-note">Las versiones anteriores se conservan. Si esta acción ya tiene una versión activa, revisá lo existente antes de crear otra.</p>
+</section>`;
+  const action=unit==='turnia'?'principal':rule?.action||'principal';
+  const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
+  const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
+  return `<section class="fu-ref-message" data-testid="followup-rule-message">
+    <div class="os-section-heading"><div><span class="os-kicker">MENSAJE VINCULADO A LA ACCIÓN</span><h3>${esc((snap.catalog?.actions?.[stage]||[]).find(a=>a.key===action)?.label||rule?.name||action)}</h3></div>
+    <span class="os-tag">${versions.length} VERSIONES</span></div>
+    ${versions.map(v=>`<article class="fu-ref-version">
+      <div class="fu-ref-version-top"><b>V${int(v.version)} · ${esc(v.status==='active'?'ACTIVA':v.status==='test'?'EN PRUEBA':'ARCHIVADA')}</b>
+        <small>${int(v.executed)} enviadas · ${int(v.conversions)} conversiones</small></div>
+      <p>${esc(v.body||'')}</p>
+      <div class="fu-ref-buttons">${canEdit?`${unit==='habita'?`<button type="button" class="btn small" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR</button>`:''}
+        ${v.status!=='active'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="active">ACTIVAR VERSIÓN</button>`:''}
+        ${v.status==='test'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="archived">DETENER PRUEBA</button>`:''}`:''}</div>
+    </article>`).join('')||'<p class="os-view-caption">Todavía no hay versiones de esta acción.</p>'}
+    ${unit==='habita'?fuVersionEditor(unit,snap,stage):''}
+    <details class="fu-ref-new-message">
+      <summary>+ NUEVA VERSIÓN DEL MENSAJE</summary>
+      <form data-fu-version-form data-fu-unit-id="${unit}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}">
+        <p class="os-view-caption">Cada versión queda registrada por separado para preservar las métricas de las anteriores.</p>
+        <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>
+        <div class="fu-ref-fields"><label class="field"><span>ACCIÓN</span><select class="input" name="action" aria-label="Acción">${(snap.catalog?.actions?.[stage]||[{key:action,label:action}]).map(a=>`<option value="${esc(a.key)}" ${a.key===action?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+        <label class="field"><span>ESTADO</span><select class="input" name="status"><option value="test">Probar 50/50</option><option value="active">Reemplazar versión activa</option></select></label></div>
+        <button class="btn primary" type="submit" ${canEdit?'':'disabled title="Requiere sesión protegida"'}>GUARDAR NUEVA VERSIÓN</button>
+      </form>
+    </details>
+  </section>`;
+}
+
+  function fuTurniaRuleEditor(snap, rule, stage) {
+  if(!rule)return `<section class="card glass"><p class="os-view-caption">Seleccioná una regla para ver sus condiciones.</p></section>`;
+  const canEdit=!state.session?.open && snap.catalog?.available;
+  const reason=canEdit?'Las condiciones de esta pantalla solo restringen la cadencia nativa de Turnia; no pueden adelantar mensajes ni modificar su consentimiento.':'Las reglas siguen el motor de Turnia. Para editarlas desde acá debe estar publicada la API de configuración y la sesión protegida.';
+  const days=['DO','LU','MA','MI','JU','VI','SA'];
+  return `<form class="card glass fu-ref-editor" data-fu-turnia-rule-form data-fu-unit-id="turnia" data-fu-stage="${esc(stage)}">
+    <div class="fu-ref-edit-head"><div><span class="os-kicker">REGLA DE TURNIA · ${esc(rule.stageTitle||stage)}</span><h3>${esc(rule.name||rule.title||rule.action||'Acción principal')}</h3></div><span class="os-tag">CADENCIA NATIVA</span></div>
+    <p class="os-view-caption">${esc(reason)}</p>
+    <label class="field"><span>NOMBRE</span><input class="input" name="name" value="${esc(rule.name||'')}" maxlength="120" ${canEdit?'':'disabled'}></label>
+    <label class="field"><span>QUÉ SE EJECUTA</span><input class="input" value="${esc(rule.action_label||rule.action||'Mensaje de la etapa')}" disabled></label>
+    <h3>Condiciones de la regla</h3>
+    <div class="fu-ref-classifiers">${Object.entries(snap.labels?.situations||{}).filter(([k])=>!['no_contactar','sin_whatsapp','numero_incorrecto','rechazo'].includes(k)).map(([key,label])=>`<label><input type="checkbox" name="sit" value="${esc(key)}" ${(rule.situations||[]).includes(key)?'checked':''} ${canEdit?'':'disabled'}><span>${esc(label)}</span></label>`).join('')}</div>
+    <div class="fu-ref-fields"><label class="field"><span>ESPERA MÍNIMA ADICIONAL (HORAS)</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(rule.after_hours??0)}" ${canEdit?'':'disabled'}></label>
+      <label class="field"><span>HORARIO DESDE</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${Number(rule.hours_from??8)}" ${canEdit?'':'disabled'}></label>
+      <label class="field"><span>HORARIO HASTA</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${Number(rule.hours_to??21)}" ${canEdit?'':'disabled'}></label></div>
+    <h3>Días habilitados</h3><div class="fu-ref-classifiers">${days.map((day,i)=>`<label><input type="checkbox" name="days" value="${i}" ${(rule.days||[1,2,3,4,5,6]).includes(i)?'checked':''} ${canEdit?'':'disabled'}><span>${day}</span></label>`).join('')}</div>
+    <label class="fu-ref-switch"><input type="checkbox" name="enabled" ${rule.enabled!==false?'checked':''} ${canEdit?'':'disabled'}> Regla activa</label>
+    <div class="fu-ref-buttons"><button type="submit" class="btn primary" ${canEdit?'':'disabled'}>GUARDAR CAMBIOS</button></div>
+  </form>`;
+}
+
+  async function fuRulesMove(unit, from, to) {
+  if(unit!=='habita'||from===to)return;
+  const snap=state.fu.n?.units[unit],ui=fuRulesState(unit);
+  if(!snap||ui.dirty||ui.moving){toast('Guardá los cambios antes de reordenar.',true);return;}
+  const step=F.commercialStages(unit,snap).find(s=>s.key===ui.commercial);
+  const rows=(snap.rules||[]).filter(r=>step?.technical?.includes(r.stage)).sort((a,b)=>Number(a.position??999)-Number(b.position??999)||String(a.key).localeCompare(String(b.key)));
+  const before=rows.map(r=>r.key),start=before.indexOf(from),end=before.indexOf(to);
+  if(start<0||end<0)return;
+  const after=[...before];after.splice(start,1);after.splice(end,0,from);
+  ui.moving=true;
+  const ok=await fuOp('habita',{op:'rule-reorder',before,after},{label:'Orden de reglas actualizado.'});
+  ui.moving=false;
+  if(ok){await loadFollowup({quiet:true});render();}
+}
+
   function fuSecuencias() {
-    const n = state.fu.n;
-    return `<section class="hero"><div><span class="eyebrow">REGLAS Y MENSAJES</span><h1>Las conversaciones, diseñadas.</h1><p>Cada producto mantiene su motor. Las versiones nuevas se miden por separado y las reglas se aplican respetando su orden y condiciones.</p></div></section>${state.session?.open?'<p class="os-warn-note">La sesión abierta no autoriza cambios sensibles de reglas o mensajes. Configurá PROSPECTING_PASSWORD en Vercel para habilitar su edición.</p>':''}
-      ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
-      ${fuUnits().filter((u) => n.units[u.id]).map((u) => {
-        const snap = n.units[u.id];
-        const rules = F.ruleRows(u.id, snap);
-        const versions = F.versionRows(u.id, snap);
-        const stages = snap.stages || [];
-        return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Reglas de ${esc(u.name)}</h2><p class="sub">${u.id === 'habita' ? 'Se editan sin deploy: gana la primera regla (por orden) que corresponde a la situación.' : 'Siguen la cadencia de Prospección de Turnia (días hábiles, tres mensajes como máximo).'}</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Cuándo</th><th>Acción</th><th>Espera</th>${u.id === 'habita' ? '<th>Horario</th><th></th>' : '<th>Sale cuando</th>'}</tr></thead><tbody>
-          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable && !state.session?.open ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button> <button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="${esc(r.key)}">EDITAR</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
-          </tbody></table></div></section>
-          ${fuRuleEditor(u.id,snap)}
-          ${stages.map((s) => {
-            const vs = versions.filter((v) => v.stage === s.key);
-            return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
-              ${u.id==='habita'&&!state.session?.open?`<button class="btn small" style="margin-top:10px" type="button" data-fu="rule-create" data-fu-stage="${esc(s.key)}">+ NUEVA REGLA PARA ESTA ETAPA</button>`:''}
-              ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
-                ${!state.session?.open && v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${!state.session?.open && v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${!state.session?.open && v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
-                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' && !state.session?.open ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
-              ${fuVersionEditor(u.id,snap,s.key)}
-              <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns">${u.id==='habita'?`<select class="input" name="action" aria-label="Acción del mensaje">${(snap.catalog?.actions?.[s.key]||[{key:'principal',label:'Acción principal'}]).map(a=>`<option value="${esc(a.key)}">${esc(a.label)}</option>`).join('')}</select>`:'' }<select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit" ${state.session?.open?'disabled title="Se requiere una sesión protegida"':''}>Guardar versión</button></div></form>
-            </details>`;
-          }).join('')}`;
-      }).join('')}`;
+  const n=state.fu.n,unit=fuScope();
+  if(unit==='todas'){
+    return `<section class="hero"><div><span class="eyebrow">GENERAL / REGLAS Y MENSAJES</span><h1>Dos motores, un mismo espacio.</h1>
+    <p>Entrá a cada negocio para configurar sus reglas en el mismo editor. Habita y Turnia conservan sus propias condiciones de avance.</p></div></section>
+    <div class="os-business-cards">${units().filter(u=>n.units[u.id]).map(u=>`<button type="button" class="os-business-card" data-goto="${u.id}" data-view-to="secuencias" data-business="${u.id}"><span class="os-kicker">REGLAS COMERCIALES</span><h2>${esc(u.name)}</h2><p>${int(n.units[u.id].rules?.length||0)} reglas · configurar flujo y mensajes</p></button>`).join('')}</div>`;
   }
+  const snap=n.units[unit];
+  if(!snap)return `<section class="card glass"><p>No hay reglas disponibles de ${esc(fuName(unit))}.</p></section>`;
+  const ui=fuRulesState(unit);
+  const commercial=F.commercialStages(unit,snap).filter(x=>!x.key.startsWith('etapa_'));
+  const active=commercial.find(s=>s.key===ui.commercial)||commercial[unit==='habita'?1:1]||commercial[0];
+  const tech=active?.technical||[];
+  const rules=F.ruleRows(unit,snap).filter(r=>tech.includes(r.stage))
+    .sort((a,b)=>Number(a.raw.position??999)-Number(b.raw.position??999)||String(a.key).localeCompare(String(b.key)));
+  const selected=ui.creating?null:rules.find(r=>r.key===ui.selected)||rules[0]||null;
+  const stage=ui.creating?(ui.technical&&tech.includes(ui.technical)?ui.technical:tech[0]):selected?.stage||tech[0]||null;
+  state.fu.ruleEdit=ui.creating?'__new':selected?.key||null;
+  state.fu.ruleDraftStage=stage;
+  state.fu.ruleTemplate=ui.creating?ui.template:null;
+  const readonly=state.session?.open||unit==='turnia'&&!snap.catalog?.available;
+  const versions=F.versionRows(unit,snap);
+  const raw=selected?.raw||null;
+  const labels=snap.labels?.situations||{};
+  const renderRules=rules.map((r,i)=>`<article class="fu-ref-rule ${selected?.key===r.key&&!ui.creating?'is-on':''}" draggable="${unit==='habita'&&!readonly&&!ui.dirty&&rules.length>1}" data-fu-drag-key="${esc(r.key)}" data-testid="followup-rule-row">
+    <div class="fu-ref-rule-actions">
+      <div class="fu-ref-pos">P${i+1}</div>
+      <button type="button" class="fu-ref-rule-label" data-fu="rules-select" data-fu-key="${esc(r.key)}">
+        <strong>${esc(r.raw.name||r.action||'Mensaje de la etapa')}</strong>
+        <small>${esc(r.when)}</small>
+        <small>${esc(r.wait)}${r.enabled?'':' · APAGADA'}</small>
+      </button>
+      ${unit==='habita'&&!readonly?`<div class="fu-ref-reorder"><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="up" ${!i||ui.dirty?'disabled':''} aria-label="Subir regla" title="Subir prioridad">↑</button><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="down" ${i===rules.length-1||ui.dirty?'disabled':''} aria-label="Bajar regla" title="Bajar prioridad">↓</button></div>`:''}
+    </div>
+  </article>`).join('');
+  const currentAction=raw?.action||'principal';
+  const form=ui.creating && !stage?'<section class="card glass"><p class="os-view-caption">Cliente es el último hito del embudo y no tiene reglas configurables.</p></section>'
+    :unit==='habita'?fuRuleEditor(unit,snap):fuTurniaRuleEditor(snap,raw,stage);
+  const message=stage&&!ui.creating?fuRulesMessage(unit,snap,raw,stage,false):fuRulesMessage(unit,snap,raw,stage,true);
+  const addAllowed=unit==='habita'&&!readonly&&tech.length>0;
+  const safeRules=rules.map(r=>r.raw);
+  return `${state.session?.open?'<p class="os-warn-note">La sesión abierta no permite editar reglas ni mensajes. Configurá PROSPECTING_PASSWORD en Vercel.</p>':''}
+    <section class="fu-ref-flowrow" data-testid="followup-flow"><span class="fu-ref-flow-label">ETAPAS COMERCIALES</span><nav class="fu-ref-flow" aria-label="Etapas comerciales">
+      ${commercial.map((s,i)=>`<button type="button" class="fu-ref-flowstep ${active?.key===s.key?'is-on':''}" data-fu="rules-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${active?.key===s.key}" data-testid="followup-commercial-stage">
+        <span class="fu-ref-num">${i+1}</span><span><b>${esc(s.title)}</b><small>${int(s.waiting)} esperando</small></span></button>${i<commercial.length-1?'<span class="fu-ref-arrow" aria-hidden="true">›</span>':''}`).join('')}
+    </nav></section>
+    <section class="fu-ref-stage-head" data-testid="followup-stage-head"><div><div class="fu-ref-stage-title"><span class="fu-ref-num">${commercial.indexOf(active)+1}</span>
+      <h2>${esc(active?.title||'')}</h2><span class="os-tag">REGLAS DE LA ETAPA</span></div>
+      <p>Las condiciones de avance, las respuestas de WhatsApp y los eventos de producto se configuran dentro de cada regla.</p></div>
+      <p>Seleccioná una regla para editarla o creá una nueva. La cola de ejecución muestra a quién corresponde aplicarla.</p></section>
+    <div class="fu-ref-workspace" data-testid="followup-rules-workspace">
+      <aside class="fu-ref-list card glass" data-testid="followup-rules-list">
+        <div class="os-section-heading"><div><h3>Reglas de esta etapa</h3><p class="os-view-caption">${unit==='habita'?'Arrastrá las reglas o usá las flechas para ordenar su prioridad. P1 se evalúa primero.':'Las reglas de Turnia respetan su secuencia nativa.'}</p></div>
+          <div class="fu-ref-add-area"><button type="button" class="btn small" data-fu="rules-add-menu" ${addAllowed?'':'disabled'} data-testid="followup-rule-add">+ AGREGAR REGLA ▾</button>
+          ${ui.showMenu?`<div class="fu-ref-add-menu"><button type="button" data-fu="rules-new">+ CREAR UNA REGLA NUEVA</button><button type="button" data-fu="rules-pick">USAR UNA REGLA EXISTENTE</button></div>`:''}</div></div>
+        <div class="fu-ref-rule-list">${renderRules}${ui.creating?`<article class="fu-ref-rule is-on"><div class="fu-ref-rule-actions"><span class="fu-ref-pos">+</span><div class="fu-ref-rule-label"><strong>${ui.template?'Copia de regla existente':'Nueva regla'}</strong><small>Revisala a la derecha y guardala.</small></div></div></article>`:''}
+        ${!rules.length&&!ui.creating?'<p class="os-view-caption">Esta etapa no tiene reglas configuradas.</p>':''}</div>
+        <details class="fu-ref-classifier-link"><summary>Administrar clasificaciones de WhatsApp</summary><p class="os-view-caption">Las situaciones existentes y personalizadas se configuran en el mismo catálogo por etapa.</p><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></details>
+      </aside>
+      <div class="fu-ref-detail" data-testid="followup-rule-detail">
+        ${ui.creating && tech.length>1?`<div class="card glass fu-ref-step-switch"><label class="field"><span>PASO TÉCNICO DE LA REGLA</span><select class="input" data-fu-rules-tech>${tech.map(key=>`<option value="${esc(key)}" ${stage===key?'selected':''}>${esc(snap.stages.find(s=>s.key===key)?.title||key)}</option>`).join('')}</select></label></div>`:''}
+        ${form}
+        ${message}
+        ${!ui.creating&&selected&&unit==='habita'&&!readonly?`<div class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-delete" data-fu-key="${esc(selected.key)}">ELIMINAR REGLA</button></div>`:''}
+        ${unit==='turnia'&&!snap.catalog?.available?'<p class="os-warn-note">El editor de reglas de Turnia se activará al desplegar su catálogo y validar el motor; la lectura de reglas sigue disponible.</p>':''}
+      </div></div>
+    ${ui.picking?`<div class="fu-ref-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="fu-rule-pick-title"><div class="fu-ref-picker card glass">
+      <div class="os-section-heading"><h3 id="fu-rule-pick-title">Usar una regla existente</h3><button type="button" class="btn small" data-fu="rules-pick-close">CERRAR</button></div>
+      <p class="os-view-caption">Elegí cualquier regla como punto de partida. La copia se abre a la derecha para que la adaptes a esta etapa antes de guardar.</p>
+      <div class="fu-ref-picker-list">${(snap.rules||[]).map(r=>`<button type="button" data-fu="rules-template" data-fu-key="${esc(r.key)}"><b>${esc(snap.stages.find(s=>s.key===r.stage)?.title||r.stage)}</b><span>${esc(r.name||r.action)}</span><small>${esc((r.situations||[]).map(x=>labels[x]||x).join(', '))}</small></button>`).join('')}</div>
+    </div></div>`:''}`;
+}
 
   function fuRendimiento() {
     const n = state.fu.n;
@@ -2865,7 +3078,46 @@
       case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); openDrawer(ds.fuAccount); break; }
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
-      case 'rule-edit': state.fu.ruleEdit = ds.fuRule || null; render(); break;
+      case 'rules-stage': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de etapa?'))break;
+        ui.commercial=ds.fuStage;ui.selected=null;ui.creating=false;ui.template=null;ui.technical=null;ui.dirty=false;ui.showMenu=false;render();break;
+      }
+      case 'rules-select': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos y cambiar de regla?'))break;
+        ui.selected=ds.fuKey;ui.creating=false;ui.template=null;ui.dirty=false;ui.showMenu=false;render();break;
+      }
+      case 'rules-add-menu': {const ui=fuRulesState(state.unit);ui.showMenu=!ui.showMenu;render();break;}
+      case 'rules-new': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos?'))break;
+        ui.creating=true;ui.template=null;ui.selected=null;ui.showMenu=false;ui.dirty=false;render();break;
+      }
+      case 'rules-pick': {const ui=fuRulesState(state.unit);ui.showMenu=false;ui.picking=true;render();break;}
+      case 'rules-pick-close': {fuRulesState(state.unit).picking=false;render();break;}
+      case 'rules-template': {
+        const ui=fuRulesState(state.unit);
+        ui.template=ds.fuKey;ui.creating=true;ui.selected=null;ui.picking=false;ui.dirty=false;render();break;
+      }
+      case 'rules-move': {
+        const ui=fuRulesState(state.unit), snap=state.fu.n?.units[state.unit];
+        const step=F.commercialStages(state.unit,snap).find(x=>x.key===ui.commercial);
+        const list=(snap?.rules||[]).filter(r=>step?.technical?.includes(r.stage)).sort((a,b)=>(a.position??999)-(b.position??999)||String(a.key).localeCompare(String(b.key)));
+        const i=list.findIndex(r=>r.key===ds.fuKey),neighbor=list[i+(ds.fuDir==='up'?-1:1)];
+        if(neighbor)await fuRulesMove(state.unit,ds.fuKey,neighbor.key);
+        break;
+      }
+      case 'rules-cancel': {const ui=fuRulesState(state.unit);ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=null;render();break;}
+      case 'rules-delete': {
+        const ui=fuRulesState(state.unit);
+        if(ui.dirty){toast('Guardá o cancelá los cambios antes de eliminar.',true);break;}
+        if(!window.confirm('¿Eliminar esta regla? Se conserva el historial de envíos y métricas.'))break;
+        const result=await fuOp(state.unit,{op:'rule-delete',key:ds.fuKey},{label:'Regla eliminada; historial conservado.'});
+        if(result){ui.selected=null;ui.creating=false;await loadFollowup({quiet:true});render();}
+        break;
+      }
+      case 'rule-edit': state.fu.ruleEdit=ds.fuRule||null;fuRulesState(state.unit).dirty=false;render();break;
       case 'rule-create': state.fu.ruleEdit='__new'; state.fu.ruleDraftStage=ds.fuStage;state.fu.ruleTemplate=null;render(); break;
       case 'version-edit': state.fu.versionEdit = ds.fuVersion || null; render(); break;
       case 'rule-toggle': {
@@ -2879,9 +3131,19 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if(form.matches('[data-fu-turnia-rule-form]')){
+      const fd=new FormData(form);
+      const val={stage:form.dataset.fuStage,name:String(fd.get('name')||''),enabled:fd.has('enabled'),
+        situations:fd.getAll('sit').map(String),days:fd.getAll('days').map(Number),
+        after_hours:Number(fd.get('after_hours')),hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to'))};
+      if(await fuOp('turnia',{op:'rule-save',key:form.dataset.fuStage,valores:val},{label:'Restricciones de Turnia guardadas.'})){
+        fuRulesState('turnia').dirty=false;await loadFollowup({quiet:true});render();
+      }
+      return;
+    }
     if(form.matches('[data-fu-inbox-form], [data-fu-manual-reply-form]')) { await fuReplySubmit(form,e.submitter);return; }
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
@@ -2912,6 +3174,37 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rule-form] input[name="sit"][value="rechazo"]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      if(form){
+        const action=form.querySelector('select[name="action"]');
+        if(e.target.checked){
+          if(action&&[...action.options].some(x=>x.value==='encuesta_cierre'))action.value='encuesta_cierre';
+          for(const checkbox of form.querySelectorAll('input[name="sit"]'))if(checkbox!==e.target)checkbox.checked=false;
+          const wait=form.querySelector('input[name="after_hours"]');if(wait)wait.value='0';
+          const previous=form.querySelector('select[name="after_action"]');if(previous)previous.value='';
+        }else if(action&&action.value==='encuesta_cierre')action.value='principal';
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
+    if(e.target.matches('[data-fu-rule-action]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      if(form){
+        const survey=e.target.value==='encuesta_cierre',reject=form.querySelector('input[name="sit"][value="rechazo"]');
+        if(reject){reject.checked=survey;if(survey)for(const other of form.querySelectorAll('input[name="sit"]'))if(other!==reject)other.checked=false;}
+        const wait=form.querySelector('input[name="after_hours"]');
+        if(survey && wait)wait.value='0';
+        const previous=form.querySelector('select[name="after_action"]');
+        if(survey && previous)previous.value='';
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
+    if(e.target.matches('[data-fu-rules-tech]')){
+      const ui=fuRulesState(state.unit);
+      if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos?')){render();return;}
+      ui.technical=e.target.value;ui.dirty=false;render();return;
+    }
     if(e.target.matches('[data-fu-rule-template]')){
       state.fu.ruleTemplate=e.target.value||null;render();return;
     }
@@ -2934,6 +3227,7 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
+    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
       clearTimeout(target._t);
@@ -2949,6 +3243,37 @@
   setInterval(() => {
     if (document.visibilityState === 'visible' && isFu() && !state.fu.task && !state.fu.busy && !state.demo) loadFollowup({ quiet: true });
   }, 60000);
+
+
+  // Igual que Habita: prioridad drag & drop (con flechas accesibles como alternativa).
+  document.addEventListener('dragstart',(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    if(!target)return;
+    const ui=fuRulesState(state.unit);
+    if(state.unit!=='habita'||ui.dirty||ui.moving){e.preventDefault();return;}
+    state.fu.dragRuleKey=target.dataset.fuDragKey;
+    e.dataTransfer?.setData('text/plain',state.fu.dragRuleKey);
+    if(e.dataTransfer)e.dataTransfer.effectAllowed='move';
+  });
+  document.addEventListener('dragover',(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    if(!target||!state.fu.dragRuleKey||target.dataset.fuDragKey===state.fu.dragRuleKey)return;
+    e.preventDefault();
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+    target.classList.add('drag-target');
+  });
+  document.addEventListener('drop',async(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    const key=state.fu.dragRuleKey;
+    if(!target||!key)return;
+    e.preventDefault();state.fu.dragRuleKey=null;
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+    if(target.dataset.fuDragKey!==key)await fuRulesMove(state.unit,key,target.dataset.fuDragKey);
+  });
+  document.addEventListener('dragend',()=>{
+    state.fu.dragRuleKey=null;
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+  });
 
   // ─── Eventos ────────────────────────────────────────────────
   document.addEventListener('click', async (e) => {
