@@ -2304,12 +2304,14 @@
 
   async function fuClaim(it) {
     const r = await fuOp(it.unit, { op: 'claim', inmobiliaria: it.id });
-    if (!r) { loadFollowup({ quiet: true }); return; }
+    if (!r) return false;
     state.fu.task = F.prepared(it.unit, r, it);
     state.fu.task.mode = 'ejecutar';
     render();
-    loadFollowup({ quiet: true });
+    // Do not start an expensive full-board refresh while the operator is
+    // opening the new task. Refresh when returning to the queue instead.
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    return true;
   }
 
   function fuNextCandidate(currentKey) {
@@ -2320,30 +2322,49 @@
     )||null : null;
   }
 
-  async function fuNext() {
-    if(state.fu.busy)return;
+  async function fuNext(clicked) {
+    if(state.fu.busy||state.fu.advancing)return;
+    state.fu.advancing=true;
     const previous=state.fu.task;
     const cur=previous?.item?.key;
-    // If no other task is eligible, retain this task's claim and context.
-    let next=fuNextCandidate(cur);
-    if(!next){
-      await loadFollowup({quiet:true});
-      next=fuNextCandidate(cur);
+    if(clicked?.dataset?.fu==='next-after'){
+      clicked.disabled=true;
+      clicked.textContent='Abriendo siguiente…';
+      clicked.setAttribute('aria-busy','true');
     }
-    if(!next){
-      toast('No hay otra tarea libre con estos filtros. Podés cambiar los filtros desde la cola.',true);
-      render();
-      return;
+    try {
+      let next=fuNextCandidate(cur);
+      if(!next){
+        await loadFollowup({quiet:true});
+        next=fuNextCandidate(cur);
+      }
+      if(!next){
+        toast('No hay otra tarea libre con estos filtros. Podés cambiar los filtros desde la cola.',true);
+        return;
+      }
+      // Never release a confirmed send, and only release an unconfirmed claim
+      // before taking another. A failed claim keeps the previous context.
+      if(previous?.mode==='ejecutar'){
+        const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
+        if(!released)return;
+        // The old claim is no longer held. Do not leave a stale 'ejecutar'
+        // task visible if claiming the new one fails.
+        state.fu.task=null;
+      }
+      // The server validates the new claim; no speculative "sent" state.
+      const claimed=await fuClaim(next);
+      if(!claimed && !state.fu.task) {
+        render();
+        void loadFollowup({quiet:true});
+      }
+    } finally {
+      state.fu.advancing=false;
+      if(clicked?.isConnected&&clicked?.dataset?.fu==='next-after'){
+        clicked.disabled=false;
+        clicked.removeAttribute('aria-busy');
+        clicked.textContent=previous?.mode==='confirmado'?'Siguiente tarea →':'Siguiente pendiente →';
+      }
     }
-    // Following the queue without confirming is NOT a sent message.
-    if(previous?.mode==='ejecutar'){
-      const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
-      if(!released)return;
-    }
-    // Keep the confirmed receipt until the next claim succeeds. If the
-    // backend rejects this claim, the user still sees their prior confirmation.
-    if(previous?.mode!=='confirmado')state.fu.task=null;
-    await fuClaim(next);
   }
 
   // ── Las vistas ──
@@ -3653,7 +3674,7 @@
         break;
       }
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
-      case 'next': await fuNext(); break;
+      case 'next': await fuNext(t); break;
       case 'back':
         if(task?.mode==='ejecutar'){
           if(!await fuOp(task.unit,{op:'release',inmobiliaria:it.id},{label:'Tarea liberada sin confirmar envío.'}))break;
@@ -3702,7 +3723,12 @@
           toast('Envío guardado y confirmado.');
           render();
           window.scrollTo({top:0,behavior:'smooth'});
-          await loadFollowup({quiet:true});
+          // Don't make the operator wait for a full-board read. The
+          // confirmed item is excluded locally; server verifies the next claim.
+          if(state.fu.n) {
+            state.fu.n.queue=state.fu.n.queue.filter(x=>x.key!==task.item?.key);
+            state.fu.n.scheduled=state.fu.n.scheduled.filter(x=>x.key!==task.item?.key);
+          }
         }else{
           // A rejected or ambiguous reply is NOT proof of persistence.
           // Keep the task intact to safely inspect before retrying.
@@ -3711,7 +3737,7 @@
         }
         break;
       }
-      case 'next-after': await fuNext(); break;
+      case 'next-after': await fuNext(t); break;
       case 'priority': if (await fuOp(task.unit, { op: 'priority', inmobiliaria: it.id, prioridad: ds.fuPriority || null }, { label: 'Prioridad guardada.' })) { it.priority = ds.fuPriority || it.priority; it.priorityManual = Boolean(ds.fuPriority); render(); loadFollowup({ quiet: true }); } break;
       case 'snooze-days': {
         const d = new Date(Date.now() + Number(ds.fuDays) * 86400000);
