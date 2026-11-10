@@ -1912,3 +1912,9 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
 @media(max-width:760px){
   body[data-unit="habita"] .os-fu-queue-grid>.os-fu-desktop-detail{display:none!important}
 }
+
+.os-fu-desktop-qa{background:#fffaf1;border-color:#f0e5ce}
+.os-fu-desktop-warning{font-size:10.5px;line-height:1.5;color:#895625;background:#fff4e4;border-radius:8px;padding:8px;margin:6px 0;overflow-wrap:anywhere}
+.os-fu-desktop-check{font-size:10px;line-height:1.45;color:#315e40;margin:5px 0}
+.os-fu-desktop-check[data-ok="false"]{color:#975128;font-weight:800}
+.os-fu-desktop-actions .os-fu-next-without{grid-column:1/-1}
