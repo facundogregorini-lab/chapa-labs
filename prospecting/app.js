@@ -2596,49 +2596,69 @@
       </tbody></table></div>${all.length > shown ? `<div style="text-align:center;padding:8px"><button class="btn small" type="button" data-more-block="fu-prospectos">Ver los ${int(all.length - shown)} restantes</button></div>` : ''}</section>`;
   }
 
-  function fuRuleEditor(unit, snap) {
+  function fuRuleEditor(unit,snap) {
   if(unit!=='habita'||!state.fu.ruleEdit)return '';
   const create=state.fu.ruleEdit==='__new';
   const stage=create?state.fu.ruleDraftStage:null;
   const existing=create?null:(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
   if(!create&&!existing)return '';
-  const options=snap.catalog?.actions?.[stage||existing?.stage]||[{key:'principal',label:'Acción principal'}];
-  const compatible=options.map(x=>x.key);
-  const template=create? (snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate) : null;
-  const defaults={stage,action:'principal',situations:['sin_respuesta'],after_hours:0,after_action:null,
-    position:1000,enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:''};
-  const r=existing || (template?{
-    ...defaults,
-    ...template,
-    key:null,
-    stage,
-    action:compatible.includes(template.action)?template.action:compatible[0],
-    after_action:compatible.includes(template.after_action)?template.after_action:null,
-    min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(stage)?template.min_demo_activity_level||0:0,
-    catalog_situation:null,
-    name:template.name ? 'Copia de '+template.name : 'Copia de '+template.action,
-  }:defaults);
-  const days=['DO','LU','MA','MI','JU','VI','SA'];
-  return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}" data-fu-unit-id="${unit}" data-fu-stage="${esc(r.stage)}">
-    <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE REGLAS · HABITA</span><h2>${create?'Crear regla':'Editar regla'}</h2></div><button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
-    <p class="os-view-caption">Gana la primera regla compatible en orden; el motor original valida y guarda el cambio, sin tocar ejecuciones históricas.</p>
-    ${create?`<label class="field" style="margin:12px 0"><span>USAR UNA REGLA EXISTENTE COMO PLANTILLA</span>
-      <select class="input" data-fu-rule-template><option value="">Empezar desde cero</option>
-        ${(snap.rules||[]).map(x=>`<option value="${esc(x.key)}" ${state.fu.ruleTemplate===x.key?'selected':''}>${esc((snap.stages||[]).find(z=>z.key===x.stage)?.title||x.stage)} · ${esc(x.name||x.action)}</option>`).join('')}
-      </select></label><p class="os-tutorial-note">Podés elegir cualquier regla para copiar sus condiciones. Las acciones incompatibles se adaptan a esta etapa y el motor valida todo al guardar.</p>`:''}
-    <div class="grid cols-2" style="margin-top:12px">
-      <label class="field"><span>Nombre</span><input class="input" name="name" maxlength="120" value="${esc(r.name||'')}"></label>
-      <label class="field"><span>Acción</span><select class="input" name="action" ${create?'':'disabled'}>${options.map(x=>`<option value="${esc(x.key)}" ${r.action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
-      <label class="field"><span>Esperar desde el último mensaje (horas)</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${r.after_hours??0}" required></label>
-      <label class="field"><span>Acción previa requerida</span><select class="input" name="after_action"><option value="">Ninguna</option>${options.map(x=>`<option value="${esc(x.key)}" ${r.after_action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
-      <label class="field"><span>Horario desde</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required></label>
-      <label class="field"><span>Horario hasta</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></label>
-    </div>
-    <h3 style="margin-top:14px">Situaciones que disparan esta regla</h3><div class="os-quick-links" style="margin-top:8px">
-      ${Object.entries(snap.labels?.situations||{}).filter(([key])=>{const x=snap.catalog?.canonical?.find(x=>x.key===key);return !x||!x.permanent_stop||key==='rechazo';}).map(([key,label])=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="sit" value="${esc(key)}" ${(r.situations||[]).includes(key)?'checked':''}>${esc(label)}</label>`).join('')}</div>
-    <h3 style="margin-top:14px">Días habilitados</h3><div class="os-quick-links" style="margin-top:8px">${days.map((d,i)=>`<label class="os-tag" style="display:inline-flex;gap:6px"><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}>${d}</label>`).join('')}</div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:15px"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''}>Regla activa</label>
-    <div class="os-unit-actions" style="margin-top:13px"><button class="btn primary" type="submit">${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button><button class="btn" type="button" data-fu="rule-edit" data-fu-rule="">CANCELAR</button></div>
+  const key=stage||existing.stage;
+  const actions=snap.catalog?.actions?.[key]||[{key:'principal',label:'Mensaje de la etapa'}];
+  const allowed=actions.map(a=>a.key);
+  const tpl=create?(snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate):null;
+  const siblings=(snap.rules||[]).filter(r=>r.stage===key);
+  const defaults={stage:key,action:allowed[0],situations:[key==='no-contactado'?'sin_respuesta':key==='no-responde'?'confirmo_numero':'interesado'],
+    after_hours:48,after_action:null,position:Math.max(0,...siblings.map(r=>Number(r.position)||0))+10,
+    enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:'',catalog_situation:null,min_demo_activity_level:0};
+  const r=existing||{...defaults,...(tpl||{}),key:null,stage:key,
+    action:tpl&&allowed.includes(tpl.action)?tpl.action:defaults.action,
+    after_action:tpl&&allowed.includes(tpl.after_action)?tpl.after_action:null,
+    catalog_situation:tpl?.catalog_situation||null,
+    min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?(tpl?.min_demo_activity_level||0):0,
+    position:defaults.position,
+    name:tpl?.name?`Copia de ${tpl.name}`.slice(0,80):''};
+  const stageCommercial=F.commercialStages(unit,snap).find(s=>s.technical.includes(key))?.key;
+  const overrides=(snap.catalog?.overrides||[]).filter(s=>s.commercial_stage===stageCommercial&&s.removed);
+  const labels=Object.entries(snap.labels?.situations||{}).filter(([s])=>{
+    const cat=snap.catalog?.canonical?.find(x=>x.key===s);
+    return (!cat||!cat.permanent_stop||s==='rechazo')&&!overrides.some(x=>x.key===s);
+  });
+  const custom=(snap.catalog?.states||[]).filter(s=>s.active&&(s.maps_to||s.product_stage===key)
+    &&(s.commercial_stage===stageCommercial||(snap.catalog?.stages||[]).some(x=>x.key===s.commercial_stage&&x.technical_stage===key)));
+  const surveyed=r.action==='encuesta_cierre';
+  const allowRejection=allowed.includes('encuesta_cierre');
+  const days=[['DO',0],['LU',1],['MA',2],['MI',3],['JU',4],['VI',5],['SA',6]];
+  const rank=existing?siblings.sort((a,b)=>(a.position||999)-(b.position||999)).findIndex(x=>x.key===r.key)+1:0;
+  return `<form class="card glass fu-ref-editor fu-ref-rule-form" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}"
+    data-fu-unit-id="habita" data-fu-stage="${esc(key)}" data-fu-position="${Number(r.position)||10}" data-testid="followup-rule-form">
+    <header class="fu-ref-edit-head"><div><div class="fu-ref-titleline"><span class="os-tag">${create?'NUEVA REGLA':'PRIORIDAD P'+rank}</span>
+      <label class="field"><span class="sr-only">NOMBRE DE LA REGLA</span><input class="input fu-ref-rule-name" name="name" maxlength="80" value="${esc(r.name||'')}" placeholder="${esc(actions.find(a=>a.key===r.action)?.label||'Nombre de la regla')}" data-testid="followup-rule-name"></label></div>
+      <p class="os-view-caption">Gana la primera regla compatible. Los cambios se guardan en el motor de Habita.</p></div>
+      <label class="fu-ref-switch"><input type="checkbox" name="enabled" ${r.enabled!==false?'checked':''} data-testid="followup-rule-enabled">ACTIVA</label>
+    </header>
+    <section class="fu-ref-when" data-testid="followup-part-when"><h3>◷ CUÁNDO SE EJECUTA</h3>
+      ${create&&tpl?'<p class="os-warn-note">Regla copiada: revisá y adaptá la situación, el mensaje y la etapa antes de guardarla.</p>':''}
+      <label class="field"><span>ETAPA DEL EMBUDO</span><input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled></label>
+      <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span><div class="fu-ref-classifiers" data-testid="followup-rule-situations">
+        ${labels.map(([id,label])=>`<label><input type="checkbox" name="sit" value="${esc(id)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled title="Esta etapa no admite encuesta de cierre"':''}><span>${esc(label)}</span></label>`).join('')}
+      </div></div>
+      ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation"><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
+      <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
+        ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+      <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
+      <div class="fu-ref-fields">
+        <label class="field"><span>DÍAS DE ENVÍO</span><div class="fu-ref-classifiers">${days.map(([d,i])=>`<label><input type="checkbox" name="days" value="${i}" ${(r.days||[]).includes(i)?'checked':''}><span>${d}</span></label>`).join('')}</div></label>
+        <label class="field"><span>HORARIO</span><div class="fu-ref-hours"><input class="input" name="hours_from" type="number" min="0" max="23" value="${r.hours_from??9}" required><span>A</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${r.hours_to??19}" required></div></label>
+      </div>
+      ${['no-abrio','sin-interaccion','sin-cuenta'].includes(key)?`<label class="field"><span>CONDICIÓN DE INTERACCIÓN CON LA DEMO</span><select class="input" name="min_demo_activity_level"><option value="0" ${(r.min_demo_activity_level||0)===0?'selected':''}>Cualquier nivel de interacción</option><option value="3" ${r.min_demo_activity_level===3?'selected':''}>Solo si generó una imagen</option></select></label>`:''}
+    </section>
+    <section class="fu-ref-what" data-testid="followup-part-what"><h3>◇ QUÉ SE EJECUTA</h3>
+      <label class="field"><span>ACCIÓN DE LA REGLA</span><select class="input" name="action" data-fu-rule-action data-testid="followup-rule-action">
+        ${actions.map(a=>`<option value="${esc(a.key)}" ${r.action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+      <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'La acción utiliza la versión de mensaje vinculada a esta etapa. Podés editarla en el panel contiguo.'}</p>
+    </section>
+    <footer class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-cancel">CANCELAR</button>
+      <button type="submit" class="btn primary" data-testid="followup-rule-save" ${state.session?.open?'disabled title="Requiere sesión protegida"':''}>${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button></footer>
   </form>`;
 }
 
@@ -2661,12 +2681,21 @@
     const create=!form.dataset.fuRuleKey;
     const rule=create?null:(snap?.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
     if(!create&&!rule)return;
-    const values={...(rule||{stage:form.dataset.fuStage,action:String(fd.get('action')||'principal'),position:1000,min_demo_activity_level:0}),
-      name:String(fd.get('name')||''),situations:fd.getAll('sit').map(String),
+    const action=String(fd.get('action')||rule?.action||'principal');
+    const situations=fd.getAll('sit').map(String);
+    if(action==='encuesta_cierre'&&!situations.includes('rechazo')){toast('La encuesta de cierre requiere la situación No interesado.',true);return;}
+    if(action!=='encuesta_cierre'&&situations.includes('rechazo')){toast('Para No interesado elegí la acción Encuesta de cierre.',true);return;}
+    const values={...(rule||{stage:form.dataset.fuStage,position:Number(form.dataset.fuPosition)||10}),
+      action, name:String(fd.get('name')||'').slice(0,80),situations,
+      catalog_situation:fd.get('catalog_situation')||null,
+      min_demo_activity_level:Number(fd.get('min_demo_activity_level')||0),
       after_hours:Number(fd.get('after_hours')),after_action:fd.get('after_action')||null,
       hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),
       days:fd.getAll('days').map(Number),enabled:fd.has('enabled')};
-    if(await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'})){
+    const saved=await fuOp(unit,{op:'rule-save',key:rule?.key||null,valores:values},{label:create?'Regla creada en Habita.':'Regla actualizada en Habita.'});
+    if(saved){
+      const ui=fuRulesState(unit);
+      ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=saved.key||rule?.key||null;
       state.fu.ruleEdit=null; await loadFollowup({quiet:true});render();
     }
     return;
@@ -3061,6 +3090,7 @@
         if(neighbor)await fuRulesMove(state.unit,ds.fuKey,neighbor.key);
         break;
       }
+      case 'rules-cancel': {const ui=fuRulesState(state.unit);ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=null;render();break;}
       case 'rules-delete': {
         const ui=fuRulesState(state.unit);
         if(ui.dirty){toast('Guardá o cancelá los cambios antes de eliminar.',true);break;}
@@ -3127,6 +3157,18 @@
   }, true);
   document.addEventListener('change', (e) => {
     if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rule-action]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      if(form){
+        const survey=e.target.value==='encuesta_cierre',reject=form.querySelector('input[name="sit"][value="rechazo"]');
+        if(reject){reject.checked=survey;if(survey)for(const other of form.querySelectorAll('input[name="sit"]'))if(other!==reject)other.checked=false;}
+        const wait=form.querySelector('input[name="after_hours"]');
+        if(survey && wait)wait.value='0';
+        const previous=form.querySelector('select[name="after_action"]');
+        if(survey && previous)previous.value='';
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
     if(e.target.matches('[data-fu-rules-tech]')){
       const ui=fuRulesState(state.unit);
       if(ui.dirty&&!window.confirm('Tenés cambios sin guardar. ¿Descartarlos?')){render();return;}
