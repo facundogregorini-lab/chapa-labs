@@ -1904,3 +1904,8 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
  .os-fu-queue-grid{grid-template-columns:minmax(0,1fr)!important}
  .os-fu-preview-side,.os-fu-side-working{position:static;max-height:none}
 }
+
+/* Confirm and advance only after an acknowledged send; prominent in mobile and desktop sidebar. */
+.os-fu-confirm-next{grid-column:1/-1;min-height:48px!important;border-radius:11px!important;background:#0b794b!important;color:#fff!important;border:1px solid #0b794b!important;font-weight:850!important;line-height:1.35;font-size:12px!important}
+.os-fu-confirm-next:disabled{opacity:.55;cursor:wait}
+.os-fu-preview-message{white-space:pre-wrap;overflow-wrap:anywhere}

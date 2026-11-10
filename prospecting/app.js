@@ -2581,6 +2581,7 @@
     const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x.versionId);
     const template=version?.body||'';
     const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
+    const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
     return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
       <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
       <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
@@ -2591,16 +2592,16 @@
         <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
         <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
       </div>
+      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
+      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
+      <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
+      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
       <div class="os-fu-preview-card"><strong>Información del contacto</strong><dl>
         <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd><dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
         <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
         <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
       <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
       <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
-      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
-      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
-      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Observaciones</strong><p>${esc(x.situationNote||x.actionReason||'Sin observaciones.')}</p></div>
       <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
       '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
@@ -3542,6 +3543,7 @@
           ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
         </p>
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile">✓ Confirmar envío</button>
+         <button type="button" class="btn primary os-fu-confirm-next" data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop">✓ Confirmar envío y siguiente →</button>
         <button type="button" class="btn os-fu-mobile-next" data-fu="next-after" data-testid="fu-next-mobile"
           aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
         ${t.unit==='habita'? `<details class="os-fu-handoff" data-testid="fu-handoff">
@@ -3822,8 +3824,10 @@
         }
         break;
       }
+      case 'confirm-and-next':
       case 'confirm': {
         if(!task||task.mode!=='ejecutar'||state.fu.busy)break;
+        const advanceAfterConfirmed=ds.fu==='confirm-and-next';
         // One deliberate tap saves the send. Generic two-tap arming previously
         // swallowed the first tap on mobile; do not arm this action.
         // Only show success after the upstream has persisted status "sent".
@@ -3842,6 +3846,7 @@
             state.fu.n.queue=state.fu.n.queue.filter(x=>x.key!==task.item?.key);
             state.fu.n.scheduled=state.fu.n.scheduled.filter(x=>x.key!==task.item?.key);
           }
+          if(advanceAfterConfirmed)await fuNext(t);
         }else{
           // A rejected or ambiguous reply is NOT proof of persistence.
           // Keep the task intact to safely inspect before retrying.
