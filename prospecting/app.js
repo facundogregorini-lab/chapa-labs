@@ -2218,33 +2218,119 @@
     </section>`;
   }
 
+  function fuQueueState() {
+  return state.fu.queueView || (state.fu.queueView = {
+    kpi:'listas',commercial:null,situation:null,rule:null,tech:null,closed:false,
+    order:'comercial',limit:25,search:'',group:null,
+  });
+}
+
+  function fuQueueSelection(scope) {
+  const n=state.fu.n,q=fuQueueState();
+  const snap=scope==='todas'?null:n.units[scope];
+  const stages=snap?F.commercialStages(scope,snap):[];
+  const current=stages.find(s=>s.key===q.commercial)||null;
+  const base=q.closed ? n.noInteresados
+    : q.kpi==='bloqueadas' ? n.blocked
+    : q.kpi==='respuestas' ? n.queue.filter(x=>x.group==='respuestas')
+    : q.kpi==='demos' ? n.queue.filter(x=>x.group==='demos') : n.queue;
+  const rows=base.filter(x=>{
+    if(scope!=='todas'&&x.unit!==scope)return false;
+    if(current && !(current.technical.includes(x.stage) && (!current.situation||x.situation===current.situation)))return false;
+    if(q.tech&&x.stage!==q.tech)return false;
+    if(q.situation&&x.situation!==q.situation&&x.catalogSituation!==q.situation)return false;
+    if(q.rule&&x.ruleKey!==q.rule)return false;
+    if(q.group&&x.group!==q.group)return false;
+    return true;
+  });
+  const filtered=F.filter(rows,{...state.fu.f,unit:scope==='todas'?state.fu.f.unit||'todas':scope,q:q.search});
+  const sort={comercial:F.byPriority,score:(a,b)=>(b.score??-1)-(a.score??-1)||F.byPriority(a,b),
+    antiguo:(a,b)=>String(a.since||'').localeCompare(String(b.since||'')),
+    reciente:(a,b)=>String(b.since||'').localeCompare(String(a.since||''))};
+  filtered.sort(sort[q.order]||sort.comercial);
+  return {q,snap,stages,current,all:base,rows:filtered};
+}
+
+  function fuQueueTableRow(x,{closed=false}={}) {
+  const me=state.session?.user?.name;
+  const locked=x.claim&&x.claim.by!==me;
+  const active=!closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
+  return `<tr class="os-fu-table-row" data-fu-open="${esc(x.key)}" tabindex="0" aria-label="Ver ${esc(x.name)}" data-testid="fu-item">
+    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':esc(String(x.score))}</td>
+    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+    <td>${esc(x.zone||'—')}</td>
+    <td><span class="os-fu-pill">${esc(x.situationLabel||'—')}</span></td>
+    <td><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
+    <td><span>${esc(x.lastText||'—')}</span><small>${esc(ago(x.since)||'—')}</small></td>
+    <td>${esc(x.phone||'—')}</td>
+    <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
+    <td>${closed?'<span class="os-fu-muted">CERRADO</span>':x.blocked?'<span class="os-fu-muted">BLOQUEADA</span>':x.dueAt?'<span class="os-fu-muted">PROGRAMADA</span>':locked?`<span class="os-fu-muted">TOMADA POR ${esc(x.claim.by)}</span>`:
+      active?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">EJECUTAR →</button>`:
+      '<span class="os-fu-muted">VER DETALLE</span>'}</td>
+  </tr>`;
+}
+
   function fuHoy() {
-    const scope = fuScope();
-    const f = state.fu.f;
-    const s = F.summary(state.fu.n, scope);
-    const list = F.filter(state.fu.n.queue, { ...f, unit: scope });
-    const sched = F.filter(state.fu.n.scheduled, { ...f, unit: scope });
-    const blocked = F.filter(state.fu.n.blocked, { ...f, unit: scope });
-    const free = list.filter((x) => !x.claim).length;
-    const groups = F.GROUPS.map((g) => [g, list.filter((x) => x.group === g)]).filter(([, l]) => l.length);
-    const shown = (g) => (state.more[`fu-${g}`] ? 1e9 : 20);
-    return `
-      <section class="hero"><div><span class="eyebrow">${scope === 'todas' ? 'Todas las unidades' : esc(fuName(scope))} · Hoy</span><h1>${free ? `${int(free)} ${free === 1 ? 'acción lista' : 'acciones listas'} para ejecutar` : 'No quedan acciones libres'}</h1><p>Primero las respuestas y las demos prometidas. Tocá una tarea para tomarla: mientras la tenés, nadie más puede mandarle.</p></div>
-        <button type="button" class="btn primary" data-fu="next" ${free ? '' : 'disabled'} data-testid="fu-take-next">Tomar la siguiente</button></section>
-      <section class="card glass" aria-label="Resumen de la cola"><div class="kpis">
-        ${kpi('Listas para hoy', int(s.ready), `${int(s.claimed)} tomadas ahora`)}
-        ${kpi('Respuestas', int(s.replies), 'Esperan acción')}
-        ${kpi('Demos pendientes', int(s.demos), 'Por crear o enviar')}
-        ${kpi('Programadas', int(s.scheduled), 'Salen más adelante')}
-        ${kpi('Bloqueadas', int(s.blocked), 'Con el motivo a la vista')}
-        ${kpi('Hechas hoy', int(s.doneToday), `${int(s.newToday)} contactos nuevos`)}
-      </div></section>
-      ${fuWhatsapp(scope)}
-      ${fuToolbar()}
-      ${groups.length ? groups.map(([g, l]) => `<section class="card glass block" data-open="true" aria-label="${esc(F.GROUP_LABEL[g])}"><div class="block-head" style="cursor:default"><div><h3>${esc(F.GROUP_LABEL[g])} <span class="count num">${l.length}</span></h3></div></div><div class="rows">${l.slice(0, shown(g)).map((x) => fuRow(x)).join('')}${l.length > shown(g) ? `<div style="text-align:center;padding:6px"><button class="btn small" type="button" data-more-block="fu-${g}">Ver los ${int(l.length - shown(g))} restantes</button></div>` : ''}</div></section>`).join('') : '<section class="card glass"><p class="empty">Nada para ejecutar con estos filtros.</p></section>'}
-      <details class="card glass" ${state.fu.open.sched ? 'open' : ''} data-fu-details="sched"><summary><strong>Programadas</strong> <span class="count num">${sched.length}</span> <span class="sub">· su paso sale más adelante</span></summary><div class="rows">${sched.slice(0, 50).map((x) => fuRow(x, { button: false })).join('') || '<p class="empty">Ninguna.</p>'}</div></details>
-      <details class="card glass" ${state.fu.open.blocked ? 'open' : ''} data-fu-details="blocked"><summary><strong>Bloqueadas</strong> <span class="count num">${blocked.length}</span> <span class="sub">· ${esc(fuBlockReasons(blocked))}</span></summary><div class="rows">${blocked.slice(0, 50).map((x) => fuRow(x, { button: false })).join('') || '<p class="empty">Ninguna.</p>'}</div></details>`;
-  }
+  const scope=fuScope(),n=state.fu.n;
+  const {q,snap,stages,current,rows}=fuQueueSelection(scope);
+  const summary=F.summary(n,scope);
+  const cards=[
+    ['listas','ACCIONES LISTAS',summary.ready,'Disponibles para ejecutar'],
+    ['respuestas','RESPUESTAS NUEVAS',summary.replies,'Responder o clasificar'],
+    ['demos','DEMOS PENDIENTES',summary.demos,'Por crear o enviar'],
+    ['bloqueadas','BLOQUEADAS',summary.blocked,`${summary.scheduled} programadas`],
+  ];
+  const stageCounter=(stage)=>F.filter(n.queue,{unit:scope,q:q.search}).filter(x=>!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation)).length;
+  const canonical=Object.entries(snap?.labels?.situations||{});
+  const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
+  const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed)).map(([key,label])=>{
+    const o=override.find(a=>a.key===key);return {key,label:o?.label||label}
+  }),...(snap?.catalog?.states||[]).filter(s=>s.active&&(!current||s.commercial_stage===current.key)).map(s=>({key:s.key,label:s.label}))];
+  const rules=scope!=='todas' && current?F.ruleRows(scope,snap).filter(r=>current.technical.includes(r.stage)): [];
+  const showClosed=scope!=='todas' && (current?.key==='contactado'||current?.key==='saludado');
+  const closedCount=n.noInteresados.filter(x=>x.unit===scope).length;
+  const filterSummary=Object.entries(state.fu.f||{}).filter(([k,v])=>['owner','priority'].includes(k)&&v);
+  const reasons=Object.entries(n.blocked.filter(x=>scope==='todas'||x.unit===scope).reduce((obj,x)=>{
+    const k=String(x.blocked||'').split(':')[0].trim()||'Sin motivo';obj[k]=(obj[k]||0)+1;return obj;
+  },{})).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  return `<section class="os-fu-center" data-testid="followup-queue">
+    <section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / COLA DE EJECUCIÓN</span><h1>Tu próxima mejor acción.</h1>
+      <p>El mismo recorrido del Follow-up de Habita: etapa → situación → regla → contacto → QA → confirmar. Cada producto decide qué se puede enviar.</p></div></section>
+    ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
+      `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
+        <button class="os-fu-stage ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage="">TODAS<strong>${stageCounter(null)}</strong></button>
+        ${stages.map(s=>`<button class="os-fu-stage ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title.toUpperCase())}<strong>${stageCounter(s)}</strong></button>`).join('')}
+      </div>`}
+    <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
+      <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
+    ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
+      <button type="button" class="${!q.situation?'is-on':''}" data-fu="queue-situation" data-fu-situation="">Todas <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))).length}</b></button>
+      ${situ.map(s=>`<button type="button" class="${q.situation===s.key?'is-on':''}" data-fu="queue-situation" data-fu-situation="${esc(s.key)}">${esc(s.label)} <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))&&(x.situation===s.key||x.catalogSituation===s.key)).length}</b></button>`).join('')}</div></div>`:''}
+    ${showClosed?`<div class="os-fu-chipbar"><strong>RESULTADO DEL CONTACTO</strong><div class="os-fu-chips">
+      <button type="button" class="${!q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="0">Pendientes de acción</button>
+      <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
+      </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
+    ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note">Primeros contactos: ${int(snap.summary.newToday||0)} / ${int(snap.summary.cap)} registrados. Los bloqueos y horarios se aplican desde ${esc(fuName(scope))}.</div>`:''}
+    <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
+    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':'en este filtro'}</h2><div class="os-fu-tools">
+      <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
+      ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
+      <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
+      <input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto">
+      <button type="button" class="btn primary" data-fu="next" ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''} data-testid="fu-take-next">TOMAR LA PRÓXIMA →</button>
+    </div></div>
+    ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
+    ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
+    <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
+    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
+    </section>
+    <details class="card glass" data-fu-details="sched" ${state.fu.open.sched?'open':''}><summary><strong>Programadas</strong> <span class="count">${int(n.scheduled.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
+      ${n.scheduled.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin programadas.</p>'}</div></details>
+    <details class="card glass" data-fu-details="blocked" ${state.fu.open.blocked?'open':''}><summary><strong>Bloqueadas</strong> <span class="count">${int(n.blocked.filter(x=>scope==='todas'||x.unit===scope).length)}</span></summary><div class="rows">
+      ${n.blocked.filter(x=>scope==='todas'||x.unit===scope).slice(0,50).map(x=>fuRow(x,{button:false})).join('')||'<p class="empty">Sin bloqueadas.</p>'}</div></details>
+  </section>`;
+}
   function fuBlockReasons(list) {
     const c = {};
     for (const x of list) { const k = String(x.blocked || '').split(':')[0].split('(')[0].trim(); c[k] = (c[k] || 0) + 1; }
