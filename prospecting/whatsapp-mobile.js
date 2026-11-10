@@ -28,11 +28,21 @@
     if(body)link.searchParams.set('text',body);
     return link.toString();
   }
+  function appLink(source,phone='',text=''){
+    const universal=nativeLink(source,phone,text);
+    if(!universal)return null;
+    const parts=new URL(universal);
+    const result=new URL('whatsapp://send');
+    result.searchParams.set('phone',parts.pathname.replace(/^\//,''));
+    const body=parts.searchParams.get('text');
+    if(body)result.searchParams.set('text',body);
+    return result.toString();
+  }
   function isMobileClient(win){
     if(!win)return false;
     const ua=win.navigator?.userAgent||'';
     return /iPhone|iPad|iPod|Android/i.test(ua)
       ||Boolean(win.matchMedia?.('(max-width: 760px) and (pointer: coarse)')?.matches);
   }
-  return {nativeLink,isMobileClient};
+  return {nativeLink,appLink,isMobileClient};
 });
