@@ -2641,6 +2641,12 @@
     ${scope!=='todas'&&customStages.length?`<div class="os-fu-chipbar" data-testid="followup-queue-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
       ${customStages.map(s=>`<button type="button" aria-pressed="${current?.key===s.key}" class="${current?.key===s.key?'is-on':''}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${stageCounter(s)}</b></button>`).join('')}
     </div></div>`:''}
+    <div class="os-fu-fastbar" data-testid="fu-fast-execution">
+      <div class="os-fu-fastbar-summary"><strong>${esc(current?.title||'Todas las etapas')}</strong><span>${int(rows.filter(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action).length)} listos</span></div>
+      <button type="button" class="btn primary os-fu-fastbar-execute" data-fu="next" ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''} data-testid="fu-fast-next">EJECUTAR SIGUIENTE →</button>
+      <button type="button" class="btn os-fu-fastbar-filters" data-fu="queue-toggle-filters" aria-expanded="${Boolean(q.extraFilters)}" aria-controls="fu-advanced-filters">Filtros ${q.extraFilters?'−':'+'}</button>
+    </div>
+    <div class="os-fu-advanced" id="fu-advanced-filters" data-expanded="${Boolean(q.extraFilters)}">
     <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
@@ -2650,6 +2656,7 @@
       <button type="button" class="${!q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="0">Pendientes de acción</button>
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
+    </div>
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
     <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
     <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
@@ -3617,6 +3624,9 @@
       case 'results-cohort': {
         const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
         r.cohortBy=ds.fuCohort;render();break;
+      }
+      case 'queue-toggle-filters': {
+        const q=fuQueueState();q.extraFilters=!q.extraFilters;render();break;
       }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
