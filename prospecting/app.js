@@ -3388,6 +3388,7 @@
     const otherClaim = it.claim && it.claim.by !== me;
     const rawWhatsApp=String(t.whatsappUrl||'');
     const nativeWhatsApp=window.ProspectingWhatsApp?.nativeLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
+    const appWhatsApp=window.ProspectingWhatsApp?.appLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
     const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}" target="_blank" rel="noopener noreferrer"
       data-fu="open-native" data-testid="fu-open-mobile" aria-label="Abrir conversación en la aplicación de WhatsApp">
       ${icon.wa} Abrir WhatsApp</a>
@@ -3399,7 +3400,9 @@
       ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
         ${whatsappActions}
         <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
-        <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.</p>
+        <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.
+          ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
+        </p>
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile" data-arm="Confirmar: el mensaje salió">✓ Confirmar envío</button>
       </div>`:''}
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
