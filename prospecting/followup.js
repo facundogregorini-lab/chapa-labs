@@ -352,5 +352,5 @@
     return { unit, never: false, at: r.at, trigger: r.trigger || '', totals: r.totals || {}, lines, pending };
   }
 
-  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });
