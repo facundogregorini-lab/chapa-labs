@@ -104,3 +104,23 @@ test('Both units expose recontact situations only after first contact',()=>{
   assert.match(app,/fuSituationOptions\(situations,it.stage,t.unit\)/);
   assert.match(app,/selected\?\.technical/);
 });
+
+test('Eight commercial funnel stage icons remain above execution shortcuts',()=>{
+  const stages=app.indexOf('data-testid="followup-reference-stage-cards"');
+  const grid=app.indexOf('data-testid="followup-queue-grid"',stages);
+  const cta=app.indexOf('data-testid="fu-take-next"',grid);
+  const filters=app.indexOf('data-testid="fu-queue-advanced"',cta);
+  assert.ok(stages>0&&grid>stages&&cta>grid&&filters>cta);
+  assert.match(app,/commercialStages\.map\(s=>`<button class="os-fu-stage/);
+  assert.match(app,/data-fu="queue-stage"/);
+  assert.match(app,/data-testid="fu-queue-sort-options"/);
+  assert.match(app,/data-fu-queue-select="order"/);
+  assert.match(app,/data-fu-queue-select="rule"/);
+  assert.match(app,/data-fu-queue-select="group"/);
+  assert.match(app,/data-fu-queue-search/);
+  assert.match(app,/data-fu="queue-kpi"/);
+  assert.match(app,/data-fu="queue-situation"/);
+  assert.match(css,/\.os-fu-queue-next\{/);
+  assert.match(css,/\.os-fu-advanced-body/);
+  assert.match(app,/fuQueueState\(\)\.advancedOpen=d\.open/);
+});
