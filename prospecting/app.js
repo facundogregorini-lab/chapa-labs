@@ -141,6 +141,7 @@
     if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
   function go(unit, view, { replace } = {}) {
+    const previousUnit = state.unit;
     if (unit!==state.unit && state.fu?.queueView) state.fu.queueView={...state.fu.queueView,commercial:null,situation:null,rule:null,tech:null,closed:false,limit:25};
     if (unit !== state.unit && window.ProspectingAgencies && unit !== 'todas')
       state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
@@ -153,12 +154,14 @@
       `/prospecting${unit === 'todas' ? '' : `/${unit}`}${state.view !== 'hoy' ? `?vista=${state.view}` : ''}${state.demo ? (state.view !== 'hoy' ? '&' : '?') + 'ejemplo=1' : ''}`;
     history[replace ? 'replaceState' : 'pushState']({}, '', path);
     render();
+    if (unit !== previousUnit && isFu() && !state.demo)
+      setTimeout(() => loadFollowup({ quiet: true }), 0);
     main.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   
 
-  window.addEventListener('popstate', () => { readRoute(); render(); });
+  window.addEventListener('popstate', () => { readRoute(); render(); if (isFu() && !state.demo) loadFollowup({ quiet: true }); });
 
   // ─── Período ────────────────────────────────────────────────
   const PERIODS = [['all', 'Histórico'], ['7', '7 días'], ['30', '30 días'], ['mes', 'Este mes']];
@@ -252,7 +255,9 @@
     const s = state.session;
     if (!state.demo && !s.google) { main.innerHTML = setupScreen(); return after(); }
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
-    if (isFu() && !state.demo && !state.fu.n && !state.fu.loading && !state.fu.error) setTimeout(() => loadFollowup(), 0);
+    if (isFu() && !state.demo && !state.fu.loading && !state.fu.error &&
+        (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])))
+      setTimeout(() => loadFollowup(), 0);
     if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
     else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder') main.innerHTML = renderFu();
     else {
@@ -2129,7 +2134,10 @@
   const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
   const UNIT_VIEWS = ['hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
-  state.fu = { raw: null, n: null, loading: false, error: null, at: 0, f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
+  state.fu = { raw: null, n: null, loading: false, error: null, at: 0,
+    loadedAt: {}, periodSignature: null, revision: 0, requestedRevision: 0,
+    requestedScope: null, requestedPeriod: null, pendingScope: null,
+    f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
   const isFu = () => (state.unit === 'todas' ? [...FU_VIEWS,'resumen'].includes(state.view) : UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder');
   const fuView = () => state.view === 'followup' ? (state.fu.sub || 'hoy') : state.view;
   const fuScope = () => (state.unit === 'todas' ? state.fu.f.unit || 'todas' : state.unit);
@@ -2147,28 +2155,62 @@
   const dayTime = (iso) => (iso ? new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : '');
 
   function fuCount(scope) {
-    if (!state.fu.n) return 0;
+    if (!state.fu.n || scope !== 'todas' && !state.fu.n.units[scope]) return '—';
     return F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length;
   }
 
   async function loadFollowup({ quiet } = {}) {
     if (state.demo) { state.fu.n = F.normalize({}); state.fu.raw = { units: {} }; return; }
-    if (state.fu.loading || !state.session || !state.session.user) return;
+    if (!state.session || !state.session.user) return;
+    const scope = fuScope();
+    const period = fuChartPeriod();
+    const signature = JSON.stringify(period);
+    if (state.fu.loading) {
+      if (scope !== state.fu.requestedScope || signature !== state.fu.requestedPeriod ||
+          state.fu.revision !== state.fu.requestedRevision) state.fu.pendingScope = scope;
+      return;
+    }
+    // Period-dependent chart data cannot be silently mixed across ranges.
+    if (state.fu.periodSignature !== null && signature !== state.fu.periodSignature) {
+      state.fu.raw = null;
+      state.fu.n = null;
+      state.fu.loadedAt = {};
+    }
+    state.fu.periodSignature = signature;
     state.fu.loading = true;
+    state.fu.requestedScope = scope;
+    state.fu.requestedPeriod = signature;
+    state.fu.requestedRevision = state.fu.revision;
     if (!quiet) render();
     try {
-      const period=fuChartPeriod();
-      state.fu.raw = await api('followup', { query: { unit: 'todas',periodo:period.preset,...(period.from?{desde:period.from}:{}),...(period.to?{hasta:period.to}:{}) } });
-      state.fu.n = F.normalize(state.fu.raw.units);
-      state.fu.at = Date.now();
-      state.fu.error = null;
+      const response = await api('followup', { query: {
+        unit: scope, periodo: period.preset,
+        ...(period.from ? { desde: period.from } : {}),
+        ...(period.to ? { hasta: period.to } : {}),
+      } });
+      const now = Date.now();
+      const prior = Object.fromEntries(Object.entries(state.fu.raw?.units || {})
+        .filter(([id, snap]) => snap && !snap.error && now - (state.fu.loadedAt[id] || 0) < 4 * 60_000));
+      const combined = F.mergeUnits(prior, response.units);
+      for (const [id, snap] of Object.entries(response.units || {}))
+        if (snap && !snap.error && !snap.__freshness?.stale) state.fu.loadedAt[id] = now;
+      state.fu.raw = { ...response, units: combined };
+      state.fu.n = F.normalize(combined);
+      state.fu.at = now;
+      state.fu.error = scope !== 'todas' && !state.fu.n.units[scope]
+        ? state.fu.n.errors[scope] || 'No se pudo actualizar este negocio.' : null;
     } catch (err) {
       state.fu.error = err.message;
       if (err.status === 401) state.session.user = null;
+      // Failed reads never replace verified data with an empty board.
     } finally {
       state.fu.loading = false;
-      // Con una tarea abierta no se redibuja: se perdería lo que se está escribiendo.
-      if (!state.fu.task&&!fuRulesState('habita').dirty&&!fuRulesState('turnia').dirty) render(); else renderTopOnly();
+      if (!state.fu.task && !fuRulesState('habita').dirty && !fuRulesState('turnia').dirty) render();
+      else renderTopOnly();
+      if (state.fu.pendingScope) {
+        state.fu.pendingScope = null;
+        setTimeout(() => loadFollowup({ quiet: true }), 0);
+      }
     }
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
@@ -2178,6 +2220,7 @@
     state.fu.busy = true;
     try {
       const { result } = await api('task', { method: 'POST', body: { unit, followup } });
+      if (!['queue', 'replies', 'whatsapp-search'].includes(followup.op)) state.fu.revision++;
       if (label) toast(label);
       if (result && result.warning) toast(result.warning, true);
       return result || {};
@@ -2243,8 +2286,13 @@
     if (state.fu.task && fuView()!=='hoy') return fuTaskWithQueue(state.fu.task);
     const v = fuView();
     const sub = '';
-    if (!state.fu.n) {
-      if (state.fu.error) return `${sub}<div class="notice glass"><span class="badge off">Sin conexión</span><span>${esc(state.fu.error)}</span><button class="btn small" type="button" data-fu="reload">Reintentar</button></div>`;
+    if (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])) {
+      const reason = state.fu.n?.errors?.[fuScope()] || state.fu.error;
+      if (reason) return `${sub}<section class="card glass" role="alert" data-testid="followup-unavailable">
+        <h2>No pudimos cargar ${esc(fuName(fuScope()))}</h2>
+        <p>${esc(reason)}. Las reglas y los prospectos no se borraron; la conexión falló.</p>
+        <button class="btn primary" type="button" data-fu="reload">REINTENTAR CONEXIÓN</button>
+      </section>`;
       return `${sub}<div class="skeleton"></div><div class="skeleton"></div>`;
     }
     const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
@@ -3015,7 +3063,7 @@
     <div class="os-business-cards">${units().filter(u=>n.units[u.id]).map(u=>`<button type="button" class="os-business-card" data-goto="${u.id}" data-view-to="secuencias" data-business="${u.id}"><span class="os-kicker">REGLAS COMERCIALES</span><h2>${esc(u.name)}</h2><p>${int(n.units[u.id].rules?.length||0)} reglas · configurar flujo y mensajes</p></button>`).join('')}</div>`;
   }
   const snap=n.units[unit];
-  if(!snap)return `<section class="card glass"><p>No hay reglas disponibles de ${esc(fuName(unit))}.</p></section>`;
+  if(!snap)return `<section class="card glass" role="alert"><p>No pudimos consultar las reglas de ${esc(fuName(unit))}. Reintentá la conexión; las reglas no fueron eliminadas.</p><button type="button" class="btn primary" data-fu="reload">REINTENTAR</button></section>`;
   const ui=fuRulesState(unit);
   const commercial=F.commercialStages(unit,snap).filter(x=>!x.key.startsWith('etapa_'));
   const active=commercial.find(s=>s.key===ui.commercial)||commercial[unit==='habita'?1:1]||commercial[0];
