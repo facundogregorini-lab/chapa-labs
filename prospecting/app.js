@@ -236,7 +236,8 @@
     ['mensajes','PLANTILLAS ANTERIORES'],
     ['playbook','PLAYBOOK']
   ];
-  $('#legacy-tabs').innerHTML = legacy.map(([key,label]) =>
+  document.body.dataset.executing = state.fu?.task ? 'true' : 'false';
+  $('#legacy-tabs').innerHTML = state.fu?.task ? '' : legacy.map(([key,label]) =>
     `<button type="button" data-view="${key}" aria-current="${state.view === key ? 'page' : 'false'}">${esc(label)}</button>`
   ).join('');
   document.body.dataset.unit = state.unit;
@@ -3477,7 +3478,7 @@
       <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="chapa-whatsapp" rel="noopener"
       data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
     return `${demoBanner()}
-      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<button class="btn small ghost" type="button" data-fu="release">Soltar sin hacer nada</button><span class="sub">La tenés vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}: nadie más puede mandarle.</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
+      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
       <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>${esc(it.stageTitle || '')}${it.situationLabel ? ` · ${esc(it.situationLabel)}` : ''}${t.actionLabel || it.action ? ` · ${esc(t.actionLabel || it.action)}` : ''}</p></div></section>
       ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
         ${whatsappActions}
@@ -3488,7 +3489,20 @@
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile">✓ Confirmar envío</button>
         <button type="button" class="btn os-fu-mobile-next" data-fu="next-after" data-testid="fu-next-mobile"
           aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
-        <p class="os-fu-mobile-next-note">Si no enviaste el mensaje, esta tarea queda libre sin marcarla como enviada.</p>
+        <details class="os-fu-reclassify" data-testid="fu-reclassify">
+          <summary class="btn os-fu-reclassify-cta" data-testid="fu-reclassify-open">Reclasificar</summary>
+          <div class="os-fu-reclassify-body">
+            ${t.unit==='habita'? `<form data-fu-change-stage>
+              <label>Etapa del funnel<select class="input" name="etapa" required>${(snap?.stages||[]).map(v=>`<option value="${esc(v.key)}" ${v.key===it.stage?'selected':''}>${esc(v.title)}</option>`).join('')}</select></label>
+              <button type="submit" class="btn primary">Guardar etapa</button>
+            </form>`:''}
+            <form data-fu-change-situation>
+              <label>Situación<select class="input" name="situacion" required>${Object.entries(situations).map(([k,l])=>`<option value="${esc(k)}" ${k===it.situation?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+              <input class="input" name="texto" placeholder="Motivo (opcional)" maxlength="500">
+              <button type="submit" class="btn primary">Guardar situación</button>
+            </form>
+          </div>
+        </details>
       </div>`:''}
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
         <section class="card glass os-fu-context-card"><h2>Contexto</h2>
@@ -3883,7 +3897,16 @@
       return;
     }
     if (!task) return;
-    if (form.matches('[data-fu-situation]')) {
+    if (form.matches('[data-fu-change-stage]')) {
+      if(task.unit!=='habita')return;
+      if(await fuOp(task.unit,{op:'stage',inmobiliaria:it.id,etapa:fd.etapa},{label:'Etapa actualizada.'})){
+        state.fu.task=null;await loadFollowup({quiet:true});render();
+      }
+    } else if (form.matches('[data-fu-change-situation]')) {
+      if(await fuOp(task.unit,{op:'situation',inmobiliaria:it.id,situacion:fd.situacion,texto:fd.texto},{label:'Situación actualizada.'})){
+        state.fu.task=null;await loadFollowup({quiet:true});render();
+      }
+    } else if (form.matches('[data-fu-situation]')) {
       if (await fuOp(task.unit, { op: 'situation', inmobiliaria: it.id, situacion: fd.situacion, texto: fd.texto }, { label: 'Situación guardada.' })) { state.fu.task = null; loadFollowup(); }
     } else if (form.matches('[data-fu-reply]')) {
       if (await fuOp(task.unit, { op: 'reply', inmobiliaria: it.id, texto: fd.texto, ...(fd.clasificacion ? { clasificacion: fd.clasificacion, confianza: 1 } : {}) }, { label: 'Respuesta registrada.' })) { state.fu.task = null; loadFollowup(); }
