@@ -2437,64 +2437,71 @@
   }
 
   function fuPipeline() {
-  const n=state.fu.n;
-  if(state.unit==='todas') {
-    const parts=units().filter(u=>n.units[u.id]).map(u=>{
-      const snap=n.units[u.id];
-      const steps=snap.funnel||[];
-      const ready=F.summary(n,u.id).ready;
+  const n=state.fu.n, scope=fuScope();
+  if(scope==='todas'){
+    const cards=units().filter(u=>n.units[u.id]).map(u=>{
+      const stages=F.commercialStages(u.id,n.units[u.id]);
+      const live=F.summary(n,u.id);
       return `<button type="button" class="os-business-card" data-business="${u.id}" data-goto="${u.id}" data-view-to="pipeline">
-        <div class="os-business-head"><span class="eyebrow">EMBUDO ${esc(u.name.toUpperCase())}</span><span class="badge live">${int(ready)} ACCIONES LISTAS</span></div>
-        <h2>${esc(u.name)}</h2><p>${steps.length} pasos técnicos · se respetan las definiciones del producto.</p>
-        <div class="os-business-metrics"><div><strong>${int(steps[0]?.reached || 0)}</strong><small>Alcanzaron inicio</small></div><div><strong>${int(steps.reduce((s,x)=>s+(x.waiting||0),0))}</strong><small>En etapas</small></div><div><strong>${int(n.blocked.filter(x=>x.unit===u.id).length)}</strong><small>Bloqueadas</small></div></div>
+        <div class="os-business-head"><span class="os-kicker">EMBUDO ${esc(u.name.toUpperCase())}</span><span class="os-tag">${int(live.ready)} LISTAS</span></div><h2>${esc(u.name)}</h2>
+        <p>${stages.length} etapas comerciales con sus definiciones de conversión independientes.</p>
+        <div class="os-business-metrics"><div><strong>${int(stages[0]?.reached||0)}</strong><small>Inicio</small></div>
+        <div><strong>${int(stages.reduce((s,x)=>s+x.waiting,0))}</strong><small>En etapas</small></div>
+        <div><strong>${int(live.blocked)}</strong><small>Bloqueadas</small></div></div>
       </button>`;
     }).join('');
-    return `<section class="hero"><div><span class="eyebrow">GENERAL / EMBUDOS</span><h1>Dos recorridos. Una sola operación.</h1><p>Compará las etapas y prioridades por negocio. Las conversiones no se suman entre productos porque sus eventos son diferentes.</p></div></section><div class="os-business-cards">${parts}</div>${fuToolbar({search:false,groups:false,filters:false})}`;
+    return `<section class="hero"><div><span class="eyebrow">GENERAL / EMBUDOS</span><h1>El recorrido de cada negocio.</h1><p>Seleccioná un negocio para ver sus etapas, situaciones, reglas y contactos. No se agregan tasas de conversión incompatibles.</p></div></section><div class="os-business-cards">${cards}</div>`;
   }
-  const unit=state.unit,snap=n.units[unit];
-  if(!snap)return `<section class="card glass"><p>No hay datos de ${esc(fuName(unit))}.</p></section>`;
-  const raw=snap.funnel||[];
-  const stages=snap.stages||[];
-  const sourceGroups=unit==='habita' ? [
-    ['prospectado','PROSPECTADO',['no-contactado']],
-    ['contactado','CONTACTADO',['no-responde']],
-    ['interesado','INTERESADO',['sin-demo','sin-enviar']],
-    ['demo-enviada','DEMO ENVIADA',['no-abrio','sin-interaccion','sin-cuenta']],
-    ['cuenta-creada','CUENTA CREADA',['sin-uso']],
-    ['cuenta-activa','CUENTA ACTIVA',['sin-suscripcion']],
-    ['cliente','CLIENTE',[]],
-    ...(snap.catalog?.stages||[]).map(s=>[s.key,s.label.toUpperCase(),[s.technical_stage]]),
-  ] : stages.map(s=>[s.key,s.title.toUpperCase(),[s.key]]);
-  const all=[...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===unit);
-  const groups=sourceGroups.map(([key,title,keys])=>{
-    const steps=keys.map(k=>raw.find(s=>s.key===k)).filter(Boolean);
-    const custom=(snap.catalog?.stages||[]).find(s=>s.key===key);
-    const waiting=custom?Number(custom.waiting||0):keys.length?steps.reduce((sum,s)=>sum+(Number(s.waiting)||0),0):Math.max(0,Number(raw.at(-1)?.reached||0)*Number(raw.at(-1)?.rate||0));
-    const reached=steps[0]?.reached||0;
-    const rate=steps.at(-1)?.rate??null;
-    return {key,title,keys,waiting,reached,rate,filterSituation:custom?.entry_situation||null};
-  });
-  const selected=groups.find(g=>g.key===state.fu.pipelineStage)||groups[0];
-  const stage=selected.keys.includes(state.fu.technicalStage)?state.fu.technicalStage:null;
-  const matched=all.filter(x=>selected.keys.includes(x.stage) && (!stage||x.stage===stage) && (!selected.filterSituation||x.situation===selected.filterSituation));
-  const filtered=F.filter(matched,{...state.fu.f,unit});
-  const selectedTechnical=stage||selected.keys[0];
-  const currentStep=raw.find(s=>s.key===selectedTechnical);
-  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / EMBUDO</span><h1>El recorrido de cada oportunidad.</h1><p>Clic en una etapa para revisar sus situaciones, acciones y contactos. Los conteos de etapas provienen del motor de ${esc(fuName(unit))}; la tabla muestra contactos con seguimiento vigente.</p></div></section>
-    <section class="card glass"><div class="os-section-heading"><div><span class="os-kicker">ETAPAS COMERCIALES</span><h2>Pipeline de ${esc(fuName(unit))}</h2></div><span class="os-tag">${groups.length} ETAPAS</span></div>
-      <div class="os-stage-rail" data-testid="commercial-pipeline-stages">${groups.map(g=>`<button type="button" class="os-stage-tile" data-fu="pipeline-stage" data-fu-stage="${esc(g.key)}" aria-pressed="${selected.key===g.key}">
-        <span>${esc(g.title)}</span><strong>${int(g.waiting)}</strong><small>${g.rate==null?'Etapa final':`${pct(g.rate)} pasa al siguiente paso`}</small></button>`).join('')}</div>
-      <div class="os-stage-details">${selected.keys.length>1?selected.keys.map(k=>{const s=raw.find(x=>x.key===k);return `<button type="button" class="btn small ${stage===k?'primary':''}" data-fu="pipeline-technical" data-fu-stage="${esc(k)}">${esc(s?.title||k)} · ${int(s?.waiting||0)}</button>`}).join('')+`<button type="button" class="btn small ${!stage?'primary':''}" data-fu="pipeline-technical" data-fu-stage="">TODAS</button>`:''}
-        <span class="os-tag">${int(selected.waiting)} EN LA ETAPA</span>
-        <button class="btn small" type="button" data-view="secuencias">REGLAS Y MENSAJES →</button></div>
-    </section>
-    <section class="card glass"><div class="os-funnel-title"><div><span class="os-kicker">DETALLE DE ETAPA</span><h2>${esc(selected.title)}</h2></div><span class="badge live">${int(filtered.length)} EN SEGUIMIENTO</span></div>
-      ${currentStep?`<p class="os-view-caption">Objetivo: avanzar a <strong>${esc(currentStep.goal)}</strong>. ${int(currentStep.reached||0)} llegaron a este paso.</p>`:''}
-      ${fuToolbar()}
-      <div class="table-wrap"><table><thead><tr><th>Prospecto</th><th>Situación</th><th>Próxima acción</th><th>Prioridad</th><th>Último contacto</th><th>Estado</th></tr></thead><tbody>
-      ${filtered.slice(0,100).map(x=>`<tr data-fu-open="${esc(x.key)}" tabindex="0" style="cursor:pointer"><td><strong>${esc(x.name)}</strong>${x.zone?`<div class="sub">${esc(x.zone)}</div>`:''}</td><td>${esc(x.situationLabel||'—')}</td><td>${esc(x.action||x.actionReason||'—')}</td><td>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</td><td>${esc(ago(x.since)||'—')}</td><td>${x.claim?`Lo tiene ${esc(x.claim.by)}`:x.blocked?`<span style="color:var(--bad-text)">${esc(x.blocked)}</span>`:x.dueAt?`Programado ${esc(dayTime(x.dueAt))}`:'Lista'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No hay contactos con acciones vigentes en esta selección.</td></tr>'}
-      </tbody></table></div>${filtered.length>100?`<p class="os-view-caption">Se muestran los primeros 100 de ${int(filtered.length)}. Para ver todos, usá Prospectos.</p>`:''}
-    </section>`;
+  const snap=n.units[scope];
+  if(!snap)return `<section class="card glass"><p>El embudo de ${esc(fuName(scope))} no está disponible.</p></section>`;
+  const stages=F.commercialStages(scope,snap);
+  const selected=stages.find(s=>s.key===state.fu.pipelineStage)||stages[0];
+  const tech=(selected?.technical||[]).includes(state.fu.technicalStage)?state.fu.technicalStage:null;
+  const activeTech=tech||selected?.technical?.[0]||null;
+  const selectedSituation=state.fu.pipelineSituation||selected?.situation||null;
+  const all=[...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope);
+  const matchStage=x=>selected?.technical?.includes(x.stage)&&(!selected.situation||selected.situation===x.situation);
+  const situationRows=all.filter(matchStage&&(x=>true));
+  const canonical=Object.entries(snap.labels?.situations||{});
+  const hidden=(snap.catalog?.overrides||[]).filter(o=>o.commercial_stage===selected?.key&&o.removed);
+  const situations=canonical.filter(([key])=>!hidden.some(h=>h.key===key)).map(([key,label])=>({key,label}));
+  const custom=(snap.catalog?.states||[]).filter(s=>s.active&&s.commercial_stage===selected?.key).map(s=>({key:s.key,label:s.label}));
+  situations.push(...custom);
+  const rows=F.filter(all.filter(x=>matchStage(x)&&(!tech||x.stage===tech)&&
+    (!selectedSituation||x.situation===selectedSituation||x.catalogSituation===selectedSituation)),
+    {...state.fu.f,unit:scope});
+  const own=F.ruleRows(scope,snap).filter(r=>selected?.technical?.includes(r.stage)&&(!tech||r.stage===tech));
+  const versions=F.versionRows(scope,snap);
+  const activeVersions=(stage,action)=>versions.filter(v=>v.stage===stage && v.action===action);
+  const selectedTechnical=snap.stages?.find(x=>x.key===activeTech);
+  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(scope).toUpperCase())} / EMBUDO</span><h1>Etapas y decisiones.</h1><p>La misma lectura del Follow-up de Habita: elegí una etapa y revisá sus pasos, situaciones, reglas y prospectos, sin cambiar la lógica del motor.</p></div></section>
+    <section class="card glass" data-testid="followup-funnel"><div class="os-funnel-title"><div><span class="os-kicker">EMBUDO COMERCIAL</span><h2>${esc(fuName(scope))} · ${stages.length} etapas</h2></div><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></div>
+    <div class="os-fu-stage-grid" data-testid="followup-funnel-stages">
+      ${stages.map(s=>`<button type="button" class="os-fu-stage ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}">${esc(s.title.toUpperCase())}
+        <strong>${int(s.waiting)}</strong><small>${s.rate===null?'Etapa sin conversión inmediata':pct(s.rate)+' avance a siguiente etapa'}</small></button>`).join('')}
+    </div>
+    ${selected?.technical?.length>1?`<div class="os-fu-chipbar" data-testid="followup-funnel-substages"><strong>ETAPA TÉCNICA</strong><div class="os-fu-chips">
+      <button type="button" class="${!tech?'is-on':''}" data-fu="pipeline-technical" data-fu-stage="">Todas <b>${int(selected.waiting)}</b></button>
+      ${selected.technical.map(key=>{const s=snap.stages.find(x=>x.key===key);return `<button type="button" class="${tech===key?'is-on':''}" data-fu="pipeline-technical" data-fu-stage="${esc(key)}">${esc(s?.title||key)} <b>${int(s?.waiting||0)}</b></button>`}).join('')}
+    </div></div>`:''}
+    <div class="os-fu-chipbar"><strong>SITUACIÓN</strong><div class="os-fu-chips">
+      <button class="${!selectedSituation?'is-on':''}" data-fu="pipeline-situation" data-fu-situation="">Todas <b>${int(situationRows.length)}</b></button>
+      ${situations.map(s=>`<button type="button" class="${selectedSituation===s.key?'is-on':''}" data-fu="pipeline-situation" data-fu-situation="${esc(s.key)}">${esc(s.label)}
+        <b>${int(situationRows.filter(x=>x.situation===s.key||x.catalogSituation===s.key).length)}</b></button>`).join('')}
+    </div></div>
+    <div class="os-fu-banner"><strong>${esc(selected?.title||'')}</strong><span>${int(selected?.waiting||0)} EN LA ETAPA · ${activeTech?'OBJETIVO: '+esc(selectedTechnical?.goal||'siguiente paso'):'SIN PASO PENDIENTE'}</span><button class="btn small" data-view="secuencias">EDITAR REGLAS →</button></div>
+    <div class="os-fu-rules">
+      ${own.map(r=>{
+        const vv=activeVersions(r.stage,r.raw?.action||'principal'),active=vv.find(v=>v.status==='active'),test=vv.find(v=>v.status==='test');
+        return `<div class="os-fu-rule"><small>${esc(r.when)} · ${esc(r.wait)}</small><strong>${esc(r.action)}</strong><span>${active?'V'+int(active.version)+' ACTIVA':'SIN VERSIÓN ACTIVA'}${r.enabled?'':' · REGLA APAGADA'}</span>
+          <div><b>${active?pct(active.rate):'—'}</b> AVANZARON · ${int(active?.executed||0)} EJECUCIONES ${test?'<span class="os-tag">A/B</span>':''}</div></div>`;
+      }).join('')||'<p class="os-fu-caption">No hay reglas configuradas en esta etapa.</p>'}
+    </div></section>
+    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><div><span class="os-kicker">CONTACTOS EN ESTA ETAPA</span><h2>${int(rows.length)} ${scope==='habita'?'inmobiliarias':'contactos'} con seguimiento</h2></div><button type="button" class="btn small" data-view="hoy">IR A LA COLA →</button></div>
+    ${fuToolbar()}
+    <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>CONTACTO</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
+    <tbody>${rows.slice(0,100).map(x=>fuQueueTableRow(x)).join('')||'<tr><td colspan="9" class="empty">No hay contactos con seguimiento vigente en este filtro.</td></tr>'}</tbody></table></div>
+    ${rows.length>100?'<p class="os-fu-caption" style="padding:12px">Se muestran 100. Usá Prospectos para consultar la lista completa.</p>':''}</section>`;
 }
 
   function fuProspectos() {
@@ -2747,8 +2754,9 @@
         const q=fuQueueState();q.closed=ds.fuClosed==='1';q.rule=null;q.group=null;q.situation=null;q.limit=25;render();break;
       }
       case 'queue-more': fuQueueState().limit+=25;render();break;
-      case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; render(); break;
+      case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; state.fu.pipelineSituation=null;render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
+      case 'pipeline-situation': state.fu.pipelineSituation=ds.fuSituation||null;render();break;
       case 'catalog-stage': state.fu.catalogStage=ds.fuStage;state.fu.catalogEdit=null;state.fu.newStage=false;render();break;
       case 'new-stage': state.fu.newStage=!state.fu.newStage;state.fu.catalogEdit=null;render();break;
       case 'new-situation': state.fu.catalogEdit={key:null,base:false,create:true,commercial_stage:state.fu.catalogStage||'prospectado'};render();break;
