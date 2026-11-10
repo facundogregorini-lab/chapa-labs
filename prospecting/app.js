@@ -2908,28 +2908,6 @@
         ${lost?`<small class="is-lost">${int(lost)} perdidas</small>`:''}
       </div></li>`;
   }).join('');
-  let detail='';
-  if(focus){
-    const step=Number(focus.step),mode=focus.mode;
-    const chosen=rows.filter(x=>{
-      const s=Number(x.step);
-      if(x.step===null)return false;
-      if(mode==='lost')return s===step&&x.lost===true;
-      if(mode==='stayed')return s===step&&!x.lost;
-      if(mode==='advanced')return s>=(step===chart.length-1?step:step+1);
-      return s>=step;
-    });
-    const name=chart[step]?.label||`Paso ${step+1}`;
-    const kind=mode==='lost'?'No interesadas':mode==='stayed'?'Se quedaron':mode==='advanced'?'Pasaron al siguiente paso':'Llegaron al paso';
-    detail=`<section class="card glass os-native-drilldown" data-testid="followup-funnel-drilldown"><div class="os-section-heading">
-      <div><span class="os-kicker">${esc(kind.toUpperCase())}</span><h2>${int(chosen.length)} inmobiliarias · ${esc(name)}</h2></div>
-      <button type="button" class="btn small" data-fu="funnel-reset">CERRAR FILTRO</button></div>
-      <div class="table-wrap"><table><thead><tr><th>INMOBILIARIA</th><th>SCORE</th><th>WHATSAPP</th><th>ÚLTIMO PASO ALCANZADO</th></tr></thead><tbody>
-        ${chosen.slice(0,300).map(x=>`<tr><td><strong>${esc(x.name||'Sin nombre')}</strong></td>
-          <td>${x.score==null?'—':int(x.score)}</td><td>${esc(x.whatsapp||'—')}</td>
-          <td>${esc(chart[x.step]?.label||'—')}</td></tr>`).join('')||'<tr><td colspan="4">No hay inmobiliarias para este filtro.</td></tr>'}
-      </tbody></table></div>${chosen.length>300?'<p class="os-fu-caption">Se muestran las primeras 300.</p>':''}</section>`;
-  }
   return `<section class="os-native-funnel" data-testid="followup-native-funnel">
     <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
       <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
@@ -2940,7 +2918,6 @@
       <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>Perdidas (no interesadas)</span></div>
     <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
     <p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>
-    ${detail}
     ${fuFunnelReviewList(snap,rows,focus,chart)}
   </section>`;
 }
