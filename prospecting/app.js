@@ -2725,7 +2725,7 @@
     <p class="os-view-caption">Primero guardá la nueva regla. Después vas a poder asociarle un mensaje o reutilizar las versiones existentes de esa acción.</p></section>`;
   const action=rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
-  const canEdit=!state.session?.open;
+  const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
   return `<section class="fu-ref-message" data-testid="followup-rule-message">
     <div class="os-section-heading"><div><span class="os-kicker">MENSAJE VINCULADO A LA ACCIÓN</span><h3>${esc((snap.catalog?.actions?.[stage]||[]).find(a=>a.key===action)?.label||rule?.name||action)}</h3></div>
     <span class="os-tag">${versions.length} VERSIONES</span></div>
@@ -2736,8 +2736,8 @@
       <div class="fu-ref-buttons">${canEdit?`${unit==='habita'?`<button type="button" class="btn small" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR</button>`:''}
         ${v.status!=='active'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="active">ACTIVAR VERSIÓN</button>`:''}
         ${v.status==='test'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="archived">DETENER PRUEBA</button>`:''}`:''}</div>
-      ${unit==='habita'?fuVersionEditor(unit,snap,stage):''}
     </article>`).join('')||'<p class="os-view-caption">Todavía no hay versiones de esta acción.</p>'}
+    ${unit==='habita'?fuVersionEditor(unit,snap,stage):''}
     <details class="fu-ref-new-message">
       <summary>+ NUEVA VERSIÓN DEL MENSAJE</summary>
       <form data-fu-version-form data-fu-unit-id="${unit}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}">
