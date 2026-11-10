@@ -82,20 +82,27 @@
     return json;
   }
 
+  const unitRequests = new Map();
   async function loadUnit(id, { quiet, noSync } = {}) {
     if (state.demo) {
       state.data[id] = window.ProspectingFixture.build(unitOf(id));
       return;
     }
+    if (unitRequests.has(id)) return unitRequests.get(id);
     if (!quiet) state.data[id] = { loading: true };
-    try {
-      const d = await api('data', { query: { unit: id } });
-      state.data[id] = d;
-      if (!noSync) maybeSync(id);
-    } catch (err) {
-      state.data[id] = { error: err.message, code: err.body && err.body.code };
-      if (err.status === 401) { state.session.user = null; render(); }
-    }
+    const work = (async () => {
+      try {
+        const d = await api('data', { query: { unit: id } });
+        state.data[id] = d;
+        if (!noSync) maybeSync(id);
+      } catch (err) {
+        state.data[id] = { error: err.message, code: err.body && err.body.code };
+        if (err.status === 401) { state.session.user = null; render(); }
+      }
+    })();
+    unitRequests.set(id, work);
+    try { return await work; }
+    finally { if (unitRequests.get(id) === work) unitRequests.delete(id); }
   }
 
   // habita.: si la planilla no entró a su base en la última hora, se manda (una vez por sesión del panel).
@@ -156,12 +163,20 @@
     render();
     if (unit !== previousUnit && isFu() && !state.demo)
       setTimeout(() => loadFollowup({ quiet: true }), 0);
+    if (!isFu() && !state.demo) {
+      ensureLoaded().then(render);
+      loadMetrics().then(render);
+    }
     main.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   
 
-  window.addEventListener('popstate', () => { readRoute(); render(); if (isFu() && !state.demo) loadFollowup({ quiet: true }); });
+  window.addEventListener('popstate', () => {
+    readRoute(); render();
+    if (isFu() && !state.demo) loadFollowup({ quiet: true });
+    else if (!state.demo) ensureLoaded().then(render);
+  });
 
   // ─── Período ────────────────────────────────────────────────
   const PERIODS = [['all', 'Histórico'], ['7', '7 días'], ['30', '30 días'], ['mes', 'Este mes']];
@@ -3351,7 +3366,7 @@
         break;
       }
       case 'unsnooze': if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, volver: true }, { label: 'Volvió a la cola.' })) { state.fu.task = null; loadFollowup(); } break;
-      case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); openDrawer(ds.fuAccount); break; }
+      case 'ficha': { const unit = task.unit; state.fu.task = null; go(unit, 'cuentas'); await ensureLoaded(); openDrawer(ds.fuAccount); break; }
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
       case 'rules-stage': {
@@ -4088,13 +4103,14 @@
   }
 
   async function ensureLoaded(force) {
-    if (state.demo || !state.session || !state.session.user) return;
-    const ids = state.unit === 'todas' ? units().map((u) => u.id) : [state.unit, ...units().map((u) => u.id).filter((x) => x !== state.unit)];
-    await Promise.all(ids.map(async (id) => {
-      if (!force && state.data[id] && (state.data[id].accounts || state.data[id].loading)) return;
-      await loadUnit(id);
-      render();
-    }));
+    if (state.demo || !state.session || !state.session.user || isFu()) return;
+    // Legacy planillas are loaded on demand. Follow-up reads its own product
+    // snapshot and must not trigger a second concurrent scan of both databases.
+    const id = state.unit;
+    if (id === 'todas') return;
+    if (!force && state.data[id]?.accounts) return;
+    await loadUnit(id);
+    render();
   }
 
   async function boot() {
@@ -4108,7 +4124,7 @@
     if (new URLSearchParams(location.search).get('ejemplo') === '1') { await startDemo(); return; }
     render();
     await ensureLoaded();
-    await loadMetrics();
+    if (!isFu()) await loadMetrics();
     render();
   }
 
@@ -4118,8 +4134,11 @@
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
-      Promise.all(units().map((u) => loadUnit(u.id, { quiet: true }))).then(render);
-      if (isFu() && !state.fu.task) loadFollowup({ quiet: true });
+      if (isFu()) {
+        if (!state.fu.task) loadFollowup({ quiet: true });
+      } else if (state.unit !== 'todas') {
+        loadUnit(state.unit, { quiet: true }).then(render);
+      }
     }
   });
 
