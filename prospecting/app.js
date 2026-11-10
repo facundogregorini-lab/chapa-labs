@@ -2649,7 +2649,7 @@
         <label class="field"><span>Nombre de la nueva persona</span><input class="input" name="contactoNombre" maxlength="120"></label>
         <label class="field"><span>WhatsApp del referido</span><input class="input" name="contactoWhatsapp" maxlength="40"></label></div>`:''}
       <label class="field" style="margin-top:14px"><span>Observación (opcional)</span><textarea class="input" name="nota" rows="2" maxlength="700" placeholder="Contexto para la siguiente acción…"></textarea></label>
-      <div class="os-fu-actions"><button type="submit" class="btn primary" data-testid="followup-reply-save" ${!selected.body?'disabled title="No hay texto para clasificar."':''}>${selected.unit==='habita'?'GUARDAR Y PASAR A LA COLA':'APLICAR CLASIFICACIÓN'}</button>
+      <div class="os-fu-actions"><button type="submit" class="btn primary" data-testid="followup-reply-save" ${!selected.body||!selected.classification?'disabled':''} ${!selected.body?'title="No hay texto para clasificar."':''}>${selected.unit==='habita'?'GUARDAR Y PASAR A LA COLA':'APLICAR CLASIFICACIÓN'}</button>
       ${selected.unit==='habita'&&selected.status!=='facu'?'<button type="submit" class="btn" name="facu" value="1" data-testid="followup-reply-facu">ASIGNAR A FACU</button>':''}
       <button type="button" class="btn" data-fu="reply-to-queue" data-fu-id="${esc(selected.id)}">VER EN COLA →</button></div>
       <p class="os-fu-caption">Las bajas y solicitudes de no contactar quedan protegidas por el motor de cada producto. La clasificación no envía WhatsApp por sí sola.</p>
@@ -3866,6 +3866,11 @@
       const selected=e.target.value, form=e.target.closest('[data-fu-inbox-form]');
       for(const block of form.querySelectorAll('[data-reply-condition]'))
         block.hidden=block.dataset.replyCondition!==selected;
+      const save=form.querySelector('[data-testid="followup-reply-save"]');
+      if(save)save.disabled=!selected||!form.closest('[data-testid="followup-reply-detail"]')
+        ?.querySelector('.os-fu-reply-bubble')?.textContent?.trim();
+      for(const label of form.querySelectorAll('.os-fu-reply-classes label'))
+        label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
     if(e.target.matches('[data-fu-queue-select]')){
