@@ -3448,7 +3448,6 @@
         if(reject){reject.checked=survey;if(survey)for(const other of form.querySelectorAll('input[name="sit"]'))if(other!==reject)other.checked=false;}
         const wait=form.querySelector('input[name="after_hours"]');
         if(survey && wait)wait.value='0';
-        const previous=form.querySelector('select[name="after_action"]');
         if(survey && previous)previous.value='';
         fuRulesState(state.unit).dirty=true;
       }
