@@ -908,3 +908,187 @@ body[data-unit="habita"] .os-native-note{
   body[data-unit="habita"] .os-native-head .os-native-period{min-width:100%}
   body[data-unit="habita"] .os-native-step{grid-template-rows:65px 250px minmax(88px,auto)}
 }
+
+
+/* ============================================================
+   Habita Follow-up — native visual contract.
+   Source of truth: admin-followup.tsx / followup-reference.css
+   Chapa's unit-switcher remains accessible at left, but the
+   workspace and every step use Habita's native header/tabs.
+   ============================================================ */
+body[data-unit="habita"]:has(.habita-fu-workspace-head) .top.os-top {
+  display:none;
+}
+body[data-unit="habita"] .habita-fu-workspace-head{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:18px;margin:0 0 9px;min-height:73px;padding:0;
+  font-family:"Manrope","Inter",Arial,sans-serif;
+}
+body[data-unit="habita"] .habita-fu-head-copy{min-width:0;flex:1 1 400px}
+body[data-unit="habita"] .habita-fu-eyebrow{
+  display:block;font-size:10px;line-height:1.2;letter-spacing:.09em;
+  color:#6e8c77;font-weight:800;text-transform:uppercase;
+}
+body[data-unit="habita"] .habita-fu-head-copy h1{
+  margin:4px 0 0;font-size:clamp(24px,2.15vw,31px);
+  font-weight:800;line-height:1.12;letter-spacing:-.039em;
+  color:#162c20;text-transform:uppercase;
+}
+body[data-unit="habita"] .habita-fu-head-copy p{
+  margin:5px 0 0;max-width:620px;font-size:12px;
+  line-height:1.45;color:#65796b;
+}
+body[data-unit="habita"] .habita-fu-utilities{
+  display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;
+  gap:17px;
+}
+body[data-unit="habita"] .habita-fu-utilities a{
+  font-size:10.5px;font-weight:700;text-transform:uppercase;
+  color:#204e38;text-decoration:none;
+  padding:8px 0;white-space:nowrap;
+}
+body[data-unit="habita"] .habita-fu-utilities a:hover,
+body[data-unit="habita"] .habita-fu-utilities a:focus-visible{
+  color:#087c50;text-decoration:underline;
+}
+body[data-unit="habita"] .habita-fu-utilities a:last-child{
+  background:#e5f2e8;border-radius:11px;padding:13px 14px;
+}
+body[data-unit="habita"] .habita-fu-tabs{
+  display:flex;flex-wrap:nowrap;align-items:center;gap:2px;
+  width:max-content;max-width:100%;overflow-x:auto;
+  margin:0 0 10px;background:#ffffffd9;
+  border:1px solid #e3ebe3;border-radius:13px;
+  padding:3px;scrollbar-width:thin;
+}
+body[data-unit="habita"] .habita-fu-tabs button{
+  flex:0 0 auto;min-height:35px;padding:7px 12px;
+  border:0;border-radius:10px;background:transparent;
+  color:#214330;cursor:pointer;
+  font-family:inherit;font-size:10px;font-weight:750;
+  white-space:nowrap;text-transform:uppercase;
+}
+body[data-unit="habita"] .habita-fu-tabs button:hover{
+  background:#edf6ef;
+}
+body[data-unit="habita"] .habita-fu-tabs button.is-on{
+  background:#0a6b46;color:#fff;
+}
+body[data-unit="habita"] .habita-fu-tabs button:focus-visible{
+  outline:2px solid #178753;outline-offset:2px;
+}
+
+/* Rules: form's semantic controls keep their exact native form action,
+   while CSS forms a single two-column editor and WhatsApp preview on
+   the right. Unlike separate cards, its header spans both sections. */
+@media(min-width:1281px){
+  body[data-unit="habita"] .fu-ref-detail{
+    display:grid;
+    grid-template-columns:minmax(270px,1.16fr) minmax(220px,.91fr) minmax(200px,.83fr);
+    grid-template-rows:auto auto auto auto;
+    align-items:start;gap:13px;
+    background:#fff;border:1px solid #dce8df;
+    border-radius:15px;padding:15px;min-width:0;
+  }
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-rule-form{
+    display:contents;
+  }
+  body[data-unit="habita"] .fu-ref-rule-form>.fu-ref-edit-head{
+    grid-column:1/3;grid-row:1;
+    padding:4px 2px 12px;margin:0;
+    align-self:center;
+  }
+  body[data-unit="habita"] .fu-ref-rule-form>.fu-ref-when{
+    grid-column:1;grid-row:2;min-width:0;
+  }
+  body[data-unit="habita"] .fu-ref-rule-form>.fu-ref-what{
+    grid-column:2;grid-row:2;min-width:0;
+  }
+  body[data-unit="habita"] .fu-ref-rule-form>.fu-ref-buttons{
+    grid-column:1/3;grid-row:3;
+    align-self:end;
+  }
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-message{
+    grid-column:1/3;grid-row:4;min-width:0;
+  }
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-wa-preview{
+    grid-column:3;grid-row:1/5;
+    align-self:start;min-width:0;
+  }
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-buttons{
+    grid-column:1/3;grid-row:5;
+  }
+  body[data-unit="habita"] .fu-ref-when,
+  body[data-unit="habita"] .fu-ref-what{
+    border:1px solid #dfe9e0;background:#f9fbf9;
+    border-radius:12px;padding:14px;
+  }
+  body[data-unit="habita"] .fu-ref-rule-form>.fu-ref-edit-head .fu-ref-titleline{
+    gap:10px;flex-wrap:nowrap;
+  }
+  body[data-unit="habita"] .fu-ref-titleline .fu-ref-rule-name{
+    font-size:17px;
+  }
+}
+body[data-unit="habita"] .fu-ref-flowrow{
+  padding:12px;border-radius:16px;
+}
+body[data-unit="habita"] .fu-ref-flowstep{
+  min-height:57px;
+}
+body[data-unit="habita"] .fu-ref-stage-head{
+  background:#f4f9f5;
+  border-color:#dfe9df;
+}
+body[data-unit="habita"] .fu-ref-rule{
+  border-radius:12px;
+}
+body[data-unit="habita"] .fu-ref-rule.is-on{
+  background:#edf8ef;border-color:#5ab781;
+}
+body[data-unit="habita"] .fu-ref-list{
+  padding:18px;border-radius:16px;
+}
+body[data-unit="habita"] .fu-ref-wa-header{
+  background:#1b3f30;
+}
+body[data-unit="habita"] .fu-ref-wa-bubble{
+  background:#d6f7db;
+}
+@media(max-width:1280px){
+  body[data-unit="habita"] .fu-ref-detail{
+    grid-template-columns:minmax(0,1fr);
+  }
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-rule-form,
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-message,
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-wa-preview,
+  body[data-unit="habita"] .fu-ref-detail>.fu-ref-buttons{
+    grid-column:1;
+  }
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .habita-fu-workspace-head{
+    align-items:flex-start;gap:12px;min-height:0;
+  }
+  body[data-unit="habita"] .habita-fu-head-copy h1{
+    font-size:23px;
+  }
+  body[data-unit="habita"] .habita-fu-head-copy p{
+    font-size:10.5px;
+  }
+  body[data-unit="habita"] .habita-fu-utilities{
+    gap:9px;justify-content:flex-start;
+  }
+  body[data-unit="habita"] .habita-fu-utilities a{
+    font-size:9px;
+  }
+  body[data-unit="habita"] .habita-fu-tabs{
+    width:100%;margin-bottom:9px;
+  }
+  body[data-unit="habita"] .habita-fu-tabs button{
+    min-height:40px;font-size:10px;
+  }
+  body[data-unit="habita"] .fu-ref-list{
+    padding:13px;
+  }
+}
