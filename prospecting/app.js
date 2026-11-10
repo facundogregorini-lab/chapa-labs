@@ -420,21 +420,22 @@
     ['prospectado','Prospectado'],['contactado','Contactado'],['interesado','Interesado'],
     ['demo-enviada','Demo enviada'],['cuenta-creada','Cuenta creada'],['cuenta-activa','Cuenta activa'],['cliente','Cliente']
   ];
-  const steps=habita?[...baseStages.map(([key,label])=>({key,label})),...(db.stages||[])]: (snap.stages||[]).map(s=>({key:s.key,label:s.title}));
+  const nativeStages=habita?baseStages:F.COMMERCIAL.turnia.map(([key,label])=>[key,label]);
+  const steps=[...nativeStages.map(([key,label])=>({key,label})),...(db.stages||[])];
   const selected=steps.find(s=>s.key===state.fu.catalogStage)||steps[0];
   const key=selected?.key||'';
   const over=(db.overrides||[]).filter(o=>o.commercial_stage===key);
-  const rows=habita?[
+  const rows=[
     ...bases.map(([id,label])=>{
       const edit=over.find(o=>o.key===id);
       return {key:id,label:edit?.label||label,description:edit?.description||'',examples:edit?.examples||'',base:true,removed:Boolean(edit?.removed)};
     }),
     ...(db.states||[]).filter(x=>x.commercial_stage===key).map(x=>({...x,base:false,removed:false}))
-  ]:bases.map(([id,label])=>({key:id,label,base:true,removed:false}));
+  ];
   const active=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
   const allowedClassifications=(db.canonical||bases.map(([key,label])=>({key,label}))).filter(x=>bases.some(([k])=>k===x.key));
   const current=active?.create?{key:'',label:'',description:'',examples:'',base:false,source:'whatsapp',maps_to:'neutro',active:true}:rows.find(x=>x.key===active?.key&&x.base===active?.base);
-  const canEdit=habita&&db.available===true&&!state.session?.open;
+  const canEdit=db.available===true&&!state.session?.open;
   const stageForm=canEdit&&state.fu.newStage?`<form class="section" data-fu-stage-form>
     <h3>Crear etapa</h3><label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80"></label>
     <label class="field"><span>Paso técnico de origen</span><select class="input" name="technical_stage">${(snap.stages||[]).map(s=>`<option value="${esc(s.key)}">${esc(s.title)}</option>`).join('')}</select></label>
@@ -448,16 +449,17 @@
     <label class="field"><span>Ejemplos</span><textarea class="input" name="examples" rows="2" maxlength="2000">${esc(current.examples||'')}</textarea></label>
     ${current.base?'':`<div data-catalog-mapping ${current.source==="product"?"hidden":""}><label class="field"><span>Situación que entiende el motor</span><select class="input" name="maps_to">${allowedClassifications.map(({key:id,label})=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
     <div data-catalog-products ${current.source==="product"?"":"hidden"}><label class="field"><span>Condición del embudo</span><select class="input" name="product_stage">
-      ${(F.commercialStages('habita',snap).find(x=>x.key===key)?.technical||[]).map(v=>`<option value="${esc(v)}" ${current.product_stage===v?'selected':''}>${esc((snap.stages||[]).find(o=>o.key===v)?.title||v)}</option>`).join('')}
+      ${(F.commercialStages(unit,snap).find(x=>x.key===key)?.technical||[]).map(v=>`<option value="${esc(v)}" ${current.product_stage===v?'selected':''}>${esc((snap.stages||[]).find(o=>o.key===v)?.title||v)}</option>`).join('')}
     </select></label></div>
-    <label class="field"><span>Origen</span><select class="input" name="source" data-fu-catalog-source><option value="whatsapp" ${current.source==='whatsapp'?'selected':''}>WhatsApp</option><option value="manual" ${current.source==='manual'?'selected':''}>Manual</option>${F.commercialStages('habita',snap).some(x=>x.key===key&&x.technical.length)?`<option value="product" ${current.source==='product'?'selected':''}>Avance del embudo</option>`:''}</select></label><label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
+    <label class="field"><span>Origen</span><select class="input" name="source" data-fu-catalog-source><option value="whatsapp" ${current.source==='whatsapp'?'selected':''}>WhatsApp</option><option value="manual" ${current.source==='manual'?'selected':''}>Manual</option>${F.commercialStages(unit,snap).some(x=>x.key===key&&x.technical.length)?`<option value="product" ${current.source==='product'?'selected':''}>Avance del embudo</option>`:''}</select></label><label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
     <div class="os-unit-actions"><button type="submit" class="btn primary">GUARDAR SITUACIÓN</button>${!active.create?`<button type="button" class="btn" data-fu="state-delete" data-fu-key="${esc(current.key)}" data-fu-base="${current.base?'1':'0'}" data-fu-commercial="${esc(key)}" data-arm="CONFIRMAR ELIMINACIÓN">ELIMINAR</button>`:''}</div></form>`:'';
   const techMap={'no-contactado':'prospectado','no-responde':'contactado','sin-demo':'interesado','sin-enviar':'interesado','no-abrio':'demo-enviada','sin-interaccion':'demo-enviada','sin-cuenta':'demo-enviada','sin-uso':'cuenta-creada','sin-suscripcion':'cuenta-activa'};
   const customStage=(db.stages||[]).find(s=>s.key===key);
-  const ruleList=F.ruleRows(unit,snap).filter(r=>habita?(customStage?r.stage===customStage.technical_stage:techMap[r.stage]===key):r.stage===key);
+  const nativeTech=F.commercialStages(unit,snap).find(x=>x.key===key)?.technical||[];
+  const ruleList=F.ruleRows(unit,snap).filter(r=>customStage?r.stage===customStage.technical_stage:nativeTech.includes(r.stage));
   const href=habita?'https://www.habitaia.app/admin/follow-up?vista=etapas':'https://turniasalud.app/panel/prospeccion';
   return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / CONFIGURACIÓN</span><h1>Etapas y situaciones.</h1><p>Los disparadores y clasificaciones pertenecen a cada producto. Cualquier cambio se valida y guarda en su base original.</p></div></section>
-    ${habita&&!canEdit?`<p class="os-warn-note">${state.session?.open?'Para editar etapas y situaciones, primero protegé Chapa con PROSPECTING_PASSWORD.':'El catálogo de Habita no está disponible en la API o falta la migración.'} El panel original sigue disponible.</p>`:''}
+    ${!canEdit?`<p class="os-warn-note">${state.session?.open?'Para editar etapas y situaciones, primero protegé Chapa con PROSPECTING_PASSWORD.':'El catálogo de '+esc(fuName(unit))+' no está disponible en la API o falta la migración.'} El panel original sigue disponible.</p>`:''}
     <div class="os-catalog-grid"><section class="card glass"><div class="os-section-heading"><h2>Etapas comerciales</h2><span class="os-tag">${steps.length} ETAPAS</span></div>
       <div class="os-catalog-list" style="margin-top:14px">${steps.map(s=>`<button type="button" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${key===s.key}"><span>${esc(s.label)}</span><span>›</span></button>`).join('')}</div>
       ${canEdit?`<button class="btn small" type="button" data-fu="new-stage" style="margin-top:13px">+ NUEVA ETAPA</button>`:''}${stageForm}</section>
@@ -473,11 +475,12 @@
 }
 
   async function submitCatalog(form) {
-  if(state.unit!=='habita')return;
+  const unit=state.unit;
+  if(!['habita','turnia'].includes(unit))return;
   const fd=new FormData(form);
   if(form.matches('[data-fu-stage-form]')){
     const values={label:String(fd.get('label')||''),technical_stage:fd.get('technical_stage'),entry_situation:fd.get('entry_situation')};
-    if(await fuOp('habita',{op:'stage-create',valores:values},{label:'Etapa creada en Habita.'})){
+    if(await fuOp(unit,{op:'stage-create',valores:values},{label:'Etapa creada en '+fuName(unit)+'.'})){
       state.fu.newStage=false;await loadFollowup({quiet:true});render();
     }
   } else if(form.matches('[data-fu-state-form]')){
@@ -489,7 +492,7 @@
       maps_to:isBase||fd.get('source')==='product'?null:(fd.get('maps_to')||null),
       product_stage:isBase||fd.get('source')!=='product'?null:(fd.get('product_stage')||null),
       active:isBase?true:fd.has('active')};
-    if(await fuOp('habita',{op:'state-save',valores:values},{label:'Situación guardada en Habita.'})){
+    if(await fuOp(unit,{op:'state-save',valores:values},{label:'Situación guardada en '+fuName(unit)+'.'})){
       state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();
     }
   }
@@ -2817,13 +2820,13 @@
       case 'edit-situation': state.fu.catalogEdit={key:ds.fuKey,base:ds.fuBase==='1',create:false,commercial_stage:state.fu.catalogStage||'prospectado'};render();break;
       case 'catalog-cancel': state.fu.catalogEdit=null;render();break;
       case 'state-restore': {
-        const canonical=state.fu.n.units.habita?.labels?.situations||{};
-        if(await fuOp('habita',{op:'state-save',valores:{base:true,key:ds.fuKey,label:canonical[ds.fuKey],commercial_stage:state.fu.catalogStage||'prospectado',description:'',examples:''}},{label:'Situación restaurada.'})){await loadFollowup({quiet:true});render();}
+        const canonical=state.fu.n.units[state.unit]?.labels?.situations||{};
+        if(await fuOp(state.unit,{op:'state-save',valores:{base:true,key:ds.fuKey,label:canonical[ds.fuKey],commercial_stage:state.fu.catalogStage||'prospectado',description:'',examples:''}},{label:'Situación restaurada.'})){await loadFollowup({quiet:true});render();}
         break;
       }
       case 'state-delete': {
         if(ds.armed!=='1')break;
-        if(await fuOp('habita',{op:'state-delete',valores:{key:ds.fuKey,base:ds.fuBase==='1',commercial_stage:ds.fuCommercial}},{label:'Situación quitada de esta etapa.'})){state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();}
+        if(await fuOp(state.unit,{op:'state-delete',valores:{key:ds.fuKey,base:ds.fuBase==='1',commercial_stage:ds.fuCommercial}},{label:'Situación quitada de esta etapa.'})){state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();}
         break;
       }
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
