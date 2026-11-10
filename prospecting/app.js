@@ -2567,6 +2567,25 @@
       +'</tr>';
   }
 
+  function fuQueueChoose(key) {
+    if(!key||state.fu.queueSelected===key||state.fu.task?.mode==='ejecutar')return;
+    const scope=fuScope(), selection=fuQueueSelection(scope);
+    if(!selection.rows.some(v=>v.key===key))return;
+    state.fu.queueSelected=key;
+    const aside=main.querySelector('.os-fu-queue-grid > .os-fu-desktop-detail');
+    if(aside)aside.outerHTML=fuDesktopQueueAside(scope,selection.rows,selection.q);
+    main.querySelectorAll('.os-fu-desktop-table tr[data-fu-open]').forEach(row=>{
+      const selected=row.dataset.fuOpen===key;
+      row.classList.toggle('is-selected',selected);
+      row.setAttribute('aria-selected',String(selected));
+    });
+  }
+
+  document.addEventListener('pointerover',(e)=>{
+    const row=e.target.closest?.('.os-fu-desktop-table tr[data-fu-open]');
+    if(row&&main.contains(row)&&!state.fu.task)fuQueueChoose(row.dataset.fuOpen);
+  });
+
   // Compact native mobile cards: only the action and the minimum decision
   // context are visible by default. Expanded details never claim a lead.
   function fuQueueMobileCard(x,{closed=false}={}) {
@@ -3706,7 +3725,8 @@
     if (!t || !main.contains(t) && !$('#drawer').contains(t)) return;
     const ds = t.dataset;
     if (ds.fu === undefined && ds.fuOpen) {
-      if (e.target.closest('button, a')) return;
+      if (e.target.closest('button, a, select, input, label')) return;
+      if(t.closest('.os-fu-desktop-table')&&!state.fu.task){fuQueueChoose(ds.fuOpen);return;}
       const it = fuFind(ds.fuOpen);
       if (it) { state.fu.task = { unit: it.unit, mode: 'ver', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
       return;
@@ -3720,6 +3740,12 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'queue-whatsapp': {
+        const x=fuFind(ds.fuKey);
+        if(x?.phone)openWhatsApp(x.phone,'');
+        else toast('Este contacto no tiene WhatsApp válido.',true);
+        break;
+      }
       case 'queue-view': {
         const item=fuFind(ds.fuKey);
         if(item){
@@ -3852,8 +3878,10 @@
         void fuOp(task.unit,{op:'open',...fields()});
         break;
       }
+      case 'confirm-and-next':
       case 'confirm': {
         if(!task||task.mode!=='ejecutar'||state.fu.busy)break;
+        const advanceAfterConfirmed=ds.fu==='confirm-and-next';
         // One deliberate tap saves the send. Generic two-tap arming previously
         // swallowed the first tap on mobile; do not arm this action.
         // Only show success after the upstream has persisted status "sent".
@@ -3872,6 +3900,7 @@
             state.fu.n.queue=state.fu.n.queue.filter(x=>x.key!==task.item?.key);
             state.fu.n.scheduled=state.fu.n.scheduled.filter(x=>x.key!==task.item?.key);
           }
+          if(advanceAfterConfirmed)await fuNext(t);
         }else{
           // A rejected or ambiguous reply is NOT proof of persistence.
           // Keep the task intact to safely inspect before retrying.
@@ -4136,6 +4165,42 @@
       if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: until, motivo: fd.motivo }, { label: 'Reprogramada.' })) { state.fu.task = null; loadFollowup(); }
     }
   }, true);
+  document.addEventListener('change', async (e) => {
+    const el=e.target;
+    if(!el.matches('[data-fu-inline-stage], [data-fu-inline-situation], [data-fu-inline-owner]'))return;
+    const key=el.dataset.fuInlineStage||el.dataset.fuInlineSituation||el.dataset.fuInlineOwner;
+    const x=fuFind(key),value=el.value;
+    if(!x||!value)return;
+    const isStage=el.matches('[data-fu-inline-stage]');
+    const isSituation=el.matches('[data-fu-inline-situation]');
+    const owner=!isStage&&!isSituation;
+    const previous=isStage?x.stage:isSituation?(x.catalogSituation||x.situation):(x.owner||'Todos');
+    if(value===previous)return;
+    const allowed=isStage?fuQueueStageChoices(x).some(v=>v.technical.includes(value))
+      :isSituation?fuQueueSituationChoices(x).some(v=>v.key===value)
+      :['Todos','Facu','Axel','Extensión'].includes(value);
+    if(!allowed){toast('La selección no está disponible para este contacto.',true);render();return;}
+    el.disabled=true;
+    try {
+      const op=isStage?'stage':isSituation?'situation':'owner';
+      const fields=isStage?{etapa:value}:isSituation?{situacion:value}:{responsable:value};
+      const result=await fuOp(x.unit,{op,inmobiliaria:x.id,...fields});
+      if(!result){render();return;}
+      const confirmed=isStage?result.stage===value:isSituation?
+        (result.situation===value||result.item?.catalogSituation===value):result.owner===value;
+      if(!confirmed){toast('El servidor no confirmó el cambio. Verificá el estado antes de continuar.',true);render();return;}
+      if(state.fu.task?.item?.id===x.id&&state.fu.task.mode==='ejecutar'&&!owner){
+        await fuOp(x.unit,{op:'release',inmobiliaria:x.id});
+        state.fu.task=null;
+      }
+      toast(owner?'Asignación guardada.':isStage?'Etapa comercial guardada.':'Situación guardada.');
+      await loadFollowup({quiet:true});
+      render();
+    } finally {
+      if(el.isConnected)el.disabled=false;
+    }
+  });
+
   document.addEventListener('change', (e) => {
     if(!e.target.matches('[data-fu-rule-version]')&&
       e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
