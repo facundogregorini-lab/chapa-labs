@@ -2476,8 +2476,9 @@
   const locked=x.claim&&x.claim.by!==me;
   const active=!closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
   return `<tr class="os-fu-table-row" data-fu-open="${esc(x.key)}" tabindex="0" aria-label="Ver ${esc(x.name)}" data-testid="fu-item">
-    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':esc(String(x.score))}</td>
-    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':`<span class="os-fu-score-bubble">${esc(String(x.score))}</span>`}</td>
+    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small>
+      ${x.unit==='habita'?`<button type="button" class="os-fu-edit-stage" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}" aria-label="Editar etapa y situación de ${esc(x.name)}">✎ Editar etapa / estado</button>`:''}</td>
     <td>${esc(x.zone||'—')}</td>
     <td><span class="os-fu-pill">${esc(x.situationLabel||'—')}</span></td>
     <td><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
@@ -2580,7 +2581,7 @@
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note">Primeros contactos: ${int(snap.summary.newToday||0)} / ${int(snap.summary.cap)} registrados. Los bloqueos y horarios se aplican desde ${esc(fuName(scope))}.</div>`:''}
     <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
     <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
-    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':'en este filtro'}</h2><div class="os-fu-tools">
+    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))} — ${int(rows.length)} ${q.closed?'NO INTERESADOS':q.kpi==='bloqueadas'?'BLOQUEADAS':rows.length===1?'LISTO':'LISTOS'}</h2><div class="os-fu-tools">
       <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
@@ -2810,6 +2811,10 @@
   }
   const snap=n.units[scope];
   if(!snap)return `<section class="card glass"><p>El embudo de ${esc(fuName(scope))} no está disponible.</p></section>`;
+  // Habita's native "Embudo" contains the historical nine-step chart.
+  // The secondary generic stages/rules board was an extra Chapa invention,
+  // so omit it here and keep it for Turnia only.
+  if(scope==='habita')return fuNativeChart(snap);
   const stages=F.commercialStages(scope,snap);
   const customStageKeys=new Set((snap.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
@@ -3429,6 +3434,15 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'queue-edit-situation': {
+        const item=fuFind(ds.fuKey);
+        if(item){
+          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
+          render();
+          setTimeout(()=>main.querySelector('[data-fu-situation]')?.scrollIntoView({block:'start',behavior:'smooth'}),0);
+        }
+        break;
+      }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
       }
