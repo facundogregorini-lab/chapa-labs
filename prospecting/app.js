@@ -488,7 +488,9 @@
   // without an additional shared password. Backend is the source of authority.
   const db=snap.catalog||{},canEdit=db.available===true&&(unit==='habita'||!state.session?.open);
   const steps=F.commercialStages(unit,snap),selected=steps.find(s=>s.key===state.fu.catalogStage)||steps.find(s=>s.key==='contactado')||steps[0];
-  const key=selected?.key||'contactado',canonical=Object.entries(snap.labels?.situations||{});
+  const key=selected?.key||'contactado',canonical=Object.entries(snap.labels?.situations||{}).filter(([id])=>
+    !['recontactar_vacaciones','recontactar_mas_adelante'].includes(id) ||
+    !(selected?.technical||[]).some(t=>t==='no-contactado'||t==='sin-saludo'));
   const overrides=(db.overrides||[]).filter(x=>x.commercial_stage===key);
   const rules=F.ruleRows(unit,snap).filter(r=>selected?.technical?.includes(r.stage));
   const rows=[
@@ -502,7 +504,8 @@
   const editing=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
   const current=editing?.create?{key:'',label:'',description:'',examples:'',active:false,maps_to:'',source:'whatsapp',product_stage:selected?.technical?.[0]||null,base:false}
     :rows.find(r=>r.key===editing?.key&&r.base===editing.base);
-  const allowed=(db.canonical||canonical.map(([key,label])=>({key,label}))).filter(x=>!x.permanent_stop);
+  const allowed=(db.canonical||canonical.map(([key,label])=>({key,label}))).filter(x=>!x.permanent_stop&&
+    (!['recontactar_vacaciones','recontactar_mas_adelante'].includes(x.key)||!(selected?.technical||[]).some(t=>t==='no-contactado'||t==='sin-saludo')));
   const isCustom=!!(db.stages||[]).find(s=>s.key===key);
   const stageForm=canEdit&&state.fu.newStage?`<form class="fu-catalog-editor" data-fu-stage-form>
     <h3>Nueva etapa</h3>
@@ -3447,6 +3450,12 @@
   }
 
   // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
+  function fuSituationOptions(situations, stage, unit) {
+    const first = unit === 'turnia' ? 'sin-saludo' : 'no-contactado';
+    return Object.entries(situations || {}).filter(([key]) =>
+      (key !== 'recontactar_vacaciones' && key !== 'recontactar_mas_adelante') || stage !== first);
+  }
+
   function renderFuTask(t) {
     const it = t.item || {};
     // After a confirmed send, show a durable receipt with a separate Next
@@ -3497,7 +3506,7 @@
               <button type="submit" class="btn primary">Guardar etapa</button>
             </form>`:''}
             <form data-fu-change-situation>
-              <label>Situación<select class="input" name="situacion" required>${Object.entries(situations).map(([k,l])=>`<option value="${esc(k)}" ${k===it.situation?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+              <label>Situación<select class="input" name="situacion" required>${fuSituationOptions(situations,it.stage,t.unit).map(([k,l])=>`<option value="${esc(k)}" ${k===it.situation?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
               <input class="input" name="texto" placeholder="Motivo (opcional)" maxlength="500">
               <button type="submit" class="btn primary">Guardar situación</button>
             </form>
@@ -3507,8 +3516,8 @@
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
         <section class="card glass os-fu-context-card"><h2>Contexto</h2>
           <dl class="facts">${it.sub && it.sub !== it.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(it.sub)}</dd>` : ''}${t.phone || it.phone ? `<dt>WhatsApp</dt><dd>${esc(t.phone || it.phone)}</dd>` : ''}${it.zone ? `<dt>Zona</dt><dd>${esc(it.zone)}</dd>` : ''}<dt>Etapa</dt><dd>${esc(it.stageTitle || '')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[it.priority] || '')}${it.priorityManual ? ' (a mano)' : ''}</dd>${it.owner ? `<dt>Responsable</dt><dd>${esc(it.owner)}</dd>` : ''}${it.since ? `<dt>Último contacto</dt><dd>${esc(ago(it.since))}${it.lastText ? ` · ${esc(it.lastText)}` : ''}</dd>` : ''}${it.blocked ? `<dt>Bloqueada</dt><dd style="color:var(--bad-text)">${esc(it.blocked)}</dd>` : ''}${it.dueAt ? `<dt>Programada</dt><dd>${esc(dayTime(it.dueAt))}</dd>` : ''}</dl>
-          <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${Object.entries(situations).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
-          <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${Object.entries(situations).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
+          <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${fuSituationOptions(situations,it.stage,t.unit).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
+          <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${fuSituationOptions(situations,it.stage,t.unit).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
           <div class="section"><h3>Prioridad y responsable</h3><div class="btns">${['alta', 'media', 'baja'].map((p) => `<button class="btn small ${it.priority === p ? 'primary' : ''}" type="button" data-fu="priority" data-fu-priority="${p}">${F.PRIORITY_LABEL[p]}</button>`).join('')}<button class="btn small ghost" type="button" data-fu="priority" data-fu-priority="">Automática</button></div>
             ${t.unit === 'turnia' ? `<form class="btns" data-fu-owner><input class="input" name="responsable" list="fu-owners" value="${esc(it.owner || '')}" placeholder="Facu, Axel…" style="flex:1 1 120px" aria-label="Responsable"><datalist id="fu-owners"><option>Facu</option><option>Axel</option>${me ? `<option>${esc(me)}</option>` : ''}</datalist><button class="btn small" type="submit">Asignar</button></form>` : '<p class="sub" style="margin:0">En habita. el responsable es el SDR de la cuenta.</p>'}</div>
           ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
