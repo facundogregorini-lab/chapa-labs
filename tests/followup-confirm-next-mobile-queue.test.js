@@ -92,7 +92,7 @@ test('Recontactar is only a situation, starting from contacted or greeted',()=>{
   assert.match(app,/data-fu-change-stage/);
   assert.match(app,/recontactar_vacaciones/);
   assert.match(app,/recontactar_mas_adelante/);
-  assert.match(app,/no altera su etapa del embudo/);
+  assert.match(app,/No altera su etapa del embudo/);
 });
 
 test('Both units expose recontact situations only after first contact',()=>{
