@@ -786,3 +786,46 @@ body[data-unit="habita"] .fu-catalog-content{
   }
   body[data-unit="habita"] .fu-ref-workspace{grid-template-columns:minmax(0,1fr)}
 }
+
+
+/* Native Habita: a condition is a removable selected chip plus '+ AGREGAR',
+   not a permanent wall of checked/unchecked classifiers. */
+body[data-unit="habita"] .fu-ref-situation-editor{
+  display:flex;flex-wrap:wrap;align-items:center;gap:7px;
+}
+body[data-unit="habita"] .fu-ref-situation-selected{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+}
+body[data-unit="habita"] .fu-ref-chipbtn{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:30px;padding:6px 9px;border-radius:9px;
+  font-family:inherit;font-size:10px;font-weight:750;
+  line-height:1.25;text-transform:uppercase;white-space:normal;
+  border:1px solid #b9e2ca;background:#eaf7ed;color:#146041;
+}
+body[data-unit="habita"] button.fu-ref-chipbtn{
+  cursor:pointer;transition:background .15s,border-color .15s;
+}
+body[data-unit="habita"] button.fu-ref-chipbtn:hover{
+  background:#d7f0de;border-color:#73ba8e;
+}
+body[data-unit="habita"] .fu-ref-chipbtn.is-static{cursor:default}
+body[data-unit="habita"] .fu-ref-chipadd{
+  flex:0 0 auto;max-width:min(240px,100%);min-height:32px;
+  padding:5px 8px;border-radius:9px;color:#196340;
+  border-color:#c2dfca;background:#fff;font-size:10px;
+  font-weight:800;text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-ref-situation-hidden{
+  position:absolute!important;width:1px!important;height:1px!important;
+  opacity:0!important;pointer-events:none!important;
+  clip-path:inset(50%)!important;overflow:hidden!important;
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .fu-ref-situation-editor{
+    align-items:flex-start;
+  }
+  body[data-unit="habita"] .fu-ref-chipbtn{
+    min-height:34px;
+  }
+}
