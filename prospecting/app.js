@@ -3157,6 +3157,19 @@
   }, true);
   document.addEventListener('change', (e) => {
     if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rule-form] input[name="sit"][value="rechazo"]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      if(form){
+        const action=form.querySelector('select[name="action"]');
+        if(e.target.checked){
+          if(action&&[...action.options].some(x=>x.value==='encuesta_cierre'))action.value='encuesta_cierre';
+          for(const checkbox of form.querySelectorAll('input[name="sit"]'))if(checkbox!==e.target)checkbox.checked=false;
+          const wait=form.querySelector('input[name="after_hours"]');if(wait)wait.value='0';
+          const previous=form.querySelector('select[name="after_action"]');if(previous)previous.value='';
+        }else if(action&&action.value==='encuesta_cierre')action.value='principal';
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
     if(e.target.matches('[data-fu-rule-action]')){
       const form=e.target.closest('[data-fu-rule-form]');
       if(form){
@@ -3212,6 +3225,37 @@
   setInterval(() => {
     if (document.visibilityState === 'visible' && isFu() && !state.fu.task && !state.fu.busy && !state.demo) loadFollowup({ quiet: true });
   }, 60000);
+
+
+  // Igual que Habita: prioridad drag & drop (con flechas accesibles como alternativa).
+  document.addEventListener('dragstart',(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    if(!target)return;
+    const ui=fuRulesState(state.unit);
+    if(state.unit!=='habita'||ui.dirty||ui.moving){e.preventDefault();return;}
+    state.fu.dragRuleKey=target.dataset.fuDragKey;
+    e.dataTransfer?.setData('text/plain',state.fu.dragRuleKey);
+    if(e.dataTransfer)e.dataTransfer.effectAllowed='move';
+  });
+  document.addEventListener('dragover',(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    if(!target||!state.fu.dragRuleKey||target.dataset.fuDragKey===state.fu.dragRuleKey)return;
+    e.preventDefault();
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+    target.classList.add('drag-target');
+  });
+  document.addEventListener('drop',async(e)=>{
+    const target=e.target.closest?.('[data-fu-drag-key]');
+    const key=state.fu.dragRuleKey;
+    if(!target||!key)return;
+    e.preventDefault();state.fu.dragRuleKey=null;
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+    if(target.dataset.fuDragKey!==key)await fuRulesMove(state.unit,key,target.dataset.fuDragKey);
+  });
+  document.addEventListener('dragend',()=>{
+    state.fu.dragRuleKey=null;
+    document.querySelectorAll('.fu-ref-rule.drag-target').forEach(x=>x.classList.remove('drag-target'));
+  });
 
   // ─── Eventos ────────────────────────────────────────────────
   document.addEventListener('click', async (e) => {
