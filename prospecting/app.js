@@ -2805,6 +2805,56 @@
   return state.fu.chartPeriod||(state.fu.chartPeriod={preset:'todo',from:'',to:''});
 }
 
+
+  // Historical funnel status, commercial stage and conversation situation
+  // are three independent dimensions, also for end-of-day review.
+  function fuFunnelReviewList(snap, historical, focus, chart) {
+    const n=state.fu.n;
+    const chosen=focus?historical.filter(x=>{
+      const step=Number(x.step),selected=Number(focus.step);
+      if(x.step===null)return false;
+      if(focus.mode==='lost')return step===selected&&x.lost===true;
+      if(focus.mode==='stayed')return step===selected&&!x.lost;
+      if(focus.mode==='advanced')return step>=(selected===chart.length-1?selected:selected+1);
+      return step>=selected;
+    }):historical;
+    const index=new Map([...n.queue,...n.scheduled,...n.blocked,...(n.noInteresados||[])]
+      .filter(x=>x.unit==='habita').map(x=>[x.id,x]));
+    const stages=F.commercialStages('habita',snap).filter(v=>v.technical?.length&&!v.situation);
+    const situations=Object.entries(snap.labels?.situations||{});
+    const limit=state.fu.funnelReviewLimit||80;
+    const cards=chosen.slice(0,limit).map(x=>{
+      const current=index.get(x.agencyId);
+      const commercial=stages.find(st=>st.technical.includes(current?.stage));
+      const technical=current?.stage||'';
+      const situation=current?.situation||'';
+      const digits=String(x.whatsapp||current?.phone||'').replace(/\D/g,'');
+      const webLink=digits.length>=8&&digits.length<=15?'https://web.whatsapp.com/send?phone='+digits:'';
+      const step=x.step===null?'Sin registrar':(chart[x.step]?.label||'Sin registrar');
+      const stageOpts=stages.map(st=>'<option value="'+esc(st.technical.includes(technical)?technical:st.technical[0])+'" '+(commercial?.key===st.key?'selected':'')+'>'+esc(st.title)+'</option>').join('');
+      const situOpts=situations.map(([key,label])=>'<option value="'+esc(key)+'" '+(situation===key?'selected':'')+'>'+esc(label)+'</option>').join('');
+      return '<article class="os-fu-funnel-review-item" data-testid="fu-funnel-review-item">'+
+        '<header><div><strong>'+esc(x.name||current?.name||'Inmobiliaria')+'</strong>'+
+        '<span>Estado del embudo: <b>'+esc(step)+'</b>'+(x.lost?' · Perdida':'')+'</span></div>'+
+        (webLink?'<a class="btn os-fu-funnel-wa" target="_blank" rel="noopener noreferrer" href="'+esc(webLink)+'">WhatsApp Web ↗</a>':'<span class="os-fu-caption">WhatsApp no disponible</span>')+
+        '</header><form data-fu-funnel-review data-fu-review-id="'+esc(x.agencyId)+'" data-fu-review-stage="'+esc(technical)+'" data-fu-review-situation="'+esc(situation)+'">'+
+        '<label>Etapa comercial<select name="etapa" class="input">'+
+        '<option value="" '+(!commercial?'selected':'')+'>'+(commercial?'Sin cambio':'Sin etapa asignada')+'</option>'+stageOpts+
+        '</select></label><label>Situación<select name="situacion" class="input">'+
+        '<option value="" '+(!situation?'selected':'')+'>Sin clasificar</option>'+situOpts+
+        '</select></label><button type="submit" class="btn os-fu-review-save">Guardar cambios</button></form>'+
+        (commercial&&current?.stageTitle&&current.stageTitle!==commercial.title?'<small>Actividad actual: '+esc(current.stageTitle)+'</small>':'')+
+        '</article>';
+    }).join('');
+    return '<section class="os-fu-funnel-review" data-testid="fu-funnel-review" aria-label="Inmobiliarias del embudo">'+
+      '<div class="os-fu-funnel-review-heading"><span class="os-kicker">REVISIÓN DE JORNADA</span>'+
+      '<h2>Inmobiliarias · '+int(chosen.length)+'</h2>'+
+      '<p>Estado alcanzado, etapa comercial y situación son campos distintos. Guardá las correcciones antes de continuar.</p></div>'+
+      '<div class="os-fu-funnel-review-list">'+(cards||'<p>No hay inmobiliarias para este filtro.</p>')+'</div>'+
+      (chosen.length>limit?'<button type="button" class="btn" data-fu="funnel-review-more">Ver '+int(Math.min(80,chosen.length-limit))+' más</button>':'')+
+      '</section>';
+  }
+
   function fuNativeChart(snap) {
   const chart=snap?.chart,lostAt=snap?.lostAt,rows=snap?.chartRows;
   if(!Array.isArray(chart)||!Array.isArray(lostAt)||!Array.isArray(rows))
