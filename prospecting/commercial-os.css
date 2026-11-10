@@ -1606,3 +1606,154 @@ body[data-unit="habita"] .os-fu-actions [data-testid="followup-reply-facu"]{
     color:#657d6c;
   }
 }
+
+
+/* Native mobile execution queue: no horizontal table, each lead has a one-tap
+   action and expandable context. Desktop keeps its full commercial table. */
+.os-fu-mobile-list{display:none}
+@media(max-width:760px){
+  body[data-unit="habita"] .os-fu-tablecard{
+    overflow:visible;
+  }
+  body[data-unit="habita"] .os-fu-tablecard>.table-wrap{
+    display:none!important;
+  }
+  body[data-unit="habita"] .os-fu-mobile-list{
+    display:grid;gap:9px;padding:10px;
+    min-width:0;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item{
+    display:grid;gap:0;min-width:0;
+    padding:12px;border:1px solid #d9e9de;
+    border-radius:14px;background:#fff;
+    box-shadow:0 3px 12px #1a41280a;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-main{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;gap:10px;min-width:0;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-body{
+    display:flex;flex-direction:column;gap:5px;
+    min-width:0;overflow-wrap:anywhere;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-name{
+    color:#193e2b;font-size:14px;font-weight:850;
+    line-height:1.25;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-stage{
+    color:#738879;font-size:10px;line-height:1.35;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-action{
+    color:#215c3d;font-size:11px;line-height:1.35;font-weight:750;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-control{
+    display:flex;justify-content:flex-end;align-items:center;
+    max-width:130px;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-control .btn{
+    min-height:44px;min-width:110px;padding:10px;
+    border-radius:10px;background:#0d754a;
+    border:1px solid #0d754a;color:#fff;
+    font-size:11px;font-weight:850;line-height:1.25;
+    white-space:nowrap;touch-action:manipulation;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-status{
+    max-width:114px;color:#8b7864;
+    font-size:10px;text-align:right;font-weight:800;
+    overflow-wrap:anywhere;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more{
+    margin-top:9px;padding-top:9px;
+    border-top:1px solid #e6eee8;min-width:0;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more summary{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:8px;min-height:32px;cursor:pointer;
+    color:#32694a;font-size:11px;font-weight:700;
+    list-style:none;touch-action:manipulation;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more summary::-webkit-details-marker{display:none}
+  body[data-unit="habita"] .os-fu-mobile-item-more summary>span{
+    font-size:21px;line-height:1;transition:transform .14s;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more[open] summary>span{
+    transform:rotate(180deg);
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more dl{
+    display:grid;grid-template-columns:minmax(92px,.75fr) minmax(0,1.25fr);
+    gap:9px 8px;margin:10px 0;
+    font-size:11px;line-height:1.45;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more dt{
+    color:#7b8e80;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-more dd{
+    margin:0;color:#284d36;overflow-wrap:anywhere;
+  }
+  body[data-unit="habita"] .os-fu-mobile-item-view{
+    width:100%;min-height:42px;
+    background:#eff7f0;border:1px solid #c7dfcc;
+    border-radius:10px;color:#206d45;
+    font-weight:750;font-size:11px;
+  }
+  body[data-unit="habita"] .os-fu-mobile-empty{
+    margin:12px 0;color:#6b806f;font-size:12px;
+  }
+  body[data-unit="habita"] .os-fu-queue-grid>.os-fu-side{
+    display:none;
+  }
+  body[data-unit="habita"] .os-fu-tablehead{
+    gap:10px;padding:13px;
+  }
+  body[data-unit="habita"] .os-fu-tablehead h2{
+    font-size:14px;
+  }
+  body[data-unit="habita"] .os-fu-tools{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    width:100%;gap:8px;
+  }
+  body[data-unit="habita"] .os-fu-tools label{
+    min-width:0;flex:auto;
+  }
+  body[data-unit="habita"] .os-fu-tools .input{
+    width:100%;max-width:none;min-width:0;
+    min-height:40px;font-size:13px;
+  }
+  body[data-unit="habita"] .os-fu-tools .os-fu-search{
+    grid-column:1/-1;width:100%!important;max-width:none!important;
+  }
+  body[data-unit="habita"] .os-fu-tools>[data-testid="fu-take-next"]{
+    grid-column:1/-1;min-height:46px;
+    font-size:12px;white-space:normal;
+  }
+  body[data-unit="habita"] .os-fu-confirmed-receipt{
+    padding:21px 15px;margin:8px 0 24px;
+  }
+}
+.os-fu-confirmed-receipt{
+  border:1px solid #baddc7;border-radius:17px;
+  background:#eff9f1;padding:24px;display:grid;
+  justify-items:start;gap:10px;color:#164a32;
+}
+.os-fu-confirmed-icon{
+  display:grid;place-items:center;
+  width:44px;height:44px;border-radius:50%;
+  background:#127c4f;color:#fff;font-weight:850;font-size:25px;
+}
+.os-fu-confirmed-receipt h1{
+  margin:0;font-size:clamp(22px,5vw,30px);
+  color:#155237;letter-spacing:-.025em;
+}
+.os-fu-confirmed-receipt p{
+  margin:0;color:#456f55;line-height:1.5;font-size:13px;
+}
+.os-fu-confirmed-receipt .os-fu-confirmed-hint{
+  font-size:11px;color:#728977;
+}
+.os-fu-confirmed-actions{
+  display:flex;flex-wrap:wrap;gap:9px;width:100%;margin-top:9px;
+}
+.os-fu-confirmed-actions .btn{
+  min-height:46px;flex:1 1 140px;
+  border-radius:11px;font-weight:800;
+}

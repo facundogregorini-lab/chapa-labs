@@ -2340,7 +2340,9 @@
       const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
       if(!released)return;
     }
-    state.fu.task=null;
+    // Keep the confirmed receipt until the next claim succeeds. If the
+    // backend rejects this claim, the user still sees their prior confirmation.
+    if(previous?.mode!=='confirmado')state.fu.task=null;
     await fuClaim(next);
   }
 
@@ -2504,6 +2506,41 @@
   </tr>`;
 }
 
+  // Compact native mobile cards: only the action and the minimum decision
+  // context are visible by default. Expanded details never claim a lead.
+  function fuQueueMobileCard(x,{closed=false}={}) {
+    const me=state.session?.user?.name;
+    const locked=x.claim&&x.claim.by!==me;
+    const executable=!closed&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action);
+    const stateText=closed?'CERRADA':x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
+      locked?'TOMADA POR '+x.claim.by:x.claim?'YA TOMADA':!x.action?'SIN ACCIÓN':'LISTA';
+    return `<article class="os-fu-mobile-item" data-testid="fu-mobile-item">
+      <div class="os-fu-mobile-item-main">
+        <div class="os-fu-mobile-item-body">
+          <strong class="os-fu-mobile-item-name">${esc(x.name)}</strong>
+          <span class="os-fu-mobile-item-stage">${esc(x.stageTitle||'')} · ${esc(x.situationLabel||'Sin clasificar')}</span>
+          <span class="os-fu-mobile-item-action">${esc(x.action||x.actionReason||'Sin acción programada')}</span>
+        </div>
+        <div class="os-fu-mobile-item-control">
+          ${executable?`<button type="button" class="btn primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-execute">EJECUTAR →</button>`:
+          `<span class="os-fu-mobile-item-status">${esc(stateText)}</span>`}
+        </div>
+      </div>
+      <details class="os-fu-mobile-item-more" data-testid="fu-mobile-expand">
+        <summary>Más información <span aria-hidden="true">⌄</span></summary>
+        <dl>
+          <dt>Ciudad</dt><dd>${esc(x.zone||'—')}</dd>
+          <dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
+          <dt>Score</dt><dd>${x.score==null?'—':esc(String(x.score))}</dd>
+          <dt>WhatsApp</dt><dd>${esc(x.phone||'—')}</dd>
+          <dt>Última acción</dt><dd>${esc(x.lastText||'—')} ${x.since?'· '+esc(ago(x.since)):''}</dd>
+          ${x.owner?`<dt>Responsable</dt><dd>${esc(x.owner)}</dd>`:''}
+        </dl>
+        <button type="button" class="btn os-fu-mobile-item-view" data-fu="queue-view" data-fu-key="${esc(x.key)}">Ver ficha completa</button>
+      </details>
+    </article>`;
+  }
+
   function fuRecommended(scope,rows,selected,q) {
   const safe=rows.find(x=>x.action&&!x.claim&&!x.blocked&&!x.dueAt&&!q.closed)||null;
   const snap=safe?state.fu.n.units[safe.unit]:null;
@@ -2605,6 +2642,9 @@
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
     <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    <div class="os-fu-mobile-list" data-testid="fu-mobile-queue">
+      ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||'<p class="os-fu-mobile-empty">No hay tareas con estos filtros.</p>'}
+    </div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
     <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
     </section>
@@ -3387,6 +3427,19 @@
   // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
   function renderFuTask(t) {
     const it = t.item || {};
+    // After a confirmed send, show a durable receipt with a separate Next
+    // action. Confirmation is never conflated with release or with claiming.
+    if(t.mode==='confirmado')return `${demoBanner()}
+      <section class="os-fu-confirmed-receipt" data-testid="fu-confirmed-receipt" role="status">
+        <span class="os-fu-confirmed-icon" aria-hidden="true">✓</span>
+        <h1>Envío confirmado</h1>
+        <p>El mensaje a <strong>${esc(t.name||it.name)}</strong> quedó registrado como enviado.</p>
+        <p class="os-fu-confirmed-hint">Podés seguir trabajando en la misma cola y con los mismos filtros.</p>
+        <div class="os-fu-confirmed-actions">
+          <button type="button" class="btn primary" data-fu="next-after" data-testid="fu-next-confirmed">Siguiente tarea →</button>
+          <button type="button" class="btn" data-fu="back" data-testid="fu-confirmed-back">Volver a la cola</button>
+        </div>
+      </section>`;
     const u = unitOf(t.unit);
     const snap = state.fu.n && state.fu.n.units[t.unit];
     const situations = (snap && snap.labels && snap.labels.situations) || {};
@@ -3505,6 +3558,14 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'queue-view': {
+        const item=fuFind(ds.fuKey);
+        if(item){
+          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
+          render();window.scrollTo({top:0,behavior:'smooth'});
+        }
+        break;
+      }
       case 'queue-edit-situation': {
         const item=fuFind(ds.fuKey);
         if(item){
@@ -3628,8 +3689,16 @@
         break;
       }
       case 'confirm': {
+        if(!task||task.mode!=='ejecutar')break;
         const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: task.messages.join('\n\n') || task.message }, { label: 'Envío confirmado.' });
-        if (r) { state.fu.task = null; await loadFollowup({ quiet: true }); render(); }
+        if (r) {
+          // Keep the completed item only as a receipt so the operator can
+          // explicitly take the next task. Never send/confirm it again.
+          state.fu.task = {...task,mode:'confirmado',confirmedAt:new Date().toISOString()};
+          render();
+          window.scrollTo({top:0,behavior:'smooth'});
+          await loadFollowup({quiet:true});
+        }
         break;
       }
       case 'next-after': await fuNext(); break;
