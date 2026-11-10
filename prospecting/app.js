@@ -2318,7 +2318,8 @@
       return `${sub}<div class="skeleton"></div><div class="skeleton"></div>`;
     }
     const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
-      .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('');
+      .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('')
+      + (state.fu.error ? `<div class="notice glass" role="status" data-testid="followup-stale-warning"><span class="badge off">CONEXIÓN</span><span>No se pudo actualizar. Se conserva la última lectura válida: ${esc(state.fu.error)}</span><button class="btn small" type="button" data-fu="reload">REINTENTAR</button></div>` : '');
     const body = { hoy: fuHoy, responder: fuReplies, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
     return sub + errors + body();
   }
