@@ -3598,7 +3598,7 @@
           fetch(API+'?op=task',{
             method:'POST',credentials:'same-origin',keepalive:true,
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({unit:task.unit,followup:{op:'open',...fields()}})
+            body:JSON.stringify({unit:task.unit,followup:{op: 'open',...fields()}})
           }).then(r=>{if(!r.ok)console.warn('No se pudo registrar la apertura de WhatsApp:',r.status);})
             .catch(()=>{});
         }
