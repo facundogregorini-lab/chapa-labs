@@ -1582,3 +1582,27 @@ body[data-unit="habita"] .os-fu-actions [data-testid="followup-reply-facu"]{
     outline:2px solid #166f46;outline-offset:3px;
   }
 }
+
+/* Next-task shortcut stays directly under the primary send confirmation on
+ * mobile, without changing the send status or resetting the queue filters. */
+@media(max-width:760px){
+  body[data-unit="habita"] .os-fu-mobile-send .os-fu-mobile-next{
+    grid-column:1/-1;
+    display:flex;align-items:center;justify-content:center;
+    min-height:50px;padding:12px;
+    border:1px solid #b4d5c2;
+    border-radius:12px;
+    background:#e0f2e7;color:#12613e;
+    font-size:14px;font-weight:850;
+    cursor:pointer;touch-action:manipulation;
+  }
+  body[data-unit="habita"] .os-fu-mobile-send .os-fu-mobile-next:focus-visible{
+    outline:3px solid #18814f;outline-offset:3px;
+  }
+  body[data-unit="habita"] .os-fu-mobile-send .os-fu-mobile-next-note{
+    grid-column:1/-1;
+    margin:0;
+    font-size:10.5px;line-height:1.4;
+    color:#657d6c;
+  }
+}
