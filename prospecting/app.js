@@ -3715,9 +3715,11 @@
         const next={step:Number(ds.fuStep),mode:ds.fuMode};
         const prev=state.fu.chartFocus;
         state.fu.chartFocus=prev?.step===next.step&&prev?.mode===next.mode?null:next;
+        state.fu.funnelReviewLimit=80;
         render();break;
       }
       case 'funnel-reset':state.fu.chartFocus=null;render();break;
+      case 'funnel-review-more':state.fu.funnelReviewLimit=(state.fu.funnelReviewLimit||80)+80;render();break;
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; state.fu.pipelineSituation=null;render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
       case 'pipeline-situation': state.fu.pipelineSituation=ds.fuSituation||null;render();break;
@@ -3944,7 +3946,7 @@
   }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(form.matches('[data-fu-chart-range]')){
@@ -3966,6 +3968,56 @@
     if(form.matches('[data-fu-inbox-form], [data-fu-manual-reply-form]')) { await fuReplySubmit(form,e.submitter);return; }
     if (form.matches('[data-fu-rule-form], [data-fu-version-edit-form]')) { await handleFuEditorSubmit(form); return; }
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
+    if(form.matches('[data-fu-funnel-review]')){
+      const id=String(form.dataset.fuReviewId||'');
+      const unit='habita', snap=state.fu.n?.units?.habita;
+      const data=new FormData(form);
+      const stage=String(data.get('etapa')||'');
+      const situation=String(data.get('situacion')||'');
+      const oldStage=String(form.dataset.fuReviewStage||'');
+      const oldSituation=String(form.dataset.fuReviewSituation||'');
+      const changeStage=Boolean(stage&&stage!==oldStage);
+      const changeSituation=Boolean(situation&&situation!==oldSituation);
+      if(!changeStage&&!changeSituation){toast('No hay cambios para guardar.');return;}
+      if(changeStage&&!F.commercialStages(unit,snap).some(v=>!v.situation&&v.technical?.includes(stage))){
+        toast('La etapa elegida no corresponde al embudo comercial.',true);return;
+      }
+      if(changeSituation&&!Object.prototype.hasOwnProperty.call(snap?.labels?.situations||{},situation)){
+        toast('La situación elegida no es válida.',true);return;
+      }
+      if(changeSituation&&situation.startsWith('recontactar_')&&
+          (stage||oldStage)==='no-contactado'){
+        toast('Recontactar se habilita desde Contactado en adelante.',true);return;
+      }
+      const btn=form.querySelector('button[type="submit"]');
+      if(btn?.disabled)return;
+      if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+      let updated=false;
+      try{
+        if(changeStage){
+          const saved=await fuOp(unit,{op:'stage',inmobiliaria:id,etapa:stage});
+          if(!saved||saved.stage!==stage){toast('No se pudo confirmar la etapa comercial.',true);return;}
+          updated=true;
+        }
+        if(changeSituation){
+          const saved=await fuOp(unit,{op:'situation',inmobiliaria:id,situacion:situation});
+          if(!saved||saved.situation!==situation){toast('No se pudo confirmar la situación.',true);return;}
+          updated=true;
+        }
+        toast('Reclasificación guardada.');
+      }finally{
+        if(updated){
+          if(state.fu.task?.unit===unit&&state.fu.task?.item?.id===id){
+            await fuOp(unit,{op:'release',inmobiliaria:id});
+            state.fu.task=null;
+          }
+          await loadFollowup({quiet:true});
+          render();
+        }
+        if(btn?.isConnected){btn.disabled=false;btn.textContent='Guardar cambios';}
+      }
+      return;
+    }
     const fd = Object.fromEntries(new FormData(form));
     const task = state.fu.task;
     const it = task && task.item;
