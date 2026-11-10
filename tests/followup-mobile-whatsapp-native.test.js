@@ -43,7 +43,7 @@ test('Dedicated mobile execution screen uses browser-native anchors; opening nev
   assert.doesNotThrow(()=>new vm.Script(app));
   assert.match(html,/src="\/prospecting\/whatsapp-mobile\.js"/);
   assert.ok(html.indexOf('whatsapp-mobile.js')<html.indexOf('app.js'));
-  assert.match(app,/state\.fu\.task && window\.ProspectingWhatsApp\?\.isMobileClient\(window\)/);
+  assert.match(app,/state\.fu\.task && v==='hoy' && window\.ProspectingWhatsApp\?\.isMobileClient\(window\)/);
   assert.match(app,/data-testid="fu-mobile-actions"/);
   assert.match(app,/data-testid="fu-open-mobile"/);
   assert.match(app,/href="\$\{esc\(nativeWhatsApp\|\|rawWhatsApp\)\}" target="_blank"/);
