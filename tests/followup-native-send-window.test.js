@@ -22,7 +22,7 @@ test('Preset controls still submit exact engine values through named hidden fiel
   assert.match(js,/name="hours_from" value="\$\{r\.hours_from\?\?9\}"/);
   assert.match(js,/name="hours_to" value="\$\{r\.hours_to\?\?19\}"/);
   assert.match(js,/case 'rules-message-focus':/);
-  assert.match(js,/days=fd\.getAll\('days'\)\.map\(Number\)/);
+  assert.match(js,/days:fd\.getAll\('days'\)\.map\(Number\)/);
   assert.match(js,/hours_from:Number\(fd\.get\('hours_from'\)\)/);
   assert.match(js,/if\(e\.target\.matches\('\[data-fu-rule-days-presets\]'\)\)/);
   assert.match(js,/if\(e\.target\.matches\('\[data-fu-rule-hours-presets\]'\)\)/);
