@@ -2543,13 +2543,30 @@
   const stage=create?state.fu.ruleDraftStage:null;
   const existing=create?null:(snap.rules||[]).find(x=>x.key===state.fu.ruleEdit);
   if(!create&&!existing)return '';
-  const r=existing||{stage,action:'principal',situations:['sin_respuesta'],after_hours:0,after_action:null,
+  const options=snap.catalog?.actions?.[stage||existing?.stage]||[{key:'principal',label:'Acción principal'}];
+  const compatible=options.map(x=>x.key);
+  const template=create? (snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate) : null;
+  const defaults={stage,action:'principal',situations:['sin_respuesta'],after_hours:0,after_action:null,
     position:1000,enabled:true,hours_from:9,hours_to:19,days:[1,2,3,4,5,6],name:''};
-  const options=snap.catalog?.actions?.[r.stage]||[{key:'principal',label:'Acción principal'}];
+  const r=existing || (template?{
+    ...defaults,
+    ...template,
+    key:null,
+    stage,
+    action:compatible.includes(template.action)?template.action:compatible[0],
+    after_action:compatible.includes(template.after_action)?template.after_action:null,
+    min_demo_activity_level:['no-abrio','sin-interaccion','sin-cuenta'].includes(stage)?template.min_demo_activity_level||0:0,
+    catalog_situation:null,
+    name:template.name ? 'Copia de '+template.name : 'Copia de '+template.action,
+  }:defaults);
   const days=['DO','LU','MA','MI','JU','VI','SA'];
   return `<form class="card glass" data-fu-rule-form data-fu-rule-key="${esc(r.key||'')}" data-fu-unit-id="${unit}" data-fu-stage="${esc(r.stage)}">
     <div class="os-section-heading"><div><span class="os-kicker">EDITOR DE REGLAS · HABITA</span><h2>${create?'Crear regla':'Editar regla'}</h2></div><button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="">CERRAR</button></div>
     <p class="os-view-caption">Gana la primera regla compatible en orden; el motor original valida y guarda el cambio, sin tocar ejecuciones históricas.</p>
+    ${create?`<label class="field" style="margin:12px 0"><span>USAR UNA REGLA EXISTENTE COMO PLANTILLA</span>
+      <select class="input" data-fu-rule-template><option value="">Empezar desde cero</option>
+        ${(snap.rules||[]).map(x=>`<option value="${esc(x.key)}" ${state.fu.ruleTemplate===x.key?'selected':''}>${esc((snap.stages||[]).find(z=>z.key===x.stage)?.title||x.stage)} · ${esc(x.name||x.action)}</option>`).join('')}
+      </select></label><p class="os-tutorial-note">Podés elegir cualquier regla para copiar sus condiciones. Las acciones incompatibles se adaptan a esta etapa y el motor valida todo al guardar.</p>`:''}
     <div class="grid cols-2" style="margin-top:12px">
       <label class="field"><span>Nombre</span><input class="input" name="name" maxlength="120" value="${esc(r.name||'')}"></label>
       <label class="field"><span>Acción</span><select class="input" name="action" ${create?'':'disabled'}>${options.map(x=>`<option value="${esc(x.key)}" ${r.action===x.key?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>
@@ -2833,7 +2850,7 @@
       case 'from-ficha': { const x = fuFind(ds.fuKey); closeDrawer(); if (x) { state.fu.task = { unit: x.unit, mode: 'ver', item: x, name: x.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; go(x.unit, 'followup'); } break; }
       case 'version-status': if (await fuOp(ds.fuUnitId, { op: 'version-status', id: ds.fuVersion, estado: ds.fuStatus }, { label: 'Versión actualizada.' })) loadFollowup(); break;
       case 'rule-edit': state.fu.ruleEdit = ds.fuRule || null; render(); break;
-      case 'rule-create': state.fu.ruleEdit='__new'; state.fu.ruleDraftStage=ds.fuStage; render(); break;
+      case 'rule-create': state.fu.ruleEdit='__new'; state.fu.ruleDraftStage=ds.fuStage;state.fu.ruleTemplate=null;render(); break;
       case 'version-edit': state.fu.versionEdit = ds.fuVersion || null; render(); break;
       case 'rule-toggle': {
         const snap = state.fu.n.units[ds.fuUnitId];
@@ -2879,6 +2896,9 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
+    if(e.target.matches('[data-fu-rule-template]')){
+      state.fu.ruleTemplate=e.target.value||null;render();return;
+    }
     if(e.target.matches('[data-fu-catalog-source]')){
       const form=e.target.closest('[data-fu-state-form]'), product=e.target.value==='product';
       if(form?.querySelector('[data-catalog-products]'))form.querySelector('[data-catalog-products]').hidden=!product;
