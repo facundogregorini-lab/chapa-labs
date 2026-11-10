@@ -1092,3 +1092,63 @@ body[data-unit="habita"] .fu-ref-wa-bubble{
     padding:13px;
   }
 }
+
+
+/* Native Habita queue: round scores, hierarchy, and discreet row CTA. */
+body[data-unit="habita"] .os-fu-score-bubble{
+  width:31px;height:31px;display:inline-grid;place-items:center;
+  border-radius:50%;background:#e2f5e9;color:#127c4b;
+  font-size:10px;font-weight:850;line-height:1;
+}
+body[data-unit="habita"] .os-fu-edit-stage{
+  display:block;width:max-content;max-width:100%;margin:4px 0 0;
+  padding:0;background:transparent;border:0;
+  color:#248451;text-decoration:underline;font-family:inherit;
+  font-size:9px;font-weight:600;cursor:pointer;text-align:left;
+}
+body[data-unit="habita"] .os-fu-edit-stage:hover{
+  color:#0e6843;
+}
+body[data-unit="habita"] .os-fu-tablecard [data-testid="fu-execute"]{
+  background:#fff;border:1px solid #dce9dd;
+  color:#0c643e;box-shadow:none;
+  font-size:10px;font-weight:750;
+}
+body[data-unit="habita"] .os-fu-tablecard [data-testid="fu-execute"]:hover{
+  background:#eaf7ef;border-color:#61ba83;
+}
+body[data-unit="habita"] .fu-catalog-head h2{
+  font-weight:850;letter-spacing:-.045em;
+  text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-catalog-head>.btn{
+  font-size:10.5px;font-weight:800;text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-catalog-state-main strong{
+  font-size:13px;color:#153d2a;
+}
+body[data-unit="habita"] .fu-catalog-state-main small{
+  line-height:1.4;color:#597362;
+}
+body[data-unit="habita"] .fu-ref-what-actions{
+  display:grid;gap:6px;align-items:stretch;
+}
+body[data-unit="habita"] .fu-ref-what-actions .btn{
+  width:100%;min-height:34px;
+  background:#fff;color:#1c6945;border:1px solid #cfded3;
+  border-radius:9px;font-size:10px;font-weight:750;text-transform:uppercase;
+}
+body[data-unit="habita"] .fu-ref-what-actions .btn:hover{
+  border-color:#409d6e;background:#f2faf5;
+}
+body[data-unit="habita"] .fu-ref-what-actions .btn:focus-visible{
+  outline:2px solid #2b9961;outline-offset:2px;
+}
+@media(max-width:760px){
+  body[data-unit="habita"] .os-fu-score-bubble{
+    width:30px;height:30px;
+  }
+  body[data-unit="habita"] .fu-ref-what-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
