@@ -26,6 +26,7 @@
     more: {},        // bloques de Hoy desplegados completos
     editing: null,   // mensaje en edición: { unit, key, text, subject }
     agent: { replied: null, fails: 0, override: false }, // modo Enviar
+    scripts: {}, scriptDrafts: {}, scriptSaving: false,
     editingTargets: null, // unidad cuyas metas del embudo se están editando
     busy: false,     // una acción en curso: un doble clic no la repite
   };
@@ -163,7 +164,7 @@
     render();
     if (unit !== previousUnit && isFu() && !state.demo)
       setTimeout(() => loadFollowup({ quiet: true }), 0);
-    if (!isFu() && !state.demo) {
+    if (!isFu() && !state.demo && state.view!=='script') {
       ensureLoaded().then(render);
       loadMetrics().then(render);
     }
@@ -218,7 +219,7 @@
   $('#units').innerHTML = segs.map(([id, name, color]) =>
     `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
   ).join('');
-  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙']];
+  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
   const tabs = state.unit === 'todas'
     ? [['resumen','RESUMEN','▦'],['hoy','COLA DE EJECUCIÓN','☷',fuCount('todas')],['pipeline','EMBUDOS','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥']]
     : common;
@@ -272,7 +273,7 @@
     const tabs=[
       ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
       ['pipeline','EMBUDO'],['secuencias','REGLAS'],
-      ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],
+      ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
     const links=[
       ['MI INMOBILIARIA','/panel'],['GALERÍA','/galeria'],
@@ -304,6 +305,7 @@
         (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])))
       setTimeout(() => loadFollowup(), 0);
     if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
+    else if (state.view === 'script') main.innerHTML = renderScript(state.unit);
     else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder') main.innerHTML = renderFu();
     else {
       const d = state.data[state.unit];
@@ -311,7 +313,7 @@
       else if (d.error) main.innerHTML = unitError(state.unit, d);
       else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
-    if(state.unit==='habita'&&isFu()&&!state.demo)
+    if(state.unit==='habita'&&(isFu()||state.view==='script')&&!state.demo)
       main.innerHTML=habitaFuChrome(main.innerHTML);
     after();
   }
@@ -2203,7 +2205,7 @@
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
   const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
-  const UNIT_VIEWS = ['hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_VIEWS = ['script', 'hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0,
     loadedAt: {}, periodSignature: null, revision: 0, requestedRevision: 0,
@@ -4844,7 +4846,7 @@
   }
 
   async function ensureLoaded(force) {
-    if (state.demo || !state.session || !state.session.user || isFu()) return;
+    if (state.demo || !state.session || !state.session.user || isFu() || state.view==='script') return;
     // Legacy planillas are loaded on demand. Follow-up reads its own product
     // snapshot and must not trigger a second concurrent scan of both databases.
     const id = state.unit;
@@ -4865,7 +4867,7 @@
     if (new URLSearchParams(location.search).get('ejemplo') === '1') { await startDemo(); return; }
     render();
     await ensureLoaded();
-    if (!isFu()) await loadMetrics();
+    if (!isFu() && state.view!=='script') await loadMetrics();
     render();
   }
 
@@ -4877,6 +4879,9 @@
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
       if (isFu()) {
         if (!state.fu.task) loadFollowup({ quiet: true });
+      } else if (state.view==='script') {
+        const x=state.scripts[state.unit];
+        if(x && state.scriptDrafts[state.unit]===(x.body||''))loadScript(state.unit,{quiet:true});
       } else if (state.unit !== 'todas') {
         loadUnit(state.unit, { quiet: true }).then(render);
       }
