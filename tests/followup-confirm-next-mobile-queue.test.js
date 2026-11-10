@@ -7,36 +7,39 @@ const vm=require('node:vm');
 const app=fs.readFileSync(path.join(__dirname,'../prospecting/app.js'),'utf8');
 const css=fs.readFileSync(path.join(__dirname,'../prospecting/commercial-os.css'),'utf8');
 
-test('One-tap confirm requires upstream persisted receipt before success',()=>{
+test('One-tap confirm checks persisted receipt without blocking on reload',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
-  assert.match(app,/case 'confirm':\\s*\\{/);
-  assert.match(app,/if\\(!task\\|\\|task\\.mode!=='ejecutar'\\|\\|state\\.fu\\.busy\\)break/);
-  assert.match(app,/op: 'confirm'/);
-  assert.match(app,/r\\?\\.execution\\?\\.status==='sent'/);
-  assert.match(app,/state\\.fu\\.task=\\{\\.\\.\\.task,mode:'confirmado'/);
-  assert.match(app,/t\\.disabled=true/);
-  assert.match(app,/Guardando envío/);
-  assert.match(app,/El servidor no confirmó el guardado/);
+  const start=app.indexOf("      case 'confirm': {");
+  const end=app.indexOf("      case 'next-after':",start);
+  const fn=app.slice(start,end);
+  assert.match(fn,/r\?\.execution\?\.status==='sent'/);
+  assert.match(fn,/Guardando envío/);
+  assert.match(fn,/state\.fu\.n\.queue=state\.fu\.n\.queue\.filter/);
+  assert.doesNotMatch(fn,/await loadFollowup/);
+  assert.match(fn,/El servidor no confirmó el guardado/);
   assert.doesNotMatch(app,/data-fu="confirm"[^>]*data-arm=/);
-  assert.match(app,/data-testid="fu-confirm-mobile"/);
-  assert.match(app,/data-testid="fu-confirm"/);
   assert.match(app,/data-testid="fu-confirmed-receipt"/);
   assert.match(app,/data-testid="fu-next-confirmed"/);
-  assert.match(app,/data-fu="next-after"/);
 });
 
-test('Next after confirmed never calls release or sends duplicate confirmation',()=>{
-  const start=app.indexOf('  async function fuNext() {');
+test('Next action shows immediate progress and avoids full-board refresh on claim',()=>{
+  const start=app.indexOf('  async function fuNext(clicked) {');
   const end=app.indexOf('  // ── Las vistas ──',start);
-  assert.ok(start>0&&end>start);
   const fn=app.slice(start,end);
+  assert.ok(start>0&&end>start);
+  assert.match(fn,/state\.fu\.advancing=true/);
+  assert.match(fn,/Abriendo siguiente/);
   assert.match(fn,/previous\?\.mode==='ejecutar'/);
   assert.match(fn,/op:'release'/);
-  assert.match(fn,/if\(previous\?\.mode!=='confirmado'\)state\.fu\.task=null/);
   assert.doesNotMatch(fn,/op: ?'confirm'/);
-  assert.match(fn,/await fuClaim\(next\)/);
-  assert.match(fn,/toast\('No hay otra tarea libre con estos filtros/);
+  assert.match(fn,/const claimed=await fuClaim\(next\)/);
+  assert.match(fn,/state\.fu\.task=null/);
+  assert.match(fn,/finally \{/);
+  const claim=app.slice(app.indexOf('  async function fuClaim(it)'),app.indexOf('  function fuNextCandidate'));
+  assert.doesNotMatch(claim,/loadFollowup/);
+  assert.match(app,/case 'next-after': await fuNext\(t\)/);
 });
+
 
 test('Mobile cards replace wide queue table without changing filtered data',()=>{
   assert.match(app,/function fuQueueMobileCard\(x,\{closed=false\}=\{\}\)/);
