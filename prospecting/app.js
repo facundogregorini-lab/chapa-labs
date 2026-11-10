@@ -264,6 +264,35 @@
     return q.conversations.length + q.followUps.length + q.greeted.length + q.fresh.length;
   }
 
+  // Native Habita Follow-up workspace, while preserving Chapa's business switcher.
+  // The original Habita tabs, title, utility destinations and hierarchy are
+  // shared across queue, responses, funnel, rules, catalog and results.
+  function habitaFuChrome(content) {
+    const tabs=[
+      ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
+      ['pipeline','EMBUDO'],['secuencias','REGLAS'],
+      ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],
+    ];
+    const links=[
+      ['MI INMOBILIARIA','/panel'],['GALERÍA','/galeria'],
+      ['PRECIOS','/precios'],['MI CUENTA','/cuenta'],
+      ['IR A MI INMOBILIARIA','/inicio'],
+    ];
+    return `<header class="habita-fu-workspace-head" data-testid="habita-workspace-header">
+      <div class="habita-fu-head-copy">
+        <span class="habita-fu-eyebrow">FOLLOW-UP</span>
+        <h1>EJECUCIÓN COMERCIAL</h1>
+        <p>Gestioná el outreach y el seguimiento de todas tus inmobiliarias.</p>
+      </div>
+      <nav class="habita-fu-utilities" aria-label="Accesos de Habita">
+        ${links.map(([label,path])=>`<a href="https://www.habitaia.app${path}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('')}
+      </nav>
+    </header>
+    <nav class="habita-fu-tabs" role="tablist" aria-label="Ejecución comercial">
+      ${tabs.map(([key,label])=>`<button type="button" role="tab" data-view="${key}" aria-selected="${state.view===key}" class="${state.view===key?'is-on':''}">${label}</button>`).join('')}
+    </nav>`+content;
+  }
+
   function render() {
     renderTop();
     if (!state.session) return;
@@ -281,6 +310,8 @@
       else if (d.error) main.innerHTML = unitError(state.unit, d);
       else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
+    if(state.unit==='habita'&&isFu()&&!state.demo)
+      main.innerHTML=habitaFuChrome(main.innerHTML);
     after();
   }
   // Cuenta regresiva del modo Enviar y aviso de un envío abierto sin confirmar (por ejemplo, tras recargar).
