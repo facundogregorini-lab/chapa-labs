@@ -3640,9 +3640,9 @@
     if (!t || !main.contains(t) && !$('#drawer').contains(t)) return;
     const ds = t.dataset;
     if (ds.fu === undefined && ds.fuOpen) {
-      if (e.target.closest('button, a')) return;
+      if (e.target.closest('button, a, select, input, textarea, label')) return;
       const it = fuFind(ds.fuOpen);
-      if (it) { state.fu.task = { unit: it.unit, mode: 'ver', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} }; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+      if (it) { state.fu.selectedQueueKey=it.key;render(); }
       return;
     }
     if (ds.arm && ds.armed !== '1') return; // la confirmación en dos clics la maneja el panel
@@ -3654,20 +3654,31 @@
       case 'reply-select': fuReplyState().selected=ds.fuKey;render();break;
       case 'reply-manual': fuReplyState().manual=!fuReplyState().manual;render();break;
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
+      case 'next-preview': {
+        const rows=fuQueueSelection(fuScope()).rows;
+        const i=rows.findIndex(x=>x.key===state.fu.selectedQueueKey);
+        if(rows.length)state.fu.selectedQueueKey=rows[(i+1)%rows.length].key;
+        render();break;
+      }
+      case 'queue-whatsapp': {
+        const x=fuFind(ds.fuKey);
+        if(x?.wa&&x.phone)openWhatsApp(x.phone,'');
+        else toast('Este contacto no tiene WhatsApp válido.',true);
+        break;
+      }
       case 'queue-view': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();window.scrollTo({top:0,behavior:'smooth'});
+          state.fu.selectedQueueKey=item.key;render();
         }
         break;
       }
       case 'queue-edit-situation': {
         const item=fuFind(ds.fuKey);
         if(item){
-          state.fu.task={unit:item.unit,mode:'ver',item,name:item.name,messages:[],warnings:[],checklist:[],history:[],links:{}};
-          render();
-          setTimeout(()=>main.querySelector('[data-fu-situation]')?.scrollIntoView({block:'start',behavior:'smooth'}),0);
+          state.fu.selectedQueueKey=item.key;
+          const row=main.querySelector('[data-fu-row-field="situation"][data-fu-key="'+CSS.escape(item.key)+'"]');
+          if(row){row.focus();row.click();}else render();
         }
         break;
       }
@@ -3950,6 +3961,19 @@
       default: break;
     }
   });
+  document.addEventListener('pointerover',(e)=>{
+    if(e.pointerType==='touch')return;
+    const row=e.target.closest?.('.os-fu-queue-table tr[data-fu-open]');
+    if(!row||row.contains(e.relatedTarget)||row.dataset.fuOpen===state.fu.selectedQueueKey)return;
+    state.fu.selectedQueueKey=row.dataset.fuOpen;
+    const q=fuQueueSelection(fuScope());
+    const side=main.querySelector('.os-fu-queue-grid > .os-fu-side');
+    if(side)side.outerHTML=fuRecommended(fuScope(),q.rows,q.current,q.q);
+    main.querySelectorAll('.os-fu-queue-table tr[data-fu-open]').forEach(tr=>{
+      const on=tr.dataset.fuOpen===state.fu.selectedQueueKey;
+      tr.classList.toggle('is-selected',on);tr.setAttribute('aria-selected',String(on));
+    });
+  });
   document.addEventListener('toggle', (e) => {
     const d=e.target;
     if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
@@ -4094,7 +4118,7 @@
       if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: until, motivo: fd.motivo }, { label: 'Reprogramada.' })) { state.fu.task = null; loadFollowup(); }
     }
   }, true);
-  document.addEventListener('change', (e) => {
+  document.addEventListener('change', async (e) => {
     if(!e.target.matches('[data-fu-rule-version]')&&
       e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
       fuRulesState(state.unit).dirty=true;
@@ -4228,6 +4252,36 @@
         label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
     if (e.target.matches('[data-fu-filter]')) { state.fu.f[e.target.dataset.fuFilter] = e.target.value; store('fu-filters', state.fu.f); render(); }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
+    if(e.target.matches('[data-fu-row-field]')){
+      const el=e.target,x=fuFind(el.dataset.fuKey),field=el.dataset.fuRowField,selected=el.value;
+      if(!x)return;
+      const op=field==='stage'?'stage':field==='situation'?'situation':'owner';
+      const original=field==='stage'?x.stage:field==='situation'?x.situation:(x.owner||'Todos');
+      if(selected===original)return;
+      el.disabled=true;
+      const body={op,inmobiliaria:x.id,...(op==='stage'?{etapa:selected}:op==='situation'?{situacion:selected}:{responsable:selected})};
+      const result=await fuOp(x.unit,body);
+      const confirmed=op==='stage'?result?.stage===selected:op==='situation'?result?.situation===selected:result?.owner===selected;
+      if(!confirmed){toast('No se confirmó el cambio. Revisá la fila.',true);el.value=original;el.disabled=false;return;}
+      state.fu.selectedQueueKey=x.key;
+      if(state.fu.task?.item?.key===x.key)state.fu.task=null;
+      await loadFollowup({quiet:true});render();return;
+    }
     if(e.target.matches('[data-fu-queue-select]')){
       const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
     }
