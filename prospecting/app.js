@@ -474,6 +474,8 @@
     neutro:'Respondió sin expresar interés ni rechazo.',
     pregunta_precios:'Consultó por planes, créditos o precios.',
     mas_adelante:'Pidió retomar la conversación más adelante.',
+    recontactar_vacaciones:'Pidió retomar después de sus vacaciones. No altera su etapa del embudo.',
+    recontactar_mas_adelante:'Pidió retomar más adelante. No altera su etapa del embudo.',
     derivo:'Indicó con quién continuar la conversación.',
     rechazo:'Respondió que la propuesta no le interesa.',
     proveedor_ia:'Ya trabaja con otro proveedor de IA.',
@@ -488,7 +490,9 @@
   // without an additional shared password. Backend is the source of authority.
   const db=snap.catalog||{},canEdit=db.available===true&&(unit==='habita'||!state.session?.open);
   const steps=F.commercialStages(unit,snap),selected=steps.find(s=>s.key===state.fu.catalogStage)||steps.find(s=>s.key==='contactado')||steps[0];
-  const key=selected?.key||'contactado',canonical=Object.entries(snap.labels?.situations||{});
+  const key=selected?.key||'contactado',canonical=Object.entries(snap.labels?.situations||{}).filter(([id])=>
+    !['recontactar_vacaciones','recontactar_mas_adelante'].includes(id) ||
+    !(selected?.technical||[]).some(t=>t==='no-contactado'||t==='sin-saludo'));
   const overrides=(db.overrides||[]).filter(x=>x.commercial_stage===key);
   const rules=F.ruleRows(unit,snap).filter(r=>selected?.technical?.includes(r.stage));
   const rows=[
@@ -502,7 +506,8 @@
   const editing=state.fu.catalogEdit?.commercial_stage===key?state.fu.catalogEdit:null;
   const current=editing?.create?{key:'',label:'',description:'',examples:'',active:false,maps_to:'',source:'whatsapp',product_stage:selected?.technical?.[0]||null,base:false}
     :rows.find(r=>r.key===editing?.key&&r.base===editing.base);
-  const allowed=(db.canonical||canonical.map(([key,label])=>({key,label}))).filter(x=>!x.permanent_stop);
+  const allowed=(db.canonical||canonical.map(([key,label])=>({key,label}))).filter(x=>!x.permanent_stop&&
+    (!['recontactar_vacaciones','recontactar_mas_adelante'].includes(x.key)||!(selected?.technical||[]).some(t=>t==='no-contactado'||t==='sin-saludo')));
   const isCustom=!!(db.stages||[]).find(s=>s.key===key);
   const stageForm=canEdit&&state.fu.newStage?`<form class="fu-catalog-editor" data-fu-stage-form>
     <h3>Nueva etapa</h3>
@@ -2621,7 +2626,9 @@
     (!q.rule||x.ruleKey===q.rule)).length;
   const canonical=Object.entries(snap?.labels?.situations||{});
   const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
-  const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed)).map(([key,label])=>{
+  const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed) &&
+    (!['recontactar_vacaciones','recontactar_mas_adelante'].includes(key) ||
+     !current || !current.technical.some(t=>t==='no-contactado'||t==='sin-saludo'))).map(([key,label])=>{
     const o=override.find(a=>a.key===key);return {key,label:o?.label||label}
   }),...(snap?.catalog?.states||[]).filter(s=>s.active&&(!current||s.commercial_stage===current.key)).map(s=>({key:s.key,label:s.label}))];
   const rules=scope!=='todas' && current?F.ruleRows(scope,snap).filter(r=>current.technical.includes(r.stage)): [];
@@ -2641,7 +2648,17 @@
     ${scope!=='todas'&&customStages.length?`<div class="os-fu-chipbar" data-testid="followup-queue-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
       ${customStages.map(s=>`<button type="button" aria-pressed="${current?.key===s.key}" class="${current?.key===s.key?'is-on':''}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${stageCounter(s)}</b></button>`).join('')}
     </div></div>`:''}
-    <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
+    <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
+    <section class="card glass os-fu-tablecard">
+    <div class="os-fu-tablehead os-fu-tablehead-fast">
+      <div class="os-fu-queue-heading"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))}</h2>
+        <span class="os-fu-ready-count">${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':rows.length===1?'listo':'listos'}</span></div>
+      <button type="button" class="btn primary os-fu-queue-next" data-fu="next"
+        ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''}
+        data-testid="fu-take-next">EJECUTAR SIGUIENTE →</button>
+    </div>
+    <div class="os-fu-queue-compact-search"><input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto"></div>
+    <details class="os-fu-queue-advanced" data-testid="fu-queue-advanced" ${q.advancedOpen?'open':''}><summary>Filtros y métricas ${q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed?'· activos':''}</summary><div class="os-fu-advanced-body"><div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
       <button type="button" class="${!q.situation?'is-on':''}" data-fu="queue-situation" data-fu-situation="">Todas <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))).length}</b></button>
@@ -2651,15 +2668,12 @@
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
-    <div class="os-fu-banner"><span>COLA DE EJECUCIÓN · ${esc(current?.title||'Todas las etapas')} · ${esc(q.situation?situ.find(s=>s.key===q.situation)?.label||q.situation:'Todas las situaciones')}</span><span>${state.fu.loading?'ACTUALIZANDO…':state.fu.at?'ACTUALIZADA '+esc(dayTime(new Date(state.fu.at).toISOString())):'SIN SINCRONIZAR'} · CADA 60 S</span><button type="button" class="btn small" data-fu="reload" aria-label="Actualizar cola">↻</button></div>
-    <div class="os-fu-queue-grid" data-testid="followup-queue-grid">
-    <section class="card glass os-fu-tablecard"><div class="os-fu-tablehead"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))} — ${int(rows.length)} ${q.closed?'NO INTERESADOS':q.kpi==='bloqueadas'?'BLOQUEADAS':rows.length===1?'LISTO':'LISTOS'}</h2><div class="os-fu-tools">
+    </div></details>
+    <details class="os-fu-table-filters" data-testid="fu-queue-sort-options" ${q.sortOpen?'open':''}><summary>Orden y filtros de la lista</summary><div class="os-fu-tools">
       <label>ORDENAR<select class="input" data-fu-queue-select="order"><option value="comercial" ${q.order==='comercial'?'selected':''}>Prioridad comercial</option><option value="score" ${q.order==='score'?'selected':''}>Score mayor</option><option value="antiguo" ${q.order==='antiguo'?'selected':''}>Más antiguas</option><option value="reciente" ${q.order==='reciente'?'selected':''}>Más recientes</option></select></label>
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
-      <input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto">
-      <button type="button" class="btn primary" data-fu="next" ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''} data-testid="fu-take-next">TOMAR LA PRÓXIMA →</button>
-    </div></div>
+    </div></details>
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
@@ -3447,6 +3461,14 @@
   }
 
   // ── La tarea: contexto, mensaje y checklist (como el detalle de Follow-up de habita.) ──
+  function fuSituationOptions(situations, stage, unit) {
+    // A stage is progress in the funnel; situations are independent metadata.
+    // Recontact is available only once the first outbound contact exists.
+    const first = unit === 'turnia' ? 'sin-saludo' : 'no-contactado';
+    return Object.entries(situations || {}).filter(([key]) =>
+      !['recontactar_vacaciones','recontactar_mas_adelante'].includes(key) || stage !== first);
+  }
+
   function renderFuTask(t) {
     const it = t.item || {};
     // After a confirmed send, show a durable receipt with a separate Next
@@ -3497,7 +3519,7 @@
               <button type="submit" class="btn primary">Guardar etapa</button>
             </form>`:''}
             <form data-fu-change-situation>
-              <label>Situación<select class="input" name="situacion" required>${Object.entries(situations).map(([k,l])=>`<option value="${esc(k)}" ${k===it.situation?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
+              <label>Situación<select class="input" name="situacion" required>${fuSituationOptions(situations,it.stage,t.unit).map(([k,l])=>`<option value="${esc(k)}" ${k===it.situation?'selected':''}>${esc(l)}</option>`).join('')}</select></label>
               <input class="input" name="texto" placeholder="Motivo (opcional)" maxlength="500">
               <button type="submit" class="btn primary">Guardar situación</button>
             </form>
@@ -3507,8 +3529,8 @@
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
         <section class="card glass os-fu-context-card"><h2>Contexto</h2>
           <dl class="facts">${it.sub && it.sub !== it.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(it.sub)}</dd>` : ''}${t.phone || it.phone ? `<dt>WhatsApp</dt><dd>${esc(t.phone || it.phone)}</dd>` : ''}${it.zone ? `<dt>Zona</dt><dd>${esc(it.zone)}</dd>` : ''}<dt>Etapa</dt><dd>${esc(it.stageTitle || '')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[it.priority] || '')}${it.priorityManual ? ' (a mano)' : ''}</dd>${it.owner ? `<dt>Responsable</dt><dd>${esc(it.owner)}</dd>` : ''}${it.since ? `<dt>Último contacto</dt><dd>${esc(ago(it.since))}${it.lastText ? ` · ${esc(it.lastText)}` : ''}</dd>` : ''}${it.blocked ? `<dt>Bloqueada</dt><dd style="color:var(--bad-text)">${esc(it.blocked)}</dd>` : ''}${it.dueAt ? `<dt>Programada</dt><dd>${esc(dayTime(it.dueAt))}</dd>` : ''}</dl>
-          <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${Object.entries(situations).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
-          <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${Object.entries(situations).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
+          <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${fuSituationOptions(situations,it.stage,t.unit).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
+          <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${fuSituationOptions(situations,it.stage,t.unit).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
           <div class="section"><h3>Prioridad y responsable</h3><div class="btns">${['alta', 'media', 'baja'].map((p) => `<button class="btn small ${it.priority === p ? 'primary' : ''}" type="button" data-fu="priority" data-fu-priority="${p}">${F.PRIORITY_LABEL[p]}</button>`).join('')}<button class="btn small ghost" type="button" data-fu="priority" data-fu-priority="">Automática</button></div>
             ${t.unit === 'turnia' ? `<form class="btns" data-fu-owner><input class="input" name="responsable" list="fu-owners" value="${esc(it.owner || '')}" placeholder="Facu, Axel…" style="flex:1 1 120px" aria-label="Responsable"><datalist id="fu-owners"><option>Facu</option><option>Axel</option>${me ? `<option>${esc(me)}</option>` : ''}</datalist><button class="btn small" type="submit">Asignar</button></form>` : '<p class="sub" style="margin:0">En habita. el responsable es el SDR de la cuenta.</p>'}</div>
           ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
@@ -3863,6 +3885,11 @@
       default: break;
     }
   });
+  document.addEventListener('toggle', (e) => {
+    const d=e.target;
+    if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
+    if(d?.matches?.('[data-testid="fu-queue-sort-options"]'))fuQueueState().sortOpen=d.open;
+  }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
     if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;

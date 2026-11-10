@@ -83,3 +83,44 @@ test('Execution hides legacy menu and presents compact reclasificar action',()=>
   assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
   assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
 });
+
+
+test('Recontactar is only a situation, starting from contacted or greeted',()=>{
+  assert.match(app,/function fuSituationOptions\(situations, stage, unit\)/);
+  assert.match(app,/stage !== first/);
+  assert.match(app,/data-fu-change-situation/);
+  assert.match(app,/data-fu-change-stage/);
+  assert.match(app,/recontactar_vacaciones/);
+  assert.match(app,/recontactar_mas_adelante/);
+  assert.match(app,/No altera su etapa del embudo/);
+});
+
+test('Both units expose recontact situations only after first contact',()=>{
+  assert.doesNotThrow(()=>new vm.Script(app));
+  assert.match(app,/function fuSituationOptions\(situations, stage, unit\)/);
+  assert.match(app,/unit === 'turnia' \? 'sin-saludo' : 'no-contactado'/);
+  assert.match(app,/recontactar_vacaciones/);
+  assert.match(app,/recontactar_mas_adelante/);
+  assert.match(app,/fuSituationOptions\(situations,it.stage,t.unit\)/);
+  assert.match(app,/selected\?\.technical/);
+});
+
+test('Eight commercial funnel stage icons remain above execution shortcuts',()=>{
+  const stages=app.indexOf('data-testid="followup-reference-stage-cards"');
+  const grid=app.indexOf('data-testid="followup-queue-grid"',stages);
+  const cta=app.indexOf('data-testid="fu-take-next"',grid);
+  const filters=app.indexOf('data-testid="fu-queue-advanced"',cta);
+  assert.ok(stages>0&&grid>stages&&cta>grid&&filters>cta);
+  assert.match(app,/commercialStages\.map\(s=>`<button class="os-fu-stage/);
+  assert.match(app,/data-fu="queue-stage"/);
+  assert.match(app,/data-testid="fu-queue-sort-options"/);
+  assert.match(app,/data-fu-queue-select="order"/);
+  assert.match(app,/data-fu-queue-select="rule"/);
+  assert.match(app,/data-fu-queue-select="group"/);
+  assert.match(app,/data-fu-queue-search/);
+  assert.match(app,/data-fu="queue-kpi"/);
+  assert.match(app,/data-fu="queue-situation"/);
+  assert.match(css,/\.os-fu-queue-next\{/);
+  assert.match(css,/\.os-fu-advanced-body/);
+  assert.match(app,/fuQueueState\(\)\.advancedOpen=d\.open/);
+});

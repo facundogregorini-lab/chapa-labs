@@ -1776,3 +1776,34 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
   body[data-executing="true"] .os-fu-mobile-send p:not(.notice){margin:0}
   body[data-executing="true"] .os-fu-lock-note{margin-left:auto}
 }
+
+/* Queue execution-first layout. The eight commercial stage cards are untouched. */
+.os-fu-tablehead-fast{padding:12px 15px 8px;gap:10px}
+.os-fu-queue-heading{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;min-width:0}
+.os-fu-queue-heading h2{font-size:14px;line-height:1.25}
+.os-fu-ready-count{font-size:12px;font-weight:800;color:#2d7650;font-variant-numeric:tabular-nums}
+.os-fu-queue-next{min-height:46px!important;padding:10px 18px!important;font-size:13px!important;white-space:nowrap}
+.os-fu-queue-compact-search{padding:0 15px 10px}
+.os-fu-queue-compact-search .os-fu-search{width:100%!important;max-width:none!important;min-height:40px}
+.os-fu-queue-advanced,.os-fu-table-filters{margin:0 15px 8px;padding:0;border-bottom:1px solid #e1eae2}
+.os-fu-queue-advanced>summary,.os-fu-table-filters>summary{cursor:pointer;list-style:none;color:#567562;font-size:11px;font-weight:750;padding:8px 0}
+.os-fu-queue-advanced>summary::-webkit-details-marker,.os-fu-table-filters>summary::-webkit-details-marker{display:none}
+.os-fu-queue-advanced>summary::before,.os-fu-table-filters>summary::before{content:"▸";margin-right:7px}
+.os-fu-queue-advanced[open]>summary::before,.os-fu-table-filters[open]>summary::before{content:"▾"}
+.os-fu-advanced-body{display:grid;gap:8px;padding:8px 0 10px}
+.os-fu-advanced-body .os-fu-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+.os-fu-advanced-body .os-fu-kpi{padding:10px}
+.os-fu-advanced-body .os-fu-kpi strong{font-size:21px}
+.os-fu-advanced-body .os-fu-chipbar{padding:8px 0}
+.os-fu-table-filters .os-fu-tools{justify-content:flex-start;padding:8px 0 12px}
+@media(max-width:760px){
+  .os-fu-tablehead-fast{display:grid;grid-template-columns:minmax(0,1fr);padding:10px 12px 8px}
+  .os-fu-queue-heading h2{font-size:13px}
+  .os-fu-queue-next{display:flex;width:100%;align-items:center;justify-content:center;min-height:49px!important}
+  .os-fu-queue-compact-search{padding:0 12px 6px}
+  .os-fu-queue-advanced,.os-fu-table-filters{margin:0 12px 6px}
+  .os-fu-advanced-body .os-fu-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .os-fu-table-filters .os-fu-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .os-fu-table-filters .os-fu-tools label{min-width:0}
+  .os-fu-table-filters .os-fu-tools .input{max-width:none;width:100%}
+}
