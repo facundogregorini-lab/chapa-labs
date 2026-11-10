@@ -78,8 +78,8 @@ test('Execution hides legacy menu and presents compact reclasificar action',()=>
   assert.match(app,/data-testid="fu-reclassify-open">Reclasificar/);
   assert.match(app,/data-fu-change-stage/);
   assert.match(app,/data-fu-change-situation/);
-  assert.match(app,/op:'stage',inmobiliaria:it\.id,etapa:fd\.etapa/);
-  assert.match(app,/op:'situation',inmobiliaria:it\.id,situacion:fd\.situacion/);
+  assert.match(app,/op:'stage',inmobiliaria:it\.id,etapa:stage/);
+  assert.match(app,/op:'situation',inmobiliaria:it\.id,situacion:situation/);
   assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
   assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
 });
