@@ -1776,3 +1776,32 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
   body[data-executing="true"] .os-fu-mobile-send p:not(.notice){margin:0}
   body[data-executing="true"] .os-fu-lock-note{margin-left:auto}
 }
+
+/* Fast mobile queue: retain the eight commercial stage icons unchanged.
+   Only subordinate filters and duplicate execution headers are collapsed. */
+.os-fu-fastbar{display:none}
+@media(max-width:760px){
+  .os-fu-fastbar{
+    display:grid;grid-template-columns:minmax(0,1fr) auto;
+    gap:9px;align-items:center;padding:11px 12px;
+    border:1px solid #dce9df;background:#f7fbf7;border-radius:14px;
+  }
+  .os-fu-fastbar-summary{display:flex;flex-direction:column;min-width:0;gap:2px}
+  .os-fu-fastbar-summary strong{font-size:13px;color:#194d34;overflow-wrap:anywhere}
+  .os-fu-fastbar-summary span{font-size:11px;color:#668172}
+  .os-fu-fastbar-execute{grid-column:1/-1;width:100%;min-height:52px!important;font-size:14px!important;border-radius:11px!important}
+  .os-fu-fastbar-filters{min-height:37px!important;padding:7px 13px!important;grid-column:2;grid-row:1}
+  .os-fu-advanced{display:none}
+  .os-fu-advanced[data-expanded="true"]{display:block}
+  .os-fu-advanced .os-fu-kpis{margin-top:8px}
+  .os-fu-banner{display:none}
+  .os-fu-tablehead{padding:10px 12px 7px!important}
+  .os-fu-tablehead h2{display:none}
+  .os-fu-tools{display:none!important}
+  .os-fu-mobile-list{padding-top:4px!important}
+  .os-fu-queue-grid{margin-top:0!important}
+  .os-fu-queue-foot{font-size:10px}
+  /* The side recommendation is redundant when every card has its own execute CTA. */
+  .os-fu-queue-grid > .os-fu-side{display:none}
+  .os-fu-stage-grid{margin-bottom:0}
+}
