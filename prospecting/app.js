@@ -2247,6 +2247,23 @@
     </section>`;
   }
 
+  function fuStageGlyph(key){
+  const p={
+   todas:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/>',
+   prospectado:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+   contactado:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/>',
+   interesado:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+   "demo-enviada":'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-3v10l-4-3"/>',
+   "cuenta-creada":'<rect x="4" y="5" width="16" height="17" rx="2"/><path d="M9 22v-4h6v4M8 9h.01M12 9h.01M16 9h.01M8 13h.01M12 13h.01M16 13h.01"/>',
+   "cuenta-activa":'<path d="m3 12 4 4 6-7M13 16l3 3 6-8"/>',
+   cliente:'<path d="m12 2 8 4.5v9L12 20l-8-4.5v-9Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v9"/>',
+   saludado:'<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/>',
+   "demo-visitada":'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+   converso:'<path d="M21 11a8 8 0 0 1-8 8H6l-3 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/><path d="M8 11h8M8 15h4"/>',
+  }[key]||'<circle cx="12" cy="12" r="8"/>';
+  return `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+}
+
   function fuQueueState() {
   return state.fu.queueView || (state.fu.queueView = {
     kpi:'listas',commercial:null,situation:null,rule:null,tech:null,closed:false,
@@ -2327,8 +2344,8 @@
       <p>El mismo recorrido del Follow-up de Habita: etapa → situación → regla → contacto → QA → confirmar. Cada producto decide qué se puede enviar.</p></div></section>
     ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
       `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
-        <button class="os-fu-stage ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage="">TODAS<strong>${stageCounter(null)}</strong></button>
-        ${stages.map(s=>`<button class="os-fu-stage ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title.toUpperCase())}<strong>${stageCounter(s)}</strong></button>`).join('')}
+        <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong><span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+        ${stages.map(s=>`<button class="os-fu-stage is-${esc(s.key)} ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${stageCounter(s)}</strong></button>`).join('')}
       </div>`}
     <div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
@@ -2498,8 +2515,7 @@
   return `<section class="hero"><div><span class="eyebrow">${esc(fuName(scope).toUpperCase())} / EMBUDO</span><h1>Etapas y decisiones.</h1><p>La misma lectura del Follow-up de Habita: elegí una etapa y revisá sus pasos, situaciones, reglas y prospectos, sin cambiar la lógica del motor.</p></div></section>
     <section class="card glass" data-testid="followup-funnel"><div class="os-funnel-title"><div><span class="os-kicker">EMBUDO COMERCIAL</span><h2>${esc(fuName(scope))} · ${stages.length} etapas</h2></div><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></div>
     <div class="os-fu-stage-grid" data-testid="followup-funnel-stages">
-      ${stages.map(s=>`<button type="button" class="os-fu-stage ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}">${esc(s.title.toUpperCase())}
-        <strong>${int(s.waiting)}</strong><small>${s.rate===null?'Etapa sin conversión inmediata':pct(s.rate)+' avance a siguiente etapa'}</small></button>`).join('')}
+      ${stages.map(s=>`<button type="button" class="os-fu-stage is-${esc(s.key)} ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${int(s.waiting)}</strong></button>`).join('')}
     </div>
     ${selected?.technical?.length>1?`<div class="os-fu-chipbar" data-testid="followup-funnel-substages"><strong>ETAPA TÉCNICA</strong><div class="os-fu-chips">
       <button type="button" class="${!tech?'is-on':''}" data-fu="pipeline-technical" data-fu-stage="">Todas <b>${int(selected.waiting)}</b></button>
