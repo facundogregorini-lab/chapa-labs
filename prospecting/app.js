@@ -3613,10 +3613,11 @@
       }
       case 'rules-preview-copy': {
         const unit=ds.fuUnitId, snap=state.fu.n?.units[unit];
-        const version=F.versionRows(unit,snap).filter(v=>v.stage===ds.fuStage&&v.action===ds.fuRuleAction)
-          .find(v=>v.status==='active');
-        if(version?.body){copy(version.body);toast('Mensaje copiado sin enviarlo.');}
-        else toast('No hay una versión activa para copiar.',true);
+        const versions=F.versionRows(unit,snap).filter(v=>v.stage===ds.fuStage&&v.action===ds.fuRuleAction);
+        const version=versions.find(v=>v.id===state.fu.previewVersion)
+          ||versions.find(v=>v.status==='active')||versions[0];
+        if(version?.body){copy(version.body);toast('Versión V'+version.version+' copiada sin enviarla.');}
+        else toast('No hay una versión del mensaje para copiar.',true);
         break;
       }
       case 'rules-cancel': {const ui=fuRulesState(state.unit);ui.dirty=false;ui.creating=false;ui.template=null;ui.selected=null;render();break;}
@@ -3691,7 +3692,9 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
-    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
+    if(!e.target.matches('[data-fu-rule-version]')&&
+      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+      fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-rule-add-sit]')){
       const form=e.target.closest('[data-fu-rule-form]');
       const selection=e.target.value;
@@ -3812,7 +3815,9 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
-    if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
+    if(!e.target.matches('[data-fu-rule-version]')&&
+      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+      fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
       clearTimeout(target._t);
