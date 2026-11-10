@@ -2312,28 +2312,36 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function fuNextCandidate(currentKey) {
+    // Preserve the current queue filters, stage, situation and priority order.
+    // Never navigate into a different operator's claim.
+    return state.fu.n ? fuQueueSelection(fuScope()).rows.find(x=>
+      x.key!==currentKey&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action)
+    )||null : null;
+  }
+
   async function fuNext() {
+    if(state.fu.busy)return;
     const previous=state.fu.task;
     const cur=previous?.item?.key;
-    // No dejar un claim abierto al pasar al siguiente (es distinto a confirmar un envío).
+    // If no other task is eligible, retain this task's claim and context.
+    let next=fuNextCandidate(cur);
+    if(!next){
+      await loadFollowup({quiet:true});
+      next=fuNextCandidate(cur);
+    }
+    if(!next){
+      toast('No hay otra tarea libre con estos filtros. Podés cambiar los filtros desde la cola.',true);
+      render();
+      return;
+    }
+    // Following the queue without confirming is NOT a sent message.
     if(previous?.mode==='ejecutar'){
       const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
       if(!released)return;
     }
     state.fu.task=null;
-    // The product validates eligibility again when claiming. A full snapshot
-    // between releasing and claiming the next row added several seconds to
-    // each click; use the visible queue and refresh after the new claim.
-    const me=state.session?.user?.name;
-    let next=state.fu.n?fuQueueSelection(fuScope()).rows
-      .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me)):null;
-    if (!next) {
-      await loadFollowup({quiet:true});
-      next=state.fu.n?fuQueueSelection(fuScope()).rows
-        .find(x=>x.key!==cur&&!x.blocked&&!x.dueAt&&x.action&&(!x.claim||x.claim.by===me)):null;
-    }
-    if (next) await fuClaim(next);
-    else { toast('No quedan tareas libres en la cola.'); render(); }
+    await fuClaim(next);
   }
 
   // ── Las vistas ──
@@ -3404,6 +3412,9 @@
           ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
         </p>
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile" data-arm="Confirmar: el mensaje salió">✓ Confirmar envío</button>
+        <button type="button" class="btn os-fu-mobile-next" data-fu="next-after" data-testid="fu-next-mobile"
+          aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
+        <p class="os-fu-mobile-next-note">Si no enviaste el mensaje, esta tarea queda libre sin marcarla como enviada.</p>
       </div>`:''}
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
         <section class="card glass os-fu-context-card"><h2>Contexto</h2>
