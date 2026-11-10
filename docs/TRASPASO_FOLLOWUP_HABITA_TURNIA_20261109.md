@@ -1,5 +1,23 @@
 ## Hallazgo de QA visual del 09/11 — REGLAS Y MENSAJES NO tiene paridad
 
+## Cierre de implementación — 10/11/2026
+
+**Publicado (Vercel: success en main de los tres repositorios):**
+- **Habita** PR #230 `axellaban/amoblaia` commit `230430473b46662120fbc8e580af26706a16cb2c`: el API de Follow-up expone el embudo histórico exacto (9 pasos), barras acumuladas, pérdidas, filas reales por paso y filtros de períodos sin inventar conteos. PR #228 y #229 ya estaban integrados.
+- **Turnia** PR #167 `axellaban/turniasalud` commit `8b14a8b2a3a2a65b9201a74ad2c3bbea05c41b0f`: catálogo propio de ocho etapas comerciales y situaciones editables, reglas que restringen la cadencia sin adelantar mensajes, protección de exclusiones y migración idempotente por `scripts/migrate-db.mjs` en deploy de producción. **CI completo aprobado**, incluida la migración contra Postgres descartable y todas las pruebas de integración. El esquema no se cargó en el Supabase de Habita; Turnia usa su propia DB.
+- **Chapa Labs** PR #64 y #65 `facundogregorini-lab/chapa-labs`, último commit `7f04eb47b62aaba76b7ffb6660e2ef1c99fe2892`: embudo histórico con período/fechas, clic en barras para ver inmobiliarias, etapa/acciones debajo, selector de unidad, editor de etapas y situaciones compartido pero persistido en cada producto, reglas con condiciones y vista previa estilo WhatsApp en la tercera columna. CI smoke aprobado. PR #61 cerrado sin merge por obsoleto; reemplazado por #65.
+
+**Verificación cumplida**: SHA integrado en main, CI verde y estado Vercel `success` para cada repo. No se enviaron mensajes ni se mutaron datos comerciales reales durante la validación.
+
+**Limitaciones para no sobredimensionar QA**:
+1. No se hizo una prueba de navegador autenticado ni capturas pixel-a-pixel contra las seis pantallas del original. No afirmar literalmente 100% de identidad visual/funcional sin ese QA manual. Revisar **Cola** y **Reglas** primero y después Embudo, Etapas y situaciones, Respuestas y Resultados, desktop y mobile.
+2. El editor de escrituras sensibles sigue bloqueado si Chapa no tiene la variable `PROSPECTING_PASSWORD` configurada en Vercel; el warning de «sesión abierta» mostrado anteriormente es evidencia de que en ese momento no estaba habilitada. Verificar en Vercel antes de las pruebas de edición, sin exponer la contraseña.
+3. `catalog.available` en Turnia solo será true si se aplicó la migración en la DB de producción. El build publicado normalmente la ejecuta automáticamente salvo `SKIP_DB_MIGRATION=1`; los estados Vercel exitosos **no prueban el valor de esas variables**. Validar respuesta de `GET /api/prospeccion?vista=followup` con el secreto de servidor por canal autorizado.
+4. Las modificaciones de reglas deben testearse en sandbox o contactos de prueba antes de afectar mensajes reales: claims, opt-outs, horarios, bajas, encuestas y versiones.
+
+**Cómo continuar si Claude Code retoma el QA**: Abrir este doc, leer `AGENTS.md`, `docs/CENTRO_COMERCIAL.md`, `docs/PROSPECCION.md`, tomar los SHA anteriores como referencia, inspeccionar HEAD nuevo en cada repo; ejecutar pruebas de navegación autenticadas, tomar capturas y comparar con `axellaban/amoblaia/src/components/admin-followup.tsx` y sus CSS. Corregir solo diferencias verificadas, sin reimplementar motores ni reabrir cierres.
+
+
 ## Estado posterior de QA y paridad — 10/11/2026 (actualización)
 
 - Cola y Reglas: mergeadas a main en Chapa PR #62 y Habita PR #228. Vercel las reporta en producción. **No declarar fidelidad visual 100% sin capturas y pruebas reales de interacción.**
