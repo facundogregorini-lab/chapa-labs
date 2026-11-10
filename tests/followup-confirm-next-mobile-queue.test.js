@@ -124,3 +124,31 @@ test('Eight commercial funnel stage icons remain above execution shortcuts',()=>
   assert.match(css,/\.os-fu-advanced-body/);
   assert.match(app,/fuQueueState\(\)\.advancedOpen=d\.open/);
 });
+
+test('Reclassify forms are intercepted and persist via backend instead of reloading the page',()=>{
+  assert.doesNotThrow(()=>new vm.Script(app));
+  const start=app.indexOf("document.addEventListener('submit'");
+  assert.ok(start>0);
+  const handler=app.slice(start,app.indexOf("  //",start+1000)>start?app.indexOf("  //",start+1000):start+12000);
+  const routing=app.slice(start,start+9300);
+  assert.match(routing,/form\.matches\('\[data-fu-chart-range\]/);
+  assert.match(routing,/\[data-fu-change-stage\]/);
+  assert.match(routing,/\[data-fu-change-situation\]/);
+  assert.match(routing,/e\.preventDefault\(\)/);
+  assert.match(routing,/op:'stage',inmobiliaria:it\.id,etapa:stage/);
+  assert.match(routing,/op:'situation',inmobiliaria:it\.id,situacion:situation/);
+  assert.match(routing,/result\.stage!==stage/);
+  assert.match(routing,/result\.situation!==situation/);
+  assert.match(routing,/state\.fu\.task=null/);
+});
+
+test('Reclassify displays only commercial funnel stages, not internal technical progress',()=>{
+  const markup=app.slice(app.indexOf('function renderFuTask(t)'),app.indexOf('function renderFuTask(t)')+12000);
+  assert.match(markup,/Etapa comercial<select/);
+  assert.match(markup,/F\.commercialStages\('habita',snap\)/);
+  assert.match(markup,/v\.technical\.includes\(it\.stage\)\?it\.stage:v\.technical\[0\]/);
+  assert.doesNotMatch(markup,/Etapa del funnel<select/);
+  assert.doesNotMatch(markup,/\(snap\?\.stages\|\|\[\]\)\.map\(v=>/);
+  assert.match(markup,/Situación<select/);
+  assert.match(markup,/fuSituationOptions\(situations,it\.stage,t\.unit\)/);
+});
