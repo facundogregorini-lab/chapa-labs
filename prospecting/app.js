@@ -4086,7 +4086,7 @@
       if (await fuOp(task.unit, { op: 'snooze', inmobiliaria: it.id, hasta: until, motivo: fd.motivo }, { label: 'Reprogramada.' })) { state.fu.task = null; loadFollowup(); }
     }
   }, true);
-  document.addEventListener('change', (e) => {
+  document.addEventListener('change', async (e) => {
     if(!e.target.matches('[data-fu-rule-version]')&&
       e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
       fuRulesState(state.unit).dirty=true;
