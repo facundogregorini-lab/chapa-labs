@@ -2830,7 +2830,7 @@
   function fuRulesState(unit) {
   state.fu.rulesWorkspace ||= {};
   return state.fu.rulesWorkspace[unit] ||= {
-    commercial: unit === 'habita' ? 'contactado' : 'saludado',
+    commercial: 'prospectado',
     selected: null, creating: false, template: null, showMenu: false, picking: false,
     technical: null, dirty: false, moving: false,
   };
