@@ -2638,11 +2638,11 @@
       <h2>${esc(selected.name)}</h2><p class="os-fu-caption">${esc(selected.phone||'')} · ${esc(selected.stage||'')}</p></div><span class="os-tag">${esc(fuName(selected.unit))}</span></div>
     <div class="os-fu-reply-bubble">${esc(selected.body||'No hay texto original registrado. Consultá WhatsApp antes de clasificar.')}<small>${esc(dayTime(selected.receivedAt)||'')}</small></div>
     ${selected.note?`<p class="os-fu-caption">Nota: ${esc(selected.note)}</p>`:''}
-    <form data-fu-inbox-form data-fu-reply-key="${esc(selected.key)}">
+    <form data-fu-inbox-form data-fu-reply-key="${esc(selected.key)}" data-fu-reply-has-body="${selected.body?'1':'0'}">
       <fieldset class="os-fu-reply-classes"><legend>CLASIFICACIÓN ${selected.classification&&selected.confidence!=null
         ?' · la extensión sugirió «'+esc(opts[selected.classification]||selected.classification)+'» con '+Math.round(selected.confidence*100)+'%'
         :selected.confidence!=null?' · sugerida '+Math.round(selected.confidence*100)+'%':''}</legend>
-      <div class="os-fu-chips">${allowed.map(o=>`<label><input type="radio" name="clase" value="${esc(o.key)}" ${selected.classification===o.key?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div></fieldset>
+      <div class="os-fu-chips">${allowed.map(o=>`<label class="${selected.classification===o.key?'is-on':''}"><input type="radio" name="clase" value="${esc(o.key)}" ${selected.classification===o.key?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div></fieldset>
       ${selected.unit==='habita'?`<div class="os-fu-conditional" data-reply-condition="mas_adelante" ${selected.classification==="mas_adelante"?"":"hidden"}>
         <label class="field"><span>Retomar el contacto (opcional)</span><input class="input" type="date" name="hasta"></label></div>
       <div class="os-fu-conditional" data-reply-condition="derivo" ${selected.classification==="derivo"?"":"hidden"}>
@@ -3867,8 +3867,7 @@
       for(const block of form.querySelectorAll('[data-reply-condition]'))
         block.hidden=block.dataset.replyCondition!==selected;
       const save=form.querySelector('[data-testid="followup-reply-save"]');
-      if(save)save.disabled=!selected||!form.closest('[data-testid="followup-reply-detail"]')
-        ?.querySelector('.os-fu-reply-bubble')?.textContent?.trim();
+      if(save)save.disabled=!selected||form.dataset.fuReplyHasBody!=='1';
       for(const label of form.querySelectorAll('.os-fu-reply-classes label'))
         label.classList.toggle('is-on',Boolean(label.querySelector('input:checked')));
     }
