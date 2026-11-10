@@ -446,8 +446,11 @@
     <label class="field"><span>Nombre</span><input class="input" name="label" required minlength="2" maxlength="80" value="${esc(current.label||'')}"></label>
     <label class="field"><span>Descripción</span><textarea class="input" name="description" rows="2" maxlength="800">${esc(current.description||'')}</textarea></label>
     <label class="field"><span>Ejemplos</span><textarea class="input" name="examples" rows="2" maxlength="2000">${esc(current.examples||'')}</textarea></label>
-    ${current.base?'':`<label class="field"><span>Equivalencia canónica</span><select class="input" name="maps_to">${allowedClassifications.map(({key:id,label})=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label>
-    <label class="field"><span>Origen</span><select class="input" name="source"><option value="whatsapp" ${current.source==='whatsapp'?'selected':''}>WhatsApp</option><option value="manual" ${current.source==='manual'?'selected':''}>Manual</option></select></label><label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
+    ${current.base?'':`<div data-catalog-mapping ${current.source==="product"?"hidden":""}><label class="field"><span>Situación que entiende el motor</span><select class="input" name="maps_to">${allowedClassifications.map(({key:id,label})=>`<option value="${esc(id)}" ${current.maps_to===id?'selected':''}>${esc(label)}</option>`).join('')}</select></label></div>
+    <div data-catalog-products ${current.source==="product"?"":"hidden"}><label class="field"><span>Condición del embudo</span><select class="input" name="product_stage">
+      ${(F.commercialStages('habita',snap).find(x=>x.key===key)?.technical||[]).map(v=>`<option value="${esc(v)}" ${current.product_stage===v?'selected':''}>${esc((snap.stages||[]).find(o=>o.key===v)?.title||v)}</option>`).join('')}
+    </select></label></div>
+    <label class="field"><span>Origen</span><select class="input" name="source" data-fu-catalog-source><option value="whatsapp" ${current.source==='whatsapp'?'selected':''}>WhatsApp</option><option value="manual" ${current.source==='manual'?'selected':''}>Manual</option>${F.commercialStages('habita',snap).some(x=>x.key===key&&x.technical.length)?`<option value="product" ${current.source==='product'?'selected':''}>Avance del embudo</option>`:''}</select></label><label style="display:flex;gap:7px;align-items:center;font-size:12px"><input type="checkbox" name="active" ${current.active?'checked':''}>Activa</label>`}
     <div class="os-unit-actions"><button type="submit" class="btn primary">GUARDAR SITUACIÓN</button>${!active.create?`<button type="button" class="btn" data-fu="state-delete" data-fu-key="${esc(current.key)}" data-fu-base="${current.base?'1':'0'}" data-fu-commercial="${esc(key)}" data-arm="CONFIRMAR ELIMINACIÓN">ELIMINAR</button>`:''}</div></form>`:'';
   const techMap={'no-contactado':'prospectado','no-responde':'contactado','sin-demo':'interesado','sin-enviar':'interesado','no-abrio':'demo-enviada','sin-interaccion':'demo-enviada','sin-cuenta':'demo-enviada','sin-uso':'cuenta-creada','sin-suscripcion':'cuenta-activa'};
   const customStage=(db.stages||[]).find(s=>s.key===key);
@@ -482,7 +485,9 @@
     const values={key:isNew?`custom_${Date.now().toString(36)}`:form.dataset.fuKey,
       commercial_stage:form.dataset.fuCommercial,base:isBase,create:isNew,
       label:String(fd.get('label')||''),description:String(fd.get('description')||''),
-      examples:String(fd.get('examples')||''),source:String(fd.get('source')||'whatsapp'),maps_to:isBase?null:fd.get('maps_to'),
+      examples:String(fd.get('examples')||''),source:String(fd.get('source')||'whatsapp'),
+      maps_to:isBase||fd.get('source')==='product'?null:(fd.get('maps_to')||null),
+      product_stage:isBase||fd.get('source')!=='product'?null:(fd.get('product_stage')||null),
       active:isBase?true:fd.has('active')};
     if(await fuOp('habita',{op:'state-save',valores:values},{label:'Situación guardada en Habita.'})){
       state.fu.catalogEdit=null;await loadFollowup({quiet:true});render();
@@ -2262,7 +2267,7 @@
     if(scope!=='todas'&&x.unit!==scope)return false;
     if(current && !(current.technical.includes(x.stage) && (!current.situation||x.situation===current.situation)))return false;
     if(q.tech&&x.stage!==q.tech)return false;
-    if(q.situation&&x.situation!==q.situation&&x.catalogSituation!==q.situation)return false;
+    if(q.situation&&x.situation!==q.situation&&x.catalogSituation!==q.situation&&!x.productSituations?.includes(q.situation))return false;
     if(q.rule&&x.ruleKey!==q.rule)return false;
     if(q.group&&x.group!==q.group)return false;
     return true;
@@ -2329,7 +2334,7 @@
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
     ${scope!=='todas'?`<div class="os-fu-chipbar" data-testid="followup-queue-situations"><strong>SITUACIÓN</strong><div class="os-fu-chips">
       <button type="button" class="${!q.situation?'is-on':''}" data-fu="queue-situation" data-fu-situation="">Todas <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))).length}</b></button>
-      ${situ.map(s=>`<button type="button" class="${q.situation===s.key?'is-on':''}" data-fu="queue-situation" data-fu-situation="${esc(s.key)}">${esc(s.label)} <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))&&(x.situation===s.key||x.catalogSituation===s.key)).length}</b></button>`).join('')}</div></div>`:''}
+      ${situ.map(s=>`<button type="button" class="${q.situation===s.key?'is-on':''}" data-fu="queue-situation" data-fu-situation="${esc(s.key)}">${esc(s.label)} <b>${n.queue.filter(x=>x.unit===scope&&(!current||current.technical.includes(x.stage))&&(x.situation===s.key||x.catalogSituation===s.key||x.productSituations?.includes(s.key))).length}</b></button>`).join('')}</div></div>`:''}
     ${showClosed?`<div class="os-fu-chipbar"><strong>RESULTADO DEL CONTACTO</strong><div class="os-fu-chips">
       <button type="button" class="${!q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="0">Pendientes de acción</button>
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
@@ -2484,7 +2489,7 @@
   const custom=(snap.catalog?.states||[]).filter(s=>s.active&&s.commercial_stage===selected?.key).map(s=>({key:s.key,label:s.label}));
   situations.push(...custom);
   const rows=F.filter(all.filter(x=>matchStage(x)&&(!tech||x.stage===tech)&&
-    (!selectedSituation||x.situation===selectedSituation||x.catalogSituation===selectedSituation)),
+    (!selectedSituation||x.situation===selectedSituation||x.catalogSituation===selectedSituation||x.productSituations?.includes(selectedSituation))),
     {...state.fu.f,unit:scope});
   const own=F.ruleRows(scope,snap).filter(r=>selected?.technical?.includes(r.stage)&&(!tech||r.stage===tech));
   const versions=F.versionRows(scope,snap);
@@ -2503,7 +2508,7 @@
     <div class="os-fu-chipbar"><strong>SITUACIÓN</strong><div class="os-fu-chips">
       <button class="${!selectedSituation?'is-on':''}" data-fu="pipeline-situation" data-fu-situation="">Todas <b>${int(situationRows.length)}</b></button>
       ${situations.map(s=>`<button type="button" class="${selectedSituation===s.key?'is-on':''}" data-fu="pipeline-situation" data-fu-situation="${esc(s.key)}">${esc(s.label)}
-        <b>${int(situationRows.filter(x=>x.situation===s.key||x.catalogSituation===s.key).length)}</b></button>`).join('')}
+        <b>${int(situationRows.filter(x=>x.situation===s.key||x.catalogSituation===s.key||x.productSituations?.includes(s.key)).length)}</b></button>`).join('')}
     </div></div>
     <div class="os-fu-banner"><strong>${esc(selected?.title||'')}</strong><span>${int(selected?.waiting||0)} EN LA ETAPA · ${activeTech?'OBJETIVO: '+esc(selectedTechnical?.goal||'siguiente paso'):'SIN PASO PENDIENTE'}</span><button class="btn small" data-view="secuencias">EDITAR REGLAS →</button></div>
     <div class="os-fu-rules">
@@ -2874,6 +2879,11 @@
     }
   }, true);
   document.addEventListener('change', (e) => {
+    if(e.target.matches('[data-fu-catalog-source]')){
+      const form=e.target.closest('[data-fu-state-form]'), product=e.target.value==='product';
+      if(form?.querySelector('[data-catalog-products]'))form.querySelector('[data-catalog-products]').hidden=!product;
+      if(form?.querySelector('[data-catalog-mapping]'))form.querySelector('[data-catalog-mapping]').hidden=product;
+    }
     if(e.target.matches('[data-fu-inbox-form] input[name="clase"]')){
       const selected=e.target.value, form=e.target.closest('[data-fu-inbox-form]');
       for(const block of form.querySelectorAll('[data-reply-condition]'))
