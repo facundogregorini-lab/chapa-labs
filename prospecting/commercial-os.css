@@ -1798,6 +1798,7 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
   .os-fu-tablehead{padding:10px 12px 7px!important}
   .os-fu-tablehead h2{display:none}
   .os-fu-tools{display:none!important}
+  .os-fu-center:has(.os-fu-advanced[data-expanded="true"]) .os-fu-tools{display:flex!important}
   .os-fu-mobile-list{padding-top:4px!important}
   .os-fu-queue-grid{margin-top:0!important}
   .os-fu-queue-foot{font-size:10px}
