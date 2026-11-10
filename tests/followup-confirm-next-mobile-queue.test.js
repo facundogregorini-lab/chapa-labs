@@ -83,3 +83,14 @@ test('Execution hides legacy menu and presents compact reclasificar action',()=>
   assert.match(css,/body\[data-executing="true"\] #legacy-tabs\{display:none!important\}/);
   assert.match(css,/body\[data-executing="true"\] \.os-workspace>main\{padding-top:14px!important\}/);
 });
+
+
+test('Recontactar is only a situation, starting from contacted or greeted',()=>{
+  assert.match(app,/function fuSituationOptions\(situations, stage, unit\)/);
+  assert.match(app,/stage !== first/);
+  assert.match(app,/data-fu-change-situation/);
+  assert.match(app,/data-fu-change-stage/);
+  assert.match(app,/Recontactar · Vacaciones/);
+  assert.match(app,/Recontactar · Más adelante/);
+  assert.match(app,/no altera su etapa del embudo/);
+});
