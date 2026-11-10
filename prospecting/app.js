@@ -62,6 +62,7 @@
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke="currentColor" stroke-width="2" d="M6 6l12 12M18 6 6 18"/></svg>',
     chev: '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" d="m6 9 6 6 6-6"/></svg>',
     ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
+    building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.4"/><path d="M9 21v-4h6v4M9 7h1m4 0h1M9 11h1m4 0h1"/></svg>',
   };
 
   function store(key, value) {
@@ -2608,7 +2609,7 @@
     const owner=x.owner||'Todos';
     const opts=(field,choices,value)=>'<select class="os-fu-inline-select" data-fu-row-field="'+field+'" data-fu-key="'+esc(x.key)+'" aria-label="'+esc(field+' de '+x.name)+'">'+choices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===value?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
     return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item">
-      <td class="os-fu-name"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+      <td class="os-fu-name"><span class="os-fu-agency-name"><span class="os-fu-agency-icon" aria-hidden="true">${icon.building}</span><span class="os-fu-agency-copy"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></span></span></td>
       <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
       <td>${opts('situation',situations,x.situation)}</td>
       <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
