@@ -2617,24 +2617,27 @@
     ? (snap?.catalog?.canonical||[]).filter(o=>o.key!=='sin_respuesta')
     : Object.entries(snap?.labels?.situations||{}).filter(([key])=>key!=='sin_respuesta').map(([key,label])=>({key,label}));
   const without=rows.filter(x=>!x.classification||x.status==='pendiente').length;
-  const facu=rows.filter(x=>x.status==='facu').length;
+  const facu=scope==='habita'?rows.length-without:rows.filter(x=>x.status==='facu').length;
   const any=scope!=='todas';
   const opts=(snap?.labels?.situations||{});
-  const newManual=stateReply.manual&&any?`<form class="card glass os-fu-manual-form" data-fu-manual-reply-form>
-    <div class="os-section-heading"><h2>Registrar una respuesta manual</h2><button type="button" class="btn small" data-fu="reply-manual">CERRAR</button></div>
+  const newManual=stateReply.manual&&any?`<form class="card glass os-fu-manual-form" data-fu-manual-reply-form data-testid="followup-reply-form">
+    <div class="os-section-heading"><h2>${scope==='habita'?'Registrar una respuesta':'Registrar una respuesta manual'}</h2><button type="button" class="btn small" data-fu="reply-manual">CERRAR</button></div>
     <p class="os-fu-caption">Usá este formulario cuando recibiste un mensaje que no quedó registrado por la extensión o la lectura de WhatsApp.</p>
-    <label class="field"><span>Contacto</span><select class="input" name="id" required><option value="">Elegí un contacto</option>
+    <label class="field"><span>${scope==='habita'?'Inmobiliaria':'Contacto'}</span><select class="input" name="id" required><option value="">Elegí…</option>
     ${[...new Map([...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope).map(x=>[x.id,x])).values()].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.stageTitle||'')}</option>`).join('')}</select></label>
-    <label class="field"><span>Texto original</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió…"></textarea></label>
+    <label class="field"><span>${scope==='habita'?'Lo que respondió (tal cual)':'Texto original'}</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió…"></textarea></label>
     <label class="field"><span>Clasificación</span><select class="input" name="clase"><option value="">${scope==="turnia"?"Sin clasificar (Turnia registra Neutro)":"Clasificar más tarde"}</option>
     ${allowed.map(x=>`<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('')}</select></label>
-    <button class="btn primary" type="submit">REGISTRAR RESPUESTA</button></form>`:'';
+    <button class="btn primary" type="submit">${scope==='habita'?'REGISTRAR':'REGISTRAR RESPUESTA'}</button></form>`:'';
   const item=selected?`
-    <div class="os-fu-conversation-head"><div><span class="os-kicker">CONVERSACIÓN SELECCIONADA</span><h2>${esc(selected.name)}</h2><p class="os-fu-caption">${esc(selected.phone||'')} · ${esc(selected.stage||'')}</p></div><span class="os-tag">${esc(fuName(selected.unit))}</span></div>
+    <div class="os-fu-conversation-head"><div><span class="os-kicker">${scope==='habita'?'RESPUESTA PENDIENTE':'CONVERSACIÓN SELECCIONADA'}</span>
+      <h2>${esc(selected.name)}</h2><p class="os-fu-caption">${esc(selected.phone||'')} · ${esc(selected.stage||'')}</p></div><span class="os-tag">${esc(fuName(selected.unit))}</span></div>
     <div class="os-fu-reply-bubble">${esc(selected.body||'No hay texto original registrado. Consultá WhatsApp antes de clasificar.')}<small>${esc(dayTime(selected.receivedAt)||'')}</small></div>
     ${selected.note?`<p class="os-fu-caption">Nota: ${esc(selected.note)}</p>`:''}
     <form data-fu-inbox-form data-fu-reply-key="${esc(selected.key)}">
-      <fieldset class="os-fu-reply-classes"><legend>CLASIFICACIÓN ${selected.confidence!=null?' · sugerida '+Math.round(selected.confidence*100)+'%':''}</legend>
+      <fieldset class="os-fu-reply-classes"><legend>CLASIFICACIÓN ${selected.classification&&selected.confidence!=null
+        ?' · la extensión sugirió «'+esc(opts[selected.classification]||selected.classification)+'» con '+Math.round(selected.confidence*100)+'%'
+        :selected.confidence!=null?' · sugerida '+Math.round(selected.confidence*100)+'%':''}</legend>
       <div class="os-fu-chips">${allowed.map(o=>`<label><input type="radio" name="clase" value="${esc(o.key)}" ${selected.classification===o.key?'checked':''}><span>${esc(o.label)}</span></label>`).join('')}</div></fieldset>
       ${selected.unit==='habita'?`<div class="os-fu-conditional" data-reply-condition="mas_adelante" ${selected.classification==="mas_adelante"?"":"hidden"}>
         <label class="field"><span>Retomar el contacto (opcional)</span><input class="input" type="date" name="hasta"></label></div>
@@ -2642,26 +2645,27 @@
         <label class="field"><span>Nombre de la nueva persona</span><input class="input" name="contactoNombre" maxlength="120"></label>
         <label class="field"><span>WhatsApp del referido</span><input class="input" name="contactoWhatsapp" maxlength="40"></label></div>`:''}
       <label class="field" style="margin-top:14px"><span>Observación (opcional)</span><textarea class="input" name="nota" rows="2" maxlength="700" placeholder="Contexto para la siguiente acción…"></textarea></label>
-      <div class="os-fu-actions"><button type="submit" class="btn primary" ${!selected.body?'disabled title="No hay texto para clasificar."':''}>APLICAR CLASIFICACIÓN</button>
-      ${selected.unit==='habita'?'<button type="submit" class="btn" name="facu" value="1">ENVIAR A REVISIÓN</button>':''}
+      <div class="os-fu-actions"><button type="submit" class="btn primary" data-testid="followup-reply-save" ${!selected.body?'disabled title="No hay texto para clasificar."':''}>${selected.unit==='habita'?'GUARDAR Y PASAR A LA COLA':'APLICAR CLASIFICACIÓN'}</button>
+      ${selected.unit==='habita'&&selected.status!=='facu'?'<button type="submit" class="btn" name="facu" value="1" data-testid="followup-reply-facu">ASIGNAR A FACU</button>':''}
       <button type="button" class="btn" data-fu="reply-to-queue" data-fu-id="${esc(selected.id)}">VER EN COLA →</button></div>
       <p class="os-fu-caption">Las bajas y solicitudes de no contactar quedan protegidas por el motor de cada producto. La clasificación no envía WhatsApp por sí sola.</p>
     </form>`:'<p class="empty">No hay respuestas pendientes.</p>';
-  return `<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
-    <h1>Conversaciones que importan.</h1><p>La misma bandeja del Follow-up de Habita: mensaje original, clasificación, contexto y siguiente acción. La conversación pertenece al producto.</p></div>
-    ${any?`<button class="btn" type="button" data-view="responder-legado">BANDEJA DE WHATSAPP ↗</button>`:''}</section>
+  return `${scope==='habita'?'':`<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
+    <h1>Conversaciones que importan.</h1><p>El mensaje original, la clasificación, el contexto y la siguiente acción pertenecen al motor del producto.</p></div>
+    ${any?`<button class="btn" type="button" data-view="responder-legado">BANDEJA DE WHATSAPP ↗</button>`:''}</section>`}
     <section class="os-fu-kpis" data-testid="followup-inbox">
-      <div class="os-fu-kpi"><span>SIN CLASIFICAR</span><strong>${int(without)}</strong><small>Requieren revisión</small></div>
-      <div class="os-fu-kpi"><span>PARA FACU</span><strong>${int(facu)}</strong><small>Respuestas especiales</small></div>
-      <div class="os-fu-kpi"><span>CONFIANZA MÍNIMA</span><strong>${scope==='habita'?'70%':'—'}</strong><small>${scope==='habita'?'Clasificación automática':'Clasificación por el equipo'}</small></div>
+      <div class="os-fu-kpi"><span>SIN CLASIFICAR</span><strong>${int(without)}</strong><small>${scope==='habita'?'la extensión no estaba segura o no las clasificó':'Requieren revisión'}</small></div>
+      <div class="os-fu-kpi"><span>PARA FACU</span><strong>${int(facu)}</strong><small>${scope==='habita'?'audios, preguntas no cubiertas, confianza baja':'Respuestas especiales'}</small></div>
+      <div class="os-fu-kpi"><span>${scope==='habita'?'MÍNIMO PARA APLICAR SOLA':'CONFIANZA MÍNIMA'}</span><strong>${scope==='habita'?'70%':'—'}</strong><small>${scope==='habita'?'de confianza en la clasificación':'Clasificación por el equipo'}</small></div>
       <button type="button" class="os-fu-kpi" data-fu="reply-manual" ${!any?'disabled':''} aria-expanded="${stateReply.manual}"><span>¿LLEGÓ UNA RESPUESTA?</span><strong>+</strong><small>Registrala a mano</small></button>
     </section>${newManual}
     <section class="card glass os-fu-inbox-grid"><div class="os-fu-conversation-list" aria-label="Respuestas pendientes">
-      ${rows.map(r=>`<button type="button" class="os-fu-conversation ${selected?.key===r.key?'is-on':''}" data-fu="reply-select" data-fu-key="${esc(r.key)}">
+      ${rows.map(r=>`<button type="button" class="os-fu-conversation ${selected?.key===r.key?'is-on':''}" data-fu="reply-select" data-fu-key="${esc(r.key)}" data-testid="followup-reply">
         <span class="os-fu-conv-head"><strong>${esc(r.name)}</strong><time>${esc(dayTime(r.receivedAt)||'')}</time></span>
         <span class="os-fu-conv-text">«${esc(r.body||'Mensaje sin texto guardado')}»</span>
-        <span class="os-fu-conv-status">${esc(r.status==='facu'?'PARA FACU':opts[r.classification]||r.classification||'SIN CLASIFICAR')}</span>
-      </button>`).join('')||'<p class="empty">No hay respuestas pendientes.</p>'}
+        <span class="os-fu-conv-tags"><span class="os-fu-conv-status">${esc(r.status==='facu'?'PARA FACU':opts[r.classification]||r.classification||'SIN CLASIFICAR')}</span>
+        ${r.confidence!=null?`<small>confianza ${Math.round(r.confidence*100)}%</small>`:''}</span>
+      </button>`).join('')||'<p class="empty">No hay respuestas sin resolver. Las que la extensión clasifica con confianza se aplican solas.</p>'}
     </div><div class="os-fu-reply-detail" data-testid="followup-reply-detail">${item}</div></section>${scope==='turnia'?historySearchHtml():''}`;
 }
 
