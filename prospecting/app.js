@@ -2761,6 +2761,7 @@
   });
   const custom=(snap.catalog?.states||[]).filter(s=>s.active&&(s.maps_to||s.product_stage===key)
     &&(s.commercial_stage===stageCommercial||(snap.catalog?.stages||[]).some(x=>x.key===s.commercial_stage&&x.technical_stage===key)));
+  const invalidCatalog=Boolean(r.catalog_situation&&!custom.some(s=>s.key===r.catalog_situation));
   const surveyed=r.action==='encuesta_cierre';
   const allowRejection=allowed.includes('encuesta_cierre');
   const days=[['DO',0],['LU',1],['MA',2],['MI',3],['JU',4],['VI',5],['SA',6]];
@@ -2775,10 +2776,11 @@
     <section class="fu-ref-when" data-testid="followup-part-when"><h3>◷ CUÁNDO SE EJECUTA</h3>
       ${create&&tpl?'<p class="os-warn-note">Regla copiada: revisá y adaptá la situación, el mensaje y la etapa antes de guardarla.</p>':''}
       <label class="field"><span>ETAPA DEL EMBUDO</span><input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled></label>
+      ${invalidCatalog?'<p class="os-warn-note" role="alert">Esta situación personalizada no está disponible en la etapa elegida. Seleccioná otra o quitá la condición antes de guardar.</p>':''}
       <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span><div class="fu-ref-classifiers" data-testid="followup-rule-situations">
         ${labels.map(([id,label])=>`<label><input type="checkbox" name="sit" value="${esc(id)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled title="Esta etapa no admite encuesta de cierre"':''}><span>${esc(label)}</span></label>`).join('')}
       </div></div>
-      ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation"><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
+      ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation" data-fu-rule-custom><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
       <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
         ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
       <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
@@ -2819,11 +2821,22 @@
     if(!create&&!rule)return;
     const action=String(fd.get('action')||rule?.action||'principal');
     const situations=fd.getAll('sit').map(String);
+    const catalogKey=String(fd.get('catalog_situation')||'');
+    const catalogState=(snap?.catalog?.states||[]).find(s=>s.key===catalogKey);
+    if(catalogKey&&(!catalogState||!catalogState.active)){
+      toast('La situación personalizada ya no está habilitada. Elegí una situación válida.',true);return;
+    }
+    if(catalogState?.source==='product'&&situations.length){
+      toast('La situación de producto no debe combinarse con situaciones de WhatsApp.',true);return;
+    }
+    if(catalogState?.source!=='product'&&catalogState?.maps_to&&!situations.includes(catalogState.maps_to)){
+      toast('La situación personalizada debe coincidir con la respuesta de WhatsApp que la define.',true);return;
+    }
     if(action==='encuesta_cierre'&&!situations.includes('rechazo')){toast('La encuesta de cierre requiere la situación No interesado.',true);return;}
     if(action!=='encuesta_cierre'&&situations.includes('rechazo')){toast('Para No interesado elegí la acción Encuesta de cierre.',true);return;}
     const values={...(rule||{stage:form.dataset.fuStage,position:Number(form.dataset.fuPosition)||10}),
       action, name:String(fd.get('name')||'').slice(0,80),situations,
-      catalog_situation:fd.get('catalog_situation')||null,
+      catalog_situation:catalogKey||null,
       min_demo_activity_level:Number(fd.get('min_demo_activity_level')||0),
       after_hours:Number(fd.get('after_hours')),after_action:fd.get('after_action')||null,
       hours_from:Number(fd.get('hours_from')),hours_to:Number(fd.get('hours_to')),
@@ -2880,13 +2893,16 @@
   const action=unit==='turnia'?'principal':rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
   const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
+  const shared=(snap.rules||[]).filter(r=>r.stage===stage&&r.action===action&&r.key!==rule?.key);
   return `<section class="fu-ref-message" data-testid="followup-rule-message">
     <div class="os-section-heading"><div><span class="os-kicker">MENSAJE VINCULADO A LA ACCIÓN</span><h3>${esc((snap.catalog?.actions?.[stage]||[]).find(a=>a.key===action)?.label||rule?.name||action)}</h3></div>
     <span class="os-tag">${versions.length} VERSIONES</span></div>
+    ${shared.length?`<p class="os-warn-note">Este mensaje también lo usan ${shared.length} ${shared.length===1?'regla':'reglas'} de la etapa. Editar la versión afecta a todas; para probar un texto distinto creá una nueva versión.</p>`:''}
     ${versions.map(v=>`<article class="fu-ref-version">
       <div class="fu-ref-version-top"><b>V${int(v.version)} · ${esc(v.status==='active'?'ACTIVA':v.status==='test'?'EN PRUEBA':'ARCHIVADA')}</b>
         <small>${int(v.executed)} enviadas · ${int(v.conversions)} conversiones</small></div>
       <p>${esc(v.body||'')}</p>
+      ${v.notes? `<p class="os-view-caption">Observaciones: ${esc(v.notes)}</p>`:''}
       <div class="fu-ref-buttons">${canEdit?`${unit==='habita'?`<button type="button" class="btn small" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR</button>`:''}
         ${v.status!=='active'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="active">ACTIVAR VERSIÓN</button>`:''}
         ${v.status==='test'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="archived">DETENER PRUEBA</button>`:''}`:''}</div>
@@ -2897,6 +2913,7 @@
       <form data-fu-version-form data-fu-unit-id="${unit}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}">
         <p class="os-view-caption">Cada versión queda registrada por separado para preservar las métricas de las anteriores.</p>
         <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>
+        <label class="field"><span>OBSERVACIONES PARA EL EQUIPO</span><textarea class="input" rows="3" name="notes" maxlength="2000" placeholder="Contexto para ejecutar esta versión…"></textarea></label>
         <div class="fu-ref-fields"><label class="field"><span>ACCIÓN</span><select class="input" name="action" aria-label="Acción">${(snap.catalog?.actions?.[stage]||[{key:action,label:action}]).map(a=>`<option value="${esc(a.key)}" ${a.key===action?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
         <label class="field"><span>ESTADO</span><select class="input" name="status"><option value="test">Probar 50/50</option><option value="active">Reemplazar versión activa</option></select></label></div>
         <button class="btn primary" type="submit" ${canEdit?'':'disabled title="Requiere sesión protegida"'}>GUARDAR NUEVA VERSIÓN</button>
@@ -3004,6 +3021,7 @@
         <small>${esc(r.when)}</small>
         <small>${esc(r.wait)}${r.enabled?'':' · APAGADA'}</small>
       </button>
+      ${unit==='habita'&&!readonly?`<button type="button" class="fu-catalog-toggle ${r.enabled?'is-on':''}" role="switch" aria-checked="${r.enabled}" aria-label="${r.enabled?'Apagar':'Activar'} regla P${i+1}" data-fu="rule-toggle" data-fu-unit-id="habita" data-fu-rule="${esc(r.key)}" ${ui.dirty?'disabled':''}><span></span>${r.enabled?'Activa':'Apagada'}</button>`:''}
       ${unit==='habita'&&!readonly?`<div class="fu-ref-reorder"><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="up" ${!i||ui.dirty?'disabled':''} aria-label="Subir regla" title="Subir prioridad">↑</button><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="down" ${i===rules.length-1||ui.dirty?'disabled':''} aria-label="Bajar regla" title="Bajar prioridad">↓</button></div>`:''}
     </div>
   </article>`).join('');
@@ -3359,7 +3377,7 @@
     const it = task && task.item;
     if (form.matches('[data-fu-version-form]')) {
       const unit = form.dataset.fuUnitId;
-      const valores = { stage: form.dataset.fuStage, action: fd.action || 'principal', channel: 'whatsapp', trigger: '', body: fd.body, ctas: ['whatsapp', 'demo', 'copy'], status: fd.status };
+      const valores = { stage: form.dataset.fuStage, action: fd.action || 'principal', channel: 'whatsapp', trigger: '', body: fd.body, notes: String(fd.notes||''), ctas: ['whatsapp', 'demo', 'copy'], status: fd.status };
       if (await fuOp(unit, { op: 'version-create', valores }, { label: 'Versión guardada.' })) loadFollowup();
       return;
     }
@@ -3382,6 +3400,32 @@
   }, true);
   document.addEventListener('change', (e) => {
     if(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))fuRulesState(state.unit).dirty=true;
+    if(e.target.matches('[data-fu-rule-custom]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      const catalog=state.fu.n?.units?.habita?.catalog;
+      const chosen=(catalog?.states||[]).find(s=>s.key===e.target.value);
+      if(form){
+        const boxes=[...form.querySelectorAll('input[name="sit"]')];
+        if(chosen){
+          const mapped=chosen.source==='product'?null:chosen.maps_to;
+          for(const cb of boxes)cb.checked=Boolean(mapped&&cb.value===mapped);
+          const action=form.querySelector('select[name="action"]');
+          if(action&&mapped==='rechazo'&&[...action.options].some(o=>o.value==='encuesta_cierre')){
+            action.value='encuesta_cierre';
+            form.querySelector('input[name="after_hours"]').value='0';
+            form.querySelector('select[name="after_action"]').value='';
+          }else if(action&&action.value==='encuesta_cierre'&&mapped!=='rechazo'){
+            action.value='principal';
+          }
+        }
+        fuRulesState(state.unit).dirty=true;
+      }
+    }
+    if(e.target.matches('[data-fu-rule-form] input[name="sit"]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      const custom=form?.querySelector('[data-fu-rule-custom]');
+      if(custom)custom.value='';
+    }
     if(e.target.matches('[data-fu-rule-form] input[name="sit"][value="rechazo"]')){
       const form=e.target.closest('[data-fu-rule-form]');
       if(form){
@@ -3399,6 +3443,8 @@
       const form=e.target.closest('[data-fu-rule-form]');
       if(form){
         const survey=e.target.value==='encuesta_cierre',reject=form.querySelector('input[name="sit"][value="rechazo"]');
+        const previous=form.querySelector('select[name="after_action"]');
+        if(previous&&previous.value===e.target.value)previous.value='';
         if(reject){reject.checked=survey;if(survey)for(const other of form.querySelectorAll('input[name="sit"]'))if(other!==reject)other.checked=false;}
         const wait=form.querySelector('input[name="after_hours"]');
         if(survey && wait)wait.value='0';
