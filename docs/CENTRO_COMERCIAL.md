@@ -1,5 +1,17 @@
 # Centro comercial: Chapa Labs + habita. + Turnia
 
+## Fuente de interacción actualizada: Habita 2a067b1 (09/11/2026)
+
+La fuente de verdad del diseño de interacción es `axellaban/amoblaia` `main` a commit `2a067b11298e9f36bb074d7245c312f2ac23b5e7`, verificado contra `4917aa7` (6 commits). Cualquier actualización posterior exige reconsultar esa fuente antes de afirmar paridad.
+
+- **Cola:** una sola fila de tarjetas comerciales (TODAS + siete etapas Habita); no duplicar el selector técnico. Turnia usa el mismo gesto con ocho etapas propias. Después KPIs, situaciones, resultados del contacto, filtros por regla, tabla y acción tomada.
+- **Respuestas:** dos columnas, listado y conversación; texto literal, clasificación y derivados; los motores se encargan de registrar y de prevenir envíos automáticos.
+- **Situaciones de origen producto (novedad):** `source=product` y `product_stage` en catálogo (validados en Habita por etapa), junto a los orígenes `whatsapp` y `manual`. Los filtros usan `productSituations[]`, sin inventar eventos.
+- **Reglas:** ampliar opciones según `catalog.actions[stage]` del motor (incluye `encuesta_cierre` en etapas tras demo donde Habita lo permite) y copiar una regla existente como borrador de otra etapa; guardar sigue sujeto a compatibilidad y validaciones de Habita. El reminder de actividad de cuenta aparece por su definición en el catálogo, no por hardcode.
+- **Turnia:** conserva sus mensajes, consentimientos, cadencias y cambios de etapa; la UI es análoga. El catálogo editable y reglas avanzadas de Turnia aún requieren contratos equivalentes. No declarar paridad al 100% hasta completar esa parte.
+- **Nunca validar un despliegue solo por el build:** ejecutar pruebas de cola, respuestas, QA, locks, encuestas y clasificación por evento, incluyendo 10 acciones controladas por negocio. Distinguir estado `main`, preview, CI y producción.
+
+
 ## Commercial OS · navegación centralizada (09/11/2026)
 
 Chapa Labs adopta un único workspace con selector **General / habita. / Turnia**. El diseño se comparte; los motores y bases siguen separados.
