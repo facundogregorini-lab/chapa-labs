@@ -2643,6 +2643,8 @@
     const messages=active?rawMessages:preview?[preview]:[];
     const notes=[x.situationNote,active?task.notes:version?.notes].filter(Boolean);
     const uniqueNotes=[...new Set(notes)];
+    const warnings=active?(task.warnings||[]):[];
+    const checklist=active?(task.checklist||[]):[];
     const digits=String(x.phone||'').replace(/\D/g,'');
     const waUrl=active?task.whatsappUrl:(digits.length>=8&&digits.length<=15?'https://web.whatsapp.com/send?phone='+digits:'');
     const me=state.session?.user?.name,locked=x.claim&&x.claim.by!==me;
@@ -2668,16 +2670,18 @@
       +'<label>CAMBIAR SITUACIÓN'+fuQueueSituationSelect(x,true)+'</label>'
       +'<label>QUIÉN LO TOMA'+fuQueueOwnerSelect(x)+'</label></div>'
       +'<div class="os-fu-desktop-actions">'+wa
+      +(active&&digits.length>=8&&digits.length<=15?'<a class="btn os-fu-next-without" href="https://web.whatsapp.com/send?phone='+digits+'" target="chapa-whatsapp" data-fu="open-native">Abrir sin texto</a>':'')
       +(active?'<button type="button" class="btn os-fu-confirm" data-fu="confirm" data-testid="fu-confirm-desktop">✓ Confirmar envío</button>'
         +'<button type="button" class="btn primary os-fu-confirm-next" data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop">✓ Confirmar envío y siguiente →</button>'
         +'<button type="button" class="btn os-fu-next-without" data-fu="next-after">Siguiente sin confirmar →</button>'
         :executable?'<button type="button" class="btn primary os-fu-claim" data-fu="claim" data-fu-key="'+esc(x.key)+'">EJECUTAR ESTA →</button>':'')
       +'</div>'
       +(status?'<p class="os-fu-desktop-alert">'+esc(status)+'</p>':'')
-      +'<section class="os-fu-desktop-card os-fu-desktop-info"><h3>Información del contacto</h3>'
-      +'<dl><dt>WhatsApp</dt><dd>'+esc(x.phone||'—')+'</dd><dt>Último contacto</dt><dd>'+esc(ago(x.since)||'—')+'</dd>'
-      +'<dt>Actividad</dt><dd>'+esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'—')+'</dd>'
-      +'<dt>Prioridad</dt><dd>'+esc(F.PRIORITY_LABEL[x.priority]||'—')+'</dd><dt>Zona</dt><dd>'+esc(x.zone||'—')+'</dd></dl></section>'
+      +(active&&(warnings.length||checklist.length)?'<section class="os-fu-desktop-card os-fu-desktop-qa" data-testid="fu-desktop-qa">'
+        +'<h3>Control antes de enviar</h3>'
+        +warnings.map(v=>'<p class="os-fu-desktop-warning">'+esc(v)+'</p>').join('')
+        +checklist.map(v=>'<p class="os-fu-desktop-check" data-ok="'+Boolean(v.ok)+'">'+(v.ok?'✓ ':'⚠ ')+esc(v.label)+(v.note?' · '+esc(v.note):'')+'</p>').join('')
+        +'</section>':'')
       +'<section class="os-fu-desktop-card os-fu-desktop-next"><h3>◎ Próxima acción</h3>'
       +'<strong>'+esc(x.action||x.actionReason||'Sin acción pendiente')+'</strong></section>'
       +'<section class="os-fu-desktop-card" data-testid="fu-desktop-message"><h3>Mensaje de WhatsApp '+(active?'':'· vista previa')+'</h3>'
@@ -2686,6 +2690,10 @@
       +(uniqueNotes.length?uniqueNotes.map(v=>'<p class="os-fu-desktop-observation">'+esc(v)+'</p>').join(''):'<p class="os-fu-desktop-muted">Sin observaciones registradas.</p>')
       +'</section>'
       +(x.situationNote?'<section class="os-fu-desktop-card"><h3>Qué dijo</h3><p class="os-fu-desktop-observation">'+esc(x.situationNote)+'</p></section>':'')
+      +'<section class="os-fu-desktop-card os-fu-desktop-info"><h3>Información del contacto</h3>'
+      +'<dl><dt>WhatsApp</dt><dd>'+esc(x.phone||'—')+'</dd><dt>Último contacto</dt><dd>'+esc(ago(x.since)||'—')+'</dd>'
+      +'<dt>Actividad</dt><dd>'+esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'—')+'</dd>'
+      +'<dt>Prioridad</dt><dd>'+esc(F.PRIORITY_LABEL[x.priority]||'—')+'</dd><dt>Zona</dt><dd>'+esc(x.zone||'—')+'</dd></dl></section>'
       +(active?'<details class="os-fu-desktop-advanced"><summary>Otras acciones · registrar fallo o reprogramar</summary>'
         +'<form class="section" data-fu-fail><label>Si no salió el mensaje<input class="input" name="motivo" placeholder="Motivo"></label>'
         +'<select class="input" name="tipo"><option value="">Otro motivo</option><option value="sin_whatsapp">Sin WhatsApp</option><option value="numero_incorrecto">Número incorrecto</option></select>'
