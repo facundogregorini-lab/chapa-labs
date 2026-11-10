@@ -3515,7 +3515,7 @@
           <summary class="btn os-fu-reclassify-cta" data-testid="fu-reclassify-open">Reclasificar</summary>
           <div class="os-fu-reclassify-body">
             ${t.unit==='habita'? `<form data-fu-change-stage>
-              <label>Etapa del funnel<select class="input" name="etapa" required>${(snap?.stages||[]).map(v=>`<option value="${esc(v.key)}" ${v.key===it.stage?'selected':''}>${esc(v.title)}</option>`).join('')}</select></label>
+              <label>Etapa comercial<select class="input" name="etapa" required>${F.commercialStages('habita',snap).filter(v=>v.technical.length>0 && !v.situation).map(v=>`<option value="${esc(v.technical.includes(it.stage)?it.stage:v.technical[0])}" ${v.technical.includes(it.stage)?'selected':''}>${esc(v.title)}</option>`).join('')}</select></label>
               <button type="submit" class="btn primary">Guardar etapa</button>
             </form>`:''}
             <form data-fu-change-situation>
@@ -3892,7 +3892,7 @@
   }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(form.matches('[data-fu-chart-range]')){
@@ -3926,13 +3926,39 @@
     if (!task) return;
     if (form.matches('[data-fu-change-stage]')) {
       if(task.unit!=='habita')return;
-      if(await fuOp(task.unit,{op:'stage',inmobiliaria:it.id,etapa:fd.etapa},{label:'Etapa actualizada.'})){
-        state.fu.task=null;await loadFollowup({quiet:true});render();
+      const stage=String(fd.etapa||'');
+      const stages=F.commercialStages('habita',state.fu.n?.units?.habita);
+      // UI labels are commercial stages. Backend expects the technical
+      // representative key, never a situation or composite stage key.
+      if(!stages.some(v=>v.technical.includes(stage)&&!v.situation)){
+        toast('La etapa elegida no es válida para Habita.',true);return;
       }
+      const result=await fuOp(task.unit,{op:'stage',inmobiliaria:it.id,etapa:stage});
+      if(!result)return;
+      if(result.stage!==stage){
+        toast('El servidor no confirmó la etapa. Revisá el estado antes de continuar.',true);return;
+      }
+      toast('Etapa comercial guardada.');
+      // Action/claim was prepared for previous stage. Avoid a stale send.
+      state.fu.task=null;
+      render();
+      void loadFollowup({quiet:true});
     } else if (form.matches('[data-fu-change-situation]')) {
-      if(await fuOp(task.unit,{op:'situation',inmobiliaria:it.id,situacion:fd.situacion,texto:fd.texto},{label:'Situación actualizada.'})){
-        state.fu.task=null;await loadFollowup({quiet:true});render();
+      const situation=String(fd.situacion||'');
+      const known=state.fu.n?.units?.[task.unit]?.labels?.situations||{};
+      if(!Object.prototype.hasOwnProperty.call(known,situation)){
+        toast('La situación seleccionada no es válida.',true);return;
       }
+      const result=await fuOp(task.unit,{op:'situation',inmobiliaria:it.id,situacion:situation,texto:fd.texto});
+      if(!result)return;
+      if(result.situation!==situation){
+        toast('El servidor no confirmó la situación. Revisá el estado antes de continuar.',true);return;
+      }
+      toast('Situación guardada.');
+      // A new situation can invalidate the proposed action; refresh queue.
+      state.fu.task=null;
+      render();
+      void loadFollowup({quiet:true});
     } else if (form.matches('[data-fu-situation]')) {
       if (await fuOp(task.unit, { op: 'situation', inmobiliaria: it.id, situacion: fd.situacion, texto: fd.texto }, { label: 'Situación guardada.' })) { state.fu.task = null; loadFollowup(); }
     } else if (form.matches('[data-fu-reply]')) {
