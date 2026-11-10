@@ -3464,7 +3464,7 @@
         <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.
           ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
         </p>
-        <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile" data-arm="Confirmar: el mensaje salió">✓ Confirmar envío</button>
+        <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile">✓ Confirmar envío</button>
         <button type="button" class="btn os-fu-mobile-next" data-fu="next-after" data-testid="fu-next-mobile"
           aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
         <p class="os-fu-mobile-next-note">Si no enviaste el mensaje, esta tarea queda libre sin marcarla como enviada.</p>
@@ -3487,7 +3487,7 @@
         </section>
         <section class="card glass os-fu-execution-card"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
           ${exec && t.checklist.length ? `<ul class="history" data-testid="fu-checklist">${t.checklist.map((c) => `<li data-check="${esc(c.key)}" data-ok="${c.ok}"><time>${c.ok ? '✓' : '✗'}</time><span><strong>${esc(c.label)}</strong>${c.note ? ` · ${esc(c.note)}` : ''}</span></li>`).join('')}</ul>` : ''}
-          ${exec ? `<div class="btns os-fu-execution-primary">${whatsappActions}<button class="btn" type="button" data-fu="confirm" data-testid="fu-confirm" data-arm="Confirmar: el mensaje salió">Confirmar envío</button></div>
+          ${exec ? `<div class="btns os-fu-execution-primary">${whatsappActions}<button class="btn" type="button" data-fu="confirm" data-testid="fu-confirm">Confirmar envío</button></div>
             <p class="sub" style="margin:0">Abrir el chat no cuenta. Confirmá cuando lo veas enviado; si el número del chat no coincide, no lo mandes.</p>
             <form class="section" data-fu-fail><h3>No salió</h3><input class="input" name="motivo" placeholder="Por qué" aria-label="Motivo"><select class="input" name="tipo" aria-label="Tipo"><option value="">Otro motivo</option><option value="sin_whatsapp">No tiene WhatsApp</option><option value="numero_incorrecto">Número incorrecto</option></select><button class="btn small" type="submit">Registrar que no salió</button></form>` : ''}
           <form class="section" data-fu-snooze><h3>Omitir o reprogramar</h3><div class="btns">${[['1', 'Mañana'], ['3', 'En 3 días'], ['7', 'En una semana']].map(([d, l]) => `<button class="btn small" type="button" data-fu="snooze-days" data-fu-days="${d}">${l}</button>`).join('')}</div><input class="input" type="date" name="hasta" aria-label="Otra fecha"><input class="input" name="motivo" placeholder="Motivo (opcional)"><button class="btn small" type="submit">Reprogramar</button>${it.snoozedUntil ? `<button class="btn small ghost" type="button" data-fu="unsnooze">Volver a la cola</button>` : ''}</form>
@@ -3689,15 +3689,25 @@
         break;
       }
       case 'confirm': {
-        if(!task||task.mode!=='ejecutar')break;
-        const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: task.messages.join('\n\n') || task.message }, { label: 'Envío confirmado.' });
-        if (r) {
-          // Keep the completed item only as a receipt so the operator can
-          // explicitly take the next task. Never send/confirm it again.
-          state.fu.task = {...task,mode:'confirmado',confirmedAt:new Date().toISOString()};
+        if(!task||task.mode!=='ejecutar'||state.fu.busy)break;
+        // One deliberate tap saves the send. Generic two-tap arming previously
+        // swallowed the first tap on mobile; do not arm this action.
+        // Only show success after the upstream has persisted status "sent".
+        t.disabled=true;
+        t.textContent='Guardando envío…';
+        t.setAttribute('aria-busy','true');
+        const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: (task.messages||[]).join('\\n\\n') || task.message });
+        if(r?.execution?.status==='sent'){
+          state.fu.task={...task,mode:'confirmado',confirmedAt:r.execution.at||new Date().toISOString()};
+          toast('Envío guardado y confirmado.');
           render();
           window.scrollTo({top:0,behavior:'smooth'});
           await loadFollowup({quiet:true});
+        }else{
+          // A rejected or ambiguous reply is NOT proof of persistence.
+          // Keep the task intact to safely inspect before retrying.
+          if(r)toast('El servidor no confirmó el guardado. Verificá el historial antes de reintentar.',true);
+          if(t.isConnected){t.disabled=false;t.removeAttribute('aria-busy');t.textContent='✓ Confirmar envío';}
         }
         break;
       }
