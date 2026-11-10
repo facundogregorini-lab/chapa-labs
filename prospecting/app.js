@@ -2347,9 +2347,16 @@
       if(previous?.mode==='ejecutar'){
         const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
         if(!released)return;
+        // The old claim is no longer held. Do not leave a stale 'ejecutar'
+        // task visible if claiming the new one fails.
+        state.fu.task=null;
       }
       // The server validates the new claim; no speculative "sent" state.
-      await fuClaim(next);
+      const claimed=await fuClaim(next);
+      if(!claimed && !state.fu.task) {
+        render();
+        void loadFollowup({quiet:true});
+      }
     } finally {
       state.fu.advancing=false;
       if(clicked?.isConnected&&clicked?.dataset?.fu==='next-after'){
