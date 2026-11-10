@@ -2723,7 +2723,7 @@
   function fuRulesMessage(unit, snap, rule, stage, create) {
   if(create)return `<section class="fu-ref-message"><h3>Mensaje de esta acción</h3>
     <p class="os-view-caption">Primero guardá la nueva regla. Después vas a poder asociarle un mensaje o reutilizar las versiones existentes de esa acción.</p></section>`;
-  const action=rule?.action||'principal';
+  const action=unit==='turnia'?'principal':rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
   const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
   return `<section class="fu-ref-message" data-testid="followup-rule-message">
@@ -2828,9 +2828,7 @@
   const message=stage&&!ui.creating?fuRulesMessage(unit,snap,raw,stage,false):fuRulesMessage(unit,snap,raw,stage,true);
   const addAllowed=unit==='habita'&&!readonly&&tech.length>0;
   const safeRules=rules.map(r=>r.raw);
-  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / REGLAS Y MENSAJES</span><h1>Reglas que hacen avanzar.</h1>
-    <p>Elegí una etapa, seleccioná una regla a la izquierda y editá sus condiciones y mensajes a la derecha, igual que en el Follow-up de Habita.</p></div></section>
-    ${state.session?.open?'<p class="os-warn-note">La sesión abierta no permite editar reglas ni mensajes. Configurá PROSPECTING_PASSWORD en Vercel.</p>':''}
+  return `${state.session?.open?'<p class="os-warn-note">La sesión abierta no permite editar reglas ni mensajes. Configurá PROSPECTING_PASSWORD en Vercel.</p>':''}
     <section class="fu-ref-flowrow" data-testid="followup-flow"><span class="fu-ref-flow-label">ETAPAS COMERCIALES</span><nav class="fu-ref-flow" aria-label="Etapas comerciales">
       ${commercial.map((s,i)=>`<button type="button" class="fu-ref-flowstep ${active?.key===s.key?'is-on':''}" data-fu="rules-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${active?.key===s.key}" data-testid="followup-commercial-stage">
         <span class="fu-ref-num">${i+1}</span><span><b>${esc(s.title)}</b><small>${int(s.waiting)} esperando</small></span></button>${i<commercial.length-1?'<span class="fu-ref-arrow" aria-hidden="true">›</span>':''}`).join('')}
