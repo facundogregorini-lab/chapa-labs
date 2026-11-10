@@ -2660,6 +2660,18 @@
   if(!Array.isArray(chart)||!Array.isArray(lostAt)||!Array.isArray(rows))
     return `<div class="os-funnel-note" data-testid="followup-native-chart-unavailable">El embudo histórico original todavía no está disponible en la API. El resumen de etapas y reglas se mantiene debajo.</div>`;
   const period=fuChartPeriod(),focus=state.fu.chartFocus||null;
+  // The exact labels and source explanations of Habita's
+  // CommercialFunnelChart, not generic "del paso anterior" placeholders.
+  const stayedLabels=[
+    'Sin interés todavía','Interesados, sin demo','No se enviaron',
+    'No abrieron la demo','Visitaron, sin interactuar',
+    'Interactuaron, sin cuenta','Cuenta sin uso','Sin suscripción',
+  ];
+  const previousLabels=[
+    '', 'de los contactados','de los interesados','de las creadas',
+    'de las enviadas','de las visitadas','de las que interactuaron',
+    'de las cuentas creadas','de las cuentas activas',
+  ];
   const counts=chart.map(x=>Number(x.count)||0),max=Math.max(0,...counts);
   const below=counts.filter(n=>n>0&&n<=max*.3),limit=below.length?Math.max(...below)*1.25:max;
   const broken=max>0&&limit<max/3;
@@ -2683,7 +2695,7 @@
     const label=x.label||`Paso ${i+1}`;
     return `<li class="os-native-step">
       <button type="button" class="os-native-step-top ${selected?'is-on':''}" aria-pressed="${selected}" data-fu="funnel-select" data-fu-step="${i}" data-fu-mode="arrived"
-        title="Ver las ${int(count)} que llegaron a ${esc(label)}"><strong>${int(count)}</strong><small>${i===0?'Base del período':x.ofPrevious==null?'—':`${int(x.ofPrevious)}% del paso anterior`}</small></button>
+        title="Ver las ${int(count)} que llegaron a ${esc(label)}"><strong>${int(count)}</strong><small>${i===0?'Base del período':x.ofPrevious==null?'—':`${int(x.ofPrevious)}% ${esc(previousLabels[i]||'del paso anterior')}`}</small></button>
       <div class="os-native-step-plot">
         ${count?`<div class="os-native-bar ${broken&&count>limit?'is-broken':''}" style="height:max(${full.toFixed(3)}%,${(stayed>0?1:0)+(lost>0?1:0)+(advanced>0?1:0)*24}px)">
           ${segment(i,'stayed',stayed,`se quedaron en ${label}`,`flex-grow:${stayed+lost?(rest*stayed/(stayed+lost)).toFixed(3):0}`)}
@@ -2691,7 +2703,10 @@
           ${broken&&count>limit&&(stayed>0||lost>0)&&advanced>0?'<span class="os-native-break" aria-hidden="true"></span>':''}
           ${segment(i,'advanced',advanced,last?'clientes pagos':`pasaron a ${chart[i+1]?.label||'el siguiente paso'}`,`flex-grow:${Math.max(1,went).toFixed(3)}`,last?'is-last':'')}
         </div>`:'<span class="os-native-zero"></span>'}
-      </div><div class="os-native-step-label"><b>${i+1}. ${esc(label)}</b><small>${int(stayed)} permanecen${lost?` · ${int(lost)} perdidas`:''}</small></div></li>`;
+      </div><div class="os-native-step-label"><b>${i+1}. ${esc(label)}</b>
+        ${last?'<small class="is-went">Clientes pagos</small>':stayed>0?`<small class="is-stayed">${int(stayed)} ${esc((stayedLabels[i]||'sin avanzar').toLocaleLowerCase('es-AR'))}</small>`:(!lost?'<small>&nbsp;</small>':'')}
+        ${lost?`<small class="is-lost">${int(lost)} perdidas</small>`:''}
+      </div></li>`;
   }).join('');
   let detail='';
   if(focus){
@@ -2716,7 +2731,7 @@
       </tbody></table></div>${chosen.length>300?'<p class="os-fu-caption">Se muestran las primeras 300.</p>':''}</section>`;
   }
   return `<section class="os-native-funnel" data-testid="followup-native-funnel">
-    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El porcentaje compara con el anterior.</p></div>
+    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
       <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
         <form data-fu-chart-range><label>Desde <input class="input" type="date" name="desde" value="${esc(period.from||'')}"></label>
           <label>Hasta <input class="input" type="date" name="hasta" value="${esc(period.to||'')}"></label>
@@ -2724,7 +2739,7 @@
     <div class="os-native-legend"><span><i class="is-went"></i>Pasaron al paso siguiente</span>
       <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>Perdidas (no interesadas)</span></div>
     <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
-    <p class="os-native-note">Elegí una cifra o un segmento de barra para consultar sus inmobiliarias. Los datos, el período y las pérdidas provienen del embudo original de Habita; las barras grandes pueden mostrar un corte de escala.</p>
+    <p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>
     ${detail}
   </section>`;
 }
