@@ -135,6 +135,57 @@ test('sin contraseña el panel queda abierto y solo pide un nombre', async () =>
   }
 });
 
+test('Habita experimental: la sesión por nombre permite editar sin PROSPECTING_PASSWORD, pero no Turnia ni visitantes anónimos', async () => {
+  const oldPassword=process.env.PROSPECTING_PASSWORD;
+  const oldHabita=process.env.HABITA_METRICS_SECRET;
+  const oldTurnia=process.env.TURNIA_METRICS_SECRET;
+  const realFetch=global.fetch;
+  delete process.env.PROSPECTING_PASSWORD;
+  process.env.HABITA_METRICS_SECRET='h'.repeat(40);
+  process.env.TURNIA_METRICS_SECRET='t'.repeat(40);
+  const calls=[];
+  global.fetch=async(url,opts={})=>{
+    calls.push({url:String(url),method:opts.method,body:opts.body?JSON.parse(opts.body):null});
+    return {ok:true,status:200,json:async()=>({ok:true,rule:{key:'demo'}})};
+  };
+  try {
+    const operation={unit:'habita',followup:{op:'rule-save',regla:{key:'demo',enabled:true}}};
+    const notLogged=await call('task',{method:'POST',body:operation});
+    assert.equal(notLogged.statusCode,401);
+    assert.equal(calls.length,0);
+
+    const login=await call('login',{method:'POST',body:{name:'Facu'}});
+    assert.equal(login.statusCode,200);
+    const openedCookie=login.headers['set-cookie'].split(';')[0];
+    const actions=[
+      'rule-save','rule-delete','rule-reorder','version-create','version-update',
+      'version-status','stage-create','state-save','state-delete','state-toggle'
+    ];
+    for(const op of actions){
+      const response=await call('task',{method:'POST',cookie:openedCookie,
+        body:{unit:'habita',followup:{op,regla:{key:'demo'}}}});
+      assert.equal(response.statusCode,200,op+': '+JSON.stringify(response.body));
+    }
+    assert.equal(calls.length,actions.length);
+    assert.ok(calls.every(x=>x.url.includes('habitaia')&&x.method==='POST'));
+    assert.ok(calls.every(x=>x.body.by==='Facu'));
+    assert.deepEqual(calls.map(x=>x.body.followup.op),actions);
+
+    const other=await call('task',{method:'POST',cookie:openedCookie,
+      body:{unit:'turnia',followup:{op:'rule-save',regla:{key:'demo'}}}});
+    assert.equal(other.statusCode,403);
+    assert.equal(calls.length,actions.length,'Turnia sensitive writes stay blocked in open mode');
+  }finally{
+    global.fetch=realFetch;
+    if(oldPassword===undefined)delete process.env.PROSPECTING_PASSWORD;
+    else process.env.PROSPECTING_PASSWORD=oldPassword;
+    if(oldHabita===undefined)delete process.env.HABITA_METRICS_SECRET;
+    else process.env.HABITA_METRICS_SECRET=oldHabita;
+    if(oldTurnia===undefined)delete process.env.TURNIA_METRICS_SECRET;
+    else process.env.TURNIA_METRICS_SECRET=oldTurnia;
+  }
+});
+
 test('unidad sin planilla configurada', async () => {
   delete process.env.TURNIA_PROSPECTING_SHEET_ID;
   const r = await call('data', { query: { unit: 'turnia' }, cookie });

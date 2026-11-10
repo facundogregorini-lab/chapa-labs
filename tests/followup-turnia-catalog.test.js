@@ -10,7 +10,7 @@ test('Same stage/situation editor writes through product-owned API for both busi
   assert.match(app,/fuOp\(unit,\{op:'stage-create'/);
   assert.match(app,/fuOp\(unit,\{op:'state-save'/);
   assert.match(app,/fuOp\(state\.unit,\{op:'state-toggle'/);
-  assert.match(app,/db\.available===true&&!state\.session\?\.open/);
+  assert.match(app,/db\.available===true&&\(unit==='habita'\|\|!state\.session\?\.open\)/);
 });
 test('Turnia custom stages remain additive without modifying the native eight-stage funnel',()=>{
   const F=require('../prospecting/followup.js');

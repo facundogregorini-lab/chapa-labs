@@ -483,7 +483,9 @@
   function fuCatalog() {
   const unit=fuScope(),snap=state.fu.n?.units?.[unit];
   if(!snap)return '<section class="card glass">Catálogo no disponible.</section>';
-  const db=snap.catalog||{},canEdit=db.available===true&&!state.session?.open;
+  // Habita experimental: an existing operator session enables catalog editing
+  // without an additional shared password. Backend is the source of authority.
+  const db=snap.catalog||{},canEdit=db.available===true&&(unit==='habita'||!state.session?.open);
   const steps=F.commercialStages(unit,snap),selected=steps.find(s=>s.key===state.fu.catalogStage)||steps.find(s=>s.key==='contactado')||steps[0];
   const key=selected?.key||'contactado',canonical=Object.entries(snap.labels?.situations||{});
   const overrides=(db.overrides||[]).filter(x=>x.commercial_stage===key);
@@ -546,7 +548,7 @@
         data-fu-commercial="${esc(key)}" aria-label="Eliminar ${esc(s.label)}" ${canEdit?'':'disabled'}>×</button></li>`;
   }).join('');
   return `<section class="fu-catalog-reference" data-testid="followup-state-catalog">
-    ${!canEdit?`<p class="os-warn-note">${state.session?.open?'Para editar, configurá PROSPECTING_PASSWORD en Vercel.':'El catálogo está en modo lectura hasta que la API del producto esté disponible.'}</p>`:''}
+    ${!canEdit?`<p class="os-warn-note">${db.available!==true?'El catálogo está en modo lectura hasta que la API del producto esté disponible.':'La edición de Turnia requiere una sesión protegida.'}</p>`:''}
     <div class="fu-catalog-layout"><aside class="fu-catalog-nav"><header><h2>Etapas del embudo</h2></header>
       <button class="btn" type="button" data-fu="new-stage" ${canEdit?'':'disabled'}>${state.fu.newStage?'CANCELAR':'+ NUEVA ETAPA'}</button>
       <nav aria-label="Etapas del embudo">${steps.map(s=>`<button type="button" aria-pressed="${s.key===key}" data-fu="catalog-stage" data-fu-stage="${esc(s.key)}">
@@ -3135,7 +3137,7 @@
 </section>`;
   const action=unit==='turnia'?'principal':rule?.action||'principal';
   const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
-  const canEdit=!state.session?.open && (unit==='habita'||snap.catalog?.available);
+  const canEdit=unit==='habita'||(!state.session?.open&&snap.catalog?.available);
   const shared=(snap.rules||[]).filter(r=>r.stage===stage&&r.action===action&&r.key!==rule?.key);
   return `<section class="fu-ref-message" data-testid="followup-rule-message">
     <div class="os-section-heading"><div><span class="os-kicker">MENSAJE VINCULADO A LA ACCIÓN</span><h3>${esc((snap.catalog?.actions?.[stage]||[]).find(a=>a.key===action)?.label||rule?.name||action)}</h3></div>
@@ -3287,7 +3289,7 @@
   state.fu.ruleEdit=ui.creating?'__new':selected?.key||null;
   state.fu.ruleDraftStage=stage;
   state.fu.ruleTemplate=ui.creating?ui.template:null;
-  const readonly=state.session?.open||unit==='turnia'&&!snap.catalog?.available;
+  const readonly=unit==='turnia'&&(state.session?.open||!snap.catalog?.available);
   const versions=F.versionRows(unit,snap);
   const raw=selected?.raw||null;
   const labels=snap.labels?.situations||{};
@@ -3310,7 +3312,7 @@
   const preview=stage?fuRulePreview(unit,snap,raw,stage,ui.creating):'';
   const addAllowed=unit==='habita'&&!readonly&&tech.length>0;
   const safeRules=rules.map(r=>r.raw);
-  return `${state.session?.open?'<p class="os-warn-note">La sesión abierta no permite editar reglas ni mensajes. Configurá PROSPECTING_PASSWORD en Vercel.</p>':''}
+  return `${unit==='turnia'&&state.session?.open?'<p class="os-warn-note">La edición de Turnia requiere una sesión protegida.</p>':''}
     <section class="fu-ref-flowrow" data-testid="followup-flow"><span class="fu-ref-flow-label">ETAPAS COMERCIALES</span><nav class="fu-ref-flow" aria-label="Etapas comerciales">
       ${commercial.map((s,i)=>`<button type="button" class="fu-ref-flowstep ${active?.key===s.key?'is-on':''}" data-fu="rules-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${active?.key===s.key}" data-testid="followup-commercial-stage">
         <span class="fu-ref-num">${i+1}</span><span><b>${esc(s.title)}</b><small>${int(s.waiting)} esperando</small></span></button>${i<commercial.length-1?'<span class="fu-ref-arrow" aria-hidden="true">›</span>':''}`).join('')}
