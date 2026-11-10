@@ -3732,6 +3732,17 @@
         fuRulesState(state.unit).dirty=true;
       }
     }
+    if(e.target.matches('[data-fu-rule-version]')){
+      const form=e.target.closest('[data-fu-rule-form]');
+      state.fu.previewVersion=e.target.value||null;
+      const snap=state.fu.n?.units?.habita;
+      const preview=main.querySelector('[data-testid="followup-preview"]');
+      if(form&&snap&&preview){
+        const original=(snap.rules||[]).find(r=>r.key===form.dataset.fuRuleKey);
+        const updated={...(original||{}),action:form.querySelector('[data-fu-rule-action]')?.value||'principal'};
+        preview.outerHTML=fuRulePreview('habita',snap,updated,form.dataset.fuStage,!form.dataset.fuRuleKey);
+      }
+    }
     if(e.target.matches('[data-fu-rule-action]')){
       const form=e.target.closest('[data-fu-rule-form]');
       if(form){
@@ -3768,6 +3779,8 @@
     if(e.target.matches('[data-fu-queue-select]')){
       const q=fuQueueState();q[e.target.dataset.fuQueueSelect]=e.target.value||null;q.limit=25;render();
     }
+    if(e.target.matches('[data-fu-rule-action], [data-fu-rule-custom], [data-fu-rule-add-sit]'))
+      syncFuLinkedRulePanel(e.target.closest('[data-fu-rule-form]'));
   });
   document.addEventListener('toggle', (e) => {
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
