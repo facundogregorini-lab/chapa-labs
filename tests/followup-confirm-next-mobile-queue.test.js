@@ -213,3 +213,29 @@ test('Handoff moves execution to Facu or Axel via durable API operation',()=>{
   assert.match(app,/op:'handoff',inmobiliaria:it\.id,para:to/);
   assert.match(app,/Tarea pasada a/);
 });
+
+test('Confirmar y siguiente only advances on confirmed server receipt',()=>{
+  const start=app.indexOf("case 'confirm': {"),end=app.indexOf("case 'next-after':",start);
+  const handler=app.slice(start,end);
+  assert.ok(start>0&&end>start);
+  assert.match(app,/case 'confirm-and-next':/);
+  assert.match(app,/data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop"/);
+  assert.match(handler,/r\?\.execution\?\.status==='sent'/);
+  assert.match(handler,/if\(advanceAfterConfirmed\)await fuNext\(t\)/);
+  assert.ok(handler.indexOf("r?.execution?.status==='sent'")<handler.indexOf("if(advanceAfterConfirmed)await fuNext(t)"));
+  assert.match(css,/\.os-fu-confirm-next\{/);
+});
+
+test('Desktop preview shows next action, WhatsApp message and actual version notes before secondary detail',()=>{
+  const start=app.indexOf('function fuRecommended(');
+  const end=app.indexOf('function fuHoy()',start);
+  const body=app.slice(start,end);
+  assert.ok(start>0&&end>start);
+  const action=body.indexOf('Próxima acción</strong>');
+  const message=body.indexOf('Mensaje de WhatsApp · borrador');
+  const observations=body.indexOf('Observaciones</strong>');
+  const contact=body.indexOf('Información del contacto</strong>');
+  assert.ok(action>=0&&message>action&&observations>message&&contact>observations);
+  assert.match(body,/const observations=\[x\.situationNote,version\?\.notes\]/);
+  assert.match(body,/esc\(observations\|\|'Sin observaciones registradas\.'/);
+});
