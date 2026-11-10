@@ -1571,3 +1571,14 @@ body[data-unit="habita"] .os-fu-actions [data-testid="followup-reply-facu"]{
     outline:3px solid #126944;outline-offset:3px;
   }
 }
+
+@media(max-width:760px){
+  body[data-unit="habita"] .os-fu-app-fallback{
+    display:inline-block;margin-top:5px;color:#0d6c43;
+    text-decoration:underline;text-underline-offset:2px;
+    font-size:11px;font-weight:700;
+  }
+  body[data-unit="habita"] .os-fu-app-fallback:focus-visible{
+    outline:2px solid #166f46;outline-offset:3px;
+  }
+}
