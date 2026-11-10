@@ -2513,25 +2513,59 @@
   return {q,snap,stages,current,all:base,rows:filtered};
 }
 
+  // Funnel stages and situations come from the product's live catalog.
+  // Dropdowns are edit controls; they must not take a claim or open a task.
+  function fuQueueStageChoices(x) {
+    const snap=state.fu.n?.units?.[x.unit];
+    return snap ? F.commercialStages(x.unit,snap).filter(v=>!v.situation&&v.technical?.length) : [];
+  }
+  function fuQueueSituationChoices(x) {
+    const snap=state.fu.n?.units?.[x.unit],stages=fuQueueStageChoices(x);
+    const commercial=stages.find(v=>v.technical.includes(x.stage))?.key;
+    const regular=fuSituationOptions(snap?.labels?.situations||{},x.stage,x.unit).map(([key,label])=>({key,label}));
+    const custom=(snap?.catalog?.states||[]).filter(v=>v.active&&v.commercial_stage===commercial)
+      .map(v=>({key:v.key,label:v.label}));
+    const all=new Map([...regular,...custom].map(v=>[v.key,v]));
+    const current=x.catalogSituation||x.situation;
+    if(current&&!all.has(current))all.set(current,{key:current,label:x.situationLabel||current});
+    return [...all.values()];
+  }
+  function fuQueueStageSelect(x,side=false) {
+    const options=fuQueueStageChoices(x),current=options.find(v=>v.technical.includes(x.stage));
+    if(!options.length)return '<span class="os-fu-pill">'+esc(x.stageTitle||x.stage||'—')+'</span>';
+    return '<select class="os-fu-inline-select os-fu-inline-stage" data-fu-inline-stage="'+esc(x.key)+'" aria-label="Cambiar etapa comercial de '+esc(x.name)+'" title="Cambiar etapa comercial">'
+      +options.map(v=>'<option value="'+esc(v.technical.includes(x.stage)?x.stage:v.technical[0])+'" '+(current?.key===v.key?'selected':'')+'>'+esc(v.title)+'</option>').join('')
+      +'</select>';
+  }
+  function fuQueueSituationSelect(x,side=false) {
+    const current=x.catalogSituation||x.situation;
+    return '<select class="os-fu-inline-select os-fu-inline-situation" data-fu-inline-situation="'+esc(x.key)+'" aria-label="Cambiar situación de '+esc(x.name)+'" title="Cambiar situación">'
+      +fuQueueSituationChoices(x).map(v=>'<option value="'+esc(v.key)+'" '+(current===v.key?'selected':'')+'>'+esc(v.label)+'</option>').join('')
+      +'</select>';
+  }
+  function fuQueueOwnerSelect(x) {
+    const current=x.owner||'Todos', owners=['Todos','Facu','Axel','Extensión'];
+    if(!owners.includes(current))owners.push(current);
+    return '<select class="os-fu-inline-select os-fu-inline-owner" data-fu-inline-owner="'+esc(x.key)+'" aria-label="Quién toma a '+esc(x.name)+'" title="Quién lo toma">'
+      +owners.map(v=>'<option '+(v===current?'selected':'')+' value="'+esc(v)+'">'+esc(v)+'</option>').join('')+'</select>';
+  }
   function fuQueueTableRow(x,{closed=false}={}) {
-  const me=state.session?.user?.name;
-  const locked=x.claim&&x.claim.by!==me;
-  const active=!closed&&!x.blocked&&!x.dueAt&&Boolean(x.action)&&!locked;
-  return `<tr class="os-fu-table-row" data-fu-open="${esc(x.key)}" tabindex="0" aria-label="Ver ${esc(x.name)}" data-testid="fu-item">
-    <td class="os-fu-score">${x.score===null||x.score===undefined?'—':`<span class="os-fu-score-bubble">${esc(String(x.score))}</span>`}</td>
-    <td><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small>
-      ${x.unit==='habita'?`<button type="button" class="os-fu-edit-stage" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}" aria-label="Editar etapa y situación de ${esc(x.name)}">✎ Editar etapa / estado</button>`:''}</td>
-    <td>${esc(x.zone||'—')}</td>
-    <td><span class="os-fu-pill">${esc(x.situationLabel||'—')}</span></td>
-    <td><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
-    <td><span>${esc(x.lastText||'—')}</span><small>${esc(ago(x.since)||'—')}</small></td>
-    <td>${esc(x.phone||'—')}</td>
-    <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
-    <td>${closed?'<span class="os-fu-muted">CERRADO</span>':x.blocked?'<span class="os-fu-muted">BLOQUEADA</span>':x.dueAt?'<span class="os-fu-muted">PROGRAMADA</span>':locked?`<span class="os-fu-muted">TOMADA POR ${esc(x.claim.by)}</span>`:
-      active?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">EJECUTAR →</button>`:
-      '<span class="os-fu-muted">VER DETALLE</span>'}</td>
-  </tr>`;
-}
+    const selected=state.fu.queueSelected===x.key||state.fu.task?.item?.key===x.key;
+    const digits=String(x.phone||'').replace(/\D/g,'');
+    const wa=digits.length>=8&&digits.length<=15
+      ? '<button class="os-fu-wa-icon" type="button" data-fu="queue-whatsapp" data-fu-key="'+esc(x.key)+'" aria-label="Escribir a '+esc(x.name)+' por WhatsApp" title="Abrir WhatsApp">'+icon.wa+'</button>'
+      : '<span class="os-fu-muted">—</span>';
+    return '<tr class="os-fu-table-row '+(selected?'is-selected':'')+'" data-fu-open="'+esc(x.key)+'" tabindex="0" aria-selected="'+selected+'" aria-label="Ver '+esc(x.name)+'" data-testid="fu-item">'
+      +'<td class="os-fu-name"><strong>'+esc(x.name)+'</strong>'+(x.sub&&x.sub!==x.name?'<small>'+esc(x.sub)+'</small>':'')+'</td>'
+      +'<td>'+fuQueueStageSelect(x)+'</td>'
+      +'<td>'+fuQueueSituationSelect(x)+'</td>'
+      +'<td class="os-fu-next-action"><b>'+esc(closed?'Sin acciones':x.action||x.actionReason||'—')+'</b></td>'
+      +'<td class="os-fu-last"><span>'+esc(ago(x.since)||'—')+'</span><small>'+esc(x.lastText||'')+'</small></td>'
+      +'<td class="os-fu-wa-cell">'+wa+'</td>'
+      +'<td>'+fuQueueOwnerSelect(x)+'</td>'
+      +'<td><span class="os-fu-priority" data-level="'+esc(x.priority)+'">'+esc(F.PRIORITY_LABEL[x.priority]||'—')+'</span></td>'
+      +'</tr>';
+  }
 
   // Compact native mobile cards: only the action and the minimum decision
   // context are visible by default. Expanded details never claim a lead.
