@@ -2124,7 +2124,8 @@
     state.fu.loading = true;
     if (!quiet) render();
     try {
-      state.fu.raw = await api('followup', { query: { unit: 'todas' } });
+      const period=fuChartPeriod();
+      state.fu.raw = await api('followup', { query: { unit: 'todas',periodo:period.preset,...(period.from?{desde:period.from}:{}),...(period.to?{hasta:period.to}:{}) } });
       state.fu.n = F.normalize(state.fu.raw.units);
       state.fu.at = Date.now();
       state.fu.error = null;
@@ -2540,6 +2541,84 @@
     return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(' · ') || 'sin bloqueos';
   }
 
+  function fuChartPeriod() {
+  return state.fu.chartPeriod||(state.fu.chartPeriod={preset:'todo',from:'',to:''});
+}
+
+  function fuNativeChart(snap) {
+  const chart=snap?.chart,lostAt=snap?.lostAt,rows=snap?.chartRows;
+  if(!Array.isArray(chart)||!Array.isArray(lostAt)||!Array.isArray(rows))
+    return `<div class="os-funnel-note" data-testid="followup-native-chart-unavailable">El embudo histórico original todavía no está disponible en la API. El resumen de etapas y reglas se mantiene debajo.</div>`;
+  const period=fuChartPeriod(),focus=state.fu.chartFocus||null;
+  const counts=chart.map(x=>Number(x.count)||0),max=Math.max(0,...counts);
+  const below=counts.filter(n=>n>0&&n<=max*.3),limit=below.length?Math.max(...below)*1.25:max;
+  const broken=max>0&&limit<max/3;
+  const height=n=>{
+    if(n<=0||max<=0)return 0;
+    if(!broken)return 100*n/max;
+    if(n<=limit)return n/limit*78;
+    return 78+22*Math.log(n/limit)/Math.log(max/limit);
+  };
+  const segment=(i,mode,count,label,style,extra='')=>{
+    if(count<=0)return '';
+    const selected=focus?.step===i&&focus.mode===mode;
+    return `<button type="button" class="os-native-segment is-${mode} ${selected?'is-on':''} ${extra}" style="${style}" data-fu="funnel-select" data-fu-step="${i}" data-fu-mode="${mode}"
+      aria-label="${int(count)} ${esc(label)}. Ver inmobiliarias" aria-pressed="${selected}" title="${int(count)} · ${esc(label)}">${int(count)}</button>`;
+  };
+  const picks=chart.map((x,i)=>{
+    const count=Number(x.count)||0,last=i===chart.length-1,next=Number(chart[i+1]?.count||0);
+    const advanced=last?count:next,lost=last?0:Number(lostAt[i]||0),stayed=Math.max(0,count-advanced-lost);
+    const full=height(count),went=height(advanced),rest=Math.max(0,full-went);
+    const selected=focus?.step===i&&focus.mode==='arrived';
+    const label=x.label||`Paso ${i+1}`;
+    return `<li class="os-native-step">
+      <button type="button" class="os-native-step-top ${selected?'is-on':''}" aria-pressed="${selected}" data-fu="funnel-select" data-fu-step="${i}" data-fu-mode="arrived"
+        title="Ver las ${int(count)} que llegaron a ${esc(label)}"><strong>${int(count)}</strong><small>${i===0?'Base del período':x.ofPrevious==null?'—':`${int(x.ofPrevious)}% del paso anterior`}</small></button>
+      <div class="os-native-step-plot">
+        ${count?`<div class="os-native-bar ${broken&&count>limit?'is-broken':''}" style="height:max(${full.toFixed(3)}%,${(stayed>0?1:0)+(lost>0?1:0)+(advanced>0?1:0)*24}px)">
+          ${segment(i,'stayed',stayed,`se quedaron en ${label}`,`flex-grow:${stayed+lost?(rest*stayed/(stayed+lost)).toFixed(3):0}`)}
+          ${segment(i,'lost',lost,`se perdieron en ${label}`,`flex-grow:${stayed+lost?(rest*lost/(stayed+lost)).toFixed(3):0}`)}
+          ${broken&&count>limit&&(stayed>0||lost>0)&&advanced>0?'<span class="os-native-break" aria-hidden="true"></span>':''}
+          ${segment(i,'advanced',advanced,last?'clientes pagos':`pasaron a ${chart[i+1]?.label||'el siguiente paso'}`,`flex-grow:${Math.max(1,went).toFixed(3)}`,last?'is-last':'')}
+        </div>`:'<span class="os-native-zero"></span>'}
+      </div><div class="os-native-step-label"><b>${i+1}. ${esc(label)}</b><small>${int(stayed)} permanecen${lost?` · ${int(lost)} perdidas`:''}</small></div></li>`;
+  }).join('');
+  let detail='';
+  if(focus){
+    const step=Number(focus.step),mode=focus.mode;
+    const chosen=rows.filter(x=>{
+      const s=Number(x.step);
+      if(x.step===null)return false;
+      if(mode==='lost')return s===step&&x.lost===true;
+      if(mode==='stayed')return s===step&&!x.lost;
+      if(mode==='advanced')return s>=(step===chart.length-1?step:step+1);
+      return s>=step;
+    });
+    const name=chart[step]?.label||`Paso ${step+1}`;
+    const kind=mode==='lost'?'No interesadas':mode==='stayed'?'Se quedaron':mode==='advanced'?'Pasaron al siguiente paso':'Llegaron al paso';
+    detail=`<section class="card glass os-native-drilldown" data-testid="followup-funnel-drilldown"><div class="os-section-heading">
+      <div><span class="os-kicker">${esc(kind.toUpperCase())}</span><h2>${int(chosen.length)} inmobiliarias · ${esc(name)}</h2></div>
+      <button type="button" class="btn small" data-fu="funnel-reset">CERRAR FILTRO</button></div>
+      <div class="table-wrap"><table><thead><tr><th>INMOBILIARIA</th><th>SCORE</th><th>WHATSAPP</th><th>ÚLTIMO PASO ALCANZADO</th></tr></thead><tbody>
+        ${chosen.slice(0,300).map(x=>`<tr><td><strong>${esc(x.name||'Sin nombre')}</strong></td>
+          <td>${x.score==null?'—':int(x.score)}</td><td>${esc(x.whatsapp||'—')}</td>
+          <td>${esc(chart[x.step]?.label||'—')}</td></tr>`).join('')||'<tr><td colspan="4">No hay inmobiliarias para este filtro.</td></tr>'}
+      </tbody></table></div>${chosen.length>300?'<p class="os-fu-caption">Se muestran las primeras 300.</p>':''}</section>`;
+  }
+  return `<section class="os-native-funnel" data-testid="followup-native-funnel">
+    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El porcentaje compara con el anterior.</p></div>
+      <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
+        <form data-fu-chart-range><label>Desde <input class="input" type="date" name="desde" value="${esc(period.from||'')}"></label>
+          <label>Hasta <input class="input" type="date" name="hasta" value="${esc(period.to||'')}"></label>
+          <button class="btn small" type="submit">APLICAR</button></form></div></div>
+    <div class="os-native-legend"><span><i class="is-went"></i>Pasaron al paso siguiente</span>
+      <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>Perdidas (no interesadas)</span></div>
+    <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
+    <p class="os-native-note">Elegí una cifra o un segmento de barra para consultar sus inmobiliarias. Los datos, el período y las pérdidas provienen del embudo original de Habita; las barras grandes pueden mostrar un corte de escala.</p>
+    ${detail}
+  </section>`;
+}
+
   function fuPipeline() {
   const n=state.fu.n, scope=fuScope();
   if(scope==='todas'){
@@ -2579,6 +2658,7 @@
   const activeVersions=(stage,action)=>versions.filter(v=>v.stage===stage && v.action===action);
   const selectedTechnical=snap.stages?.find(x=>x.key===activeTech);
   return `<section class="hero"><div><span class="eyebrow">${esc(fuName(scope).toUpperCase())} / EMBUDO</span><h1>Etapas y decisiones.</h1><p>La misma lectura del Follow-up de Habita: elegí una etapa y revisá sus pasos, situaciones, reglas y prospectos, sin cambiar la lógica del motor.</p></div></section>
+    ${scope==='habita'?fuNativeChart(snap):''}
     <section class="card glass" data-testid="followup-funnel"><div class="os-funnel-title"><div><span class="os-kicker">EMBUDO COMERCIAL</span><h2>${esc(fuName(scope))} · ${stages.length} etapas</h2></div><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></div>
     <div class="os-fu-stage-grid" data-testid="followup-funnel-stages">
       ${stages.map(s=>`<button type="button" class="os-fu-stage is-${esc(s.key)} ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${int(s.waiting)}</strong></button>`).join('')}
@@ -3042,6 +3122,17 @@
         const q=fuQueueState();q.closed=ds.fuClosed==='1';q.rule=null;q.group=null;q.situation=null;q.limit=25;render();break;
       }
       case 'queue-more': fuQueueState().limit+=25;render();break;
+      case 'funnel-period': {
+        const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
+        state.fu.chartFocus=null;await loadFollowup({quiet:true});render();break;
+      }
+      case 'funnel-select': {
+        const next={step:Number(ds.fuStep),mode:ds.fuMode};
+        const prev=state.fu.chartFocus;
+        state.fu.chartFocus=prev?.step===next.step&&prev?.mode===next.mode?null:next;
+        render();break;
+      }
+      case 'funnel-reset':state.fu.chartFocus=null;render();break;
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; state.fu.pipelineSituation=null;render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
       case 'pipeline-situation': state.fu.pipelineSituation=ds.fuSituation||null;render();break;
@@ -3167,9 +3258,15 @@
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if(form.matches('[data-fu-chart-range]')){
+      const fd=new FormData(form),p=fuChartPeriod(),from=String(fd.get('desde')||''),to=String(fd.get('hasta')||'');
+      if(from&&to&&to<from){toast('La fecha Hasta debe ser igual o posterior a Desde.',true);return;}
+      p.preset='todo';p.from=from;p.to=to;state.fu.chartFocus=null;
+      await loadFollowup({quiet:true});render();return;
+    }
     if(form.matches('[data-fu-turnia-rule-form]')){
       const fd=new FormData(form);
       const val={stage:form.dataset.fuStage,name:String(fd.get('name')||''),enabled:fd.has('enabled'),
