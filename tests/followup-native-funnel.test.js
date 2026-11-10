@@ -4,7 +4,7 @@ const read=p=>fs.readFileSync(path.resolve(__dirname,'..',p),'utf8');
 const app=read('prospecting/app.js'),api=read('api/prospecting.js'),css=read('prospecting/commercial-os.css');
 test('Real Habita chart: nine steps, original counts, losses and period navigation',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
-  for(const s of ['followup-native-funnel','followup-funnel-drilldown','data-fu="funnel-select"',
+  for(const s of ['followup-native-funnel','fu-funnel-review','data-fu="funnel-select"',
     "case 'funnel-period'","case 'funnel-select'","case 'funnel-reset'",
     'data-fu-chart-range','chartRows','lostAt','chartPeriod'])
     assert.ok(app.includes(s),s);
@@ -15,7 +15,7 @@ test('Real Habita chart: nine steps, original counts, losses and period navigati
 test('Period data is never synthesized from pending tasks',()=>{
   assert.match(app,/if\(!Array\.isArray\(chart\)\|\|!Array\.isArray\(lostAt\)\|\|!Array\.isArray\(rows\)\)/);
   assert.match(app,/followup-native-chart-unavailable/);
-  assert.match(app,/chosen=rows\.filter/);
+  assert.match(app,/const chosen=focus\?historical\.filter/);
 });
 test('Responsive segmented chart and distinct advance/stay/lost classes',()=>{
   for(const s of ['.os-native-chart','.os-native-segment.is-advanced','.os-native-segment.is-stayed',
