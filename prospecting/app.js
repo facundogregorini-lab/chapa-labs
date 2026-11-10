@@ -3470,6 +3470,14 @@
         }
         break;
       }
+      case 'results-window': {
+        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        r.windowKey=ds.fuWindow;render();break;
+      }
+      case 'results-cohort': {
+        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        r.cohortBy=ds.fuCohort;render();break;
+      }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
       }
