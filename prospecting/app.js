@@ -2660,7 +2660,7 @@
       <input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto">
       <button type="button" class="btn primary" data-fu="next" ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''} data-testid="fu-take-next">TOMAR LA PRÓXIMA →</button>
     </div></details></div>
-    ${filterSummary.length.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
+    ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
     <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed})).join('')||'<tr><td colspan="9" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
