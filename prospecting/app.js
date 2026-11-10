@@ -2355,6 +2355,9 @@
 
   function renderFu() {
     if (state.demo) return `${demoBanner()}<div class="notice glass"><span class="badge demo">Ejemplo</span><span>La bandeja comercial lee la cola de Follow-up de cada app: en el modo de ejemplo no hay datos.</span></div>`;
+    // Mobile is a focused action screen, never a queue squeezed into a right rail.
+    if (state.fu.task && window.ProspectingWhatsApp?.isMobileClient(window))
+      return renderFuTask(state.fu.task);
     if (state.fu.task && fuView()!=='hoy') return fuTaskWithQueue(state.fu.task);
     const v = fuView();
     const sub = '';
@@ -3383,11 +3386,24 @@
     const acc = fuAccount(t.unit, it);
     const me = state.session && state.session.user && state.session.user.name;
     const otherClaim = it.claim && it.claim.by !== me;
+    const rawWhatsApp=String(t.whatsappUrl||'');
+    const nativeWhatsApp=window.ProspectingWhatsApp?.nativeLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
+    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}"
+      data-fu="open-native" data-testid="fu-open-mobile" aria-label="Abrir conversación en la aplicación de WhatsApp">
+      ${icon.wa} Abrir WhatsApp</a>
+      <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="chapa-whatsapp" rel="noopener"
+      data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
     return `${demoBanner()}
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<button class="btn small ghost" type="button" data-fu="release">Soltar sin hacer nada</button><span class="sub">La tenés vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}: nadie más puede mandarle.</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
-      <section class="hero"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>${esc(it.stageTitle || '')}${it.situationLabel ? ` · ${esc(it.situationLabel)}` : ''}${t.actionLabel || it.action ? ` · ${esc(t.actionLabel || it.action)}` : ''}</p></div></section>
-      <div class="grid cols-3" data-testid="fu-detail">
-        <section class="card glass"><h2>Contexto</h2>
+      <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>${esc(it.stageTitle || '')}${it.situationLabel ? ` · ${esc(it.situationLabel)}` : ''}${t.actionLabel || it.action ? ` · ${esc(t.actionLabel || it.action)}` : ''}</p></div></section>
+      ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
+        ${whatsappActions}
+        <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
+        <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.</p>
+        <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile" data-arm="Confirmar: el mensaje salió">✓ Confirmar envío</button>
+      </div>`:''}
+      <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
+        <section class="card glass os-fu-context-card"><h2>Contexto</h2>
           <dl class="facts">${it.sub && it.sub !== it.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(it.sub)}</dd>` : ''}${t.phone || it.phone ? `<dt>WhatsApp</dt><dd>${esc(t.phone || it.phone)}</dd>` : ''}${it.zone ? `<dt>Zona</dt><dd>${esc(it.zone)}</dd>` : ''}<dt>Etapa</dt><dd>${esc(it.stageTitle || '')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[it.priority] || '')}${it.priorityManual ? ' (a mano)' : ''}</dd>${it.owner ? `<dt>Responsable</dt><dd>${esc(it.owner)}</dd>` : ''}${it.since ? `<dt>Último contacto</dt><dd>${esc(ago(it.since))}${it.lastText ? ` · ${esc(it.lastText)}` : ''}</dd>` : ''}${it.blocked ? `<dt>Bloqueada</dt><dd style="color:var(--bad-text)">${esc(it.blocked)}</dd>` : ''}${it.dueAt ? `<dt>Programada</dt><dd>${esc(dayTime(it.dueAt))}</dd>` : ''}</dl>
           <form class="section" data-fu-situation><h3>Situación</h3><select class="input" name="situacion" aria-label="Situación">${Object.entries(situations).map(([k, l]) => `<option value="${esc(k)}" ${it.situation === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><input class="input" name="texto" placeholder="Qué dijo (texto original)" value="${esc(it.situationNote || '')}"><button class="btn small" type="submit">Guardar situación</button></form>
           <form class="section" data-fu-reply><h3>Registrar una respuesta</h3><textarea class="input" name="texto" rows="2" placeholder="Lo que respondió por WhatsApp" required></textarea><select class="input" name="clasificacion" aria-label="Clasificación"><option value="">Resolver después (queda en Respuestas)</option>${Object.entries(situations).filter(([k]) => k !== 'sin_respuesta').map(([k, l]) => `<option value="${esc(k)}">${esc(l)}</option>`).join('')}</select><button class="btn small" type="submit">Registrar</button></form>
@@ -3395,16 +3411,16 @@
             ${t.unit === 'turnia' ? `<form class="btns" data-fu-owner><input class="input" name="responsable" list="fu-owners" value="${esc(it.owner || '')}" placeholder="Facu, Axel…" style="flex:1 1 120px" aria-label="Responsable"><datalist id="fu-owners"><option>Facu</option><option>Axel</option>${me ? `<option>${esc(me)}</option>` : ''}</datalist><button class="btn small" type="submit">Asignar</button></form>` : '<p class="sub" style="margin:0">En habita. el responsable es el SDR de la cuenta.</p>'}</div>
           ${t.history && t.history.length ? `<div class="section"><h3>Últimas acciones</h3><ul class="history">${t.history.map((h) => `<li><time>${esc(dayTime(h.at))}</time><span>${esc(h.text)}</span></li>`).join('')}</ul></div>` : ''}
         </section>
-        <section class="card glass"><h2>Mensaje</h2>
+        <section class="card glass os-fu-message-card"><h2>Mensaje</h2>
           ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}${fuDemoWarning(t)}
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
             ${t.notes ? `<div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes)}</p></div>` : ''}`
           : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !it.blocked && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
           <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
         </section>
-        <section class="card glass"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
+        <section class="card glass os-fu-execution-card"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
           ${exec && t.checklist.length ? `<ul class="history" data-testid="fu-checklist">${t.checklist.map((c) => `<li data-check="${esc(c.key)}" data-ok="${c.ok}"><time>${c.ok ? '✓' : '✗'}</time><span><strong>${esc(c.label)}</strong>${c.note ? ` · ${esc(c.note)}` : ''}</span></li>`).join('')}</ul>` : ''}
-          ${exec ? `<div class="btns">${t.whatsappUrl ? `<button class="btn primary" type="button" data-fu="open" data-testid="fu-open">${icon.wa} Abrir WhatsApp</button>` : ''}<button class="btn ${t.whatsappUrl ? '' : 'primary'}" type="button" data-fu="confirm" data-testid="fu-confirm" data-arm="Confirmar: el mensaje salió">Confirmar envío</button></div>
+          ${exec ? `<div class="btns os-fu-execution-primary">${whatsappActions}<button class="btn" type="button" data-fu="confirm" data-testid="fu-confirm" data-arm="Confirmar: el mensaje salió">Confirmar envío</button></div>
             <p class="sub" style="margin:0">Abrir el chat no cuenta. Confirmá cuando lo veas enviado; si el número del chat no coincide, no lo mandes.</p>
             <form class="section" data-fu-fail><h3>No salió</h3><input class="input" name="motivo" placeholder="Por qué" aria-label="Motivo"><select class="input" name="tipo" aria-label="Tipo"><option value="">Otro motivo</option><option value="sin_whatsapp">No tiene WhatsApp</option><option value="numero_incorrecto">Número incorrecto</option></select><button class="btn small" type="submit">Registrar que no salió</button></form>` : ''}
           <form class="section" data-fu-snooze><h3>Omitir o reprogramar</h3><div class="btns">${[['1', 'Mañana'], ['3', 'En 3 días'], ['7', 'En una semana']].map(([d, l]) => `<button class="btn small" type="button" data-fu="snooze-days" data-fu-days="${d}">${l}</button>`).join('')}</div><input class="input" type="date" name="hasta" aria-label="Otra fecha"><input class="input" name="motivo" placeholder="Motivo (opcional)"><button class="btn small" type="submit">Reprogramar</button>${it.snoozedUntil ? `<button class="btn small ghost" type="button" data-fu="unsnooze">Volver a la cola</button>` : ''}</form>
@@ -3570,9 +3586,33 @@
         state.fu.task=null;render();loadFollowup({quiet:true});break;
       case 'release': if (await fuOp(task.unit, { op: 'release', inmobiliaria: it.id }, { label: 'Quedó libre.' })) { state.fu.task = null; loadFollowup(); } break;
       case 'copy': copy(task.messages[Number(ds.fuIndex)] || task.message); break;
-      case 'open':
-        if (await fuOp(task.unit, { op: 'open', ...fields() })) window.open(task.whatsappUrl, 'chapa-whatsapp');
+      case 'open-native': {
+        // Keep browser navigation synchronous with the actual user gesture:
+        // Safari/iOS won't launch universal links from an async callback.
+        // The event's default anchor navigation opens the WhatsApp app on
+        // mobile. This fetch only records "chat opened" (never "sent").
+        if(task?.mode==='ejecutar'&&it){
+          fetch(API+'?op=task',{
+            method:'POST',credentials:'same-origin',keepalive:true,
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({unit:task.unit,followup:{op:'open',...fields()}})
+          }).then(r=>{if(!r.ok)console.warn('No se pudo registrar la apertura de WhatsApp:',r.status);})
+            .catch(()=>{});
+        }
         break;
+      }
+      case 'open': {
+        const native=window.ProspectingWhatsApp?.nativeLink(task.whatsappUrl,task.phone||it.phone,(task.messages||[]).join('\n\n')||task.message||'');
+        const mobile=window.ProspectingWhatsApp?.isMobileClient(window);
+        const target=mobile?native:task.whatsappUrl;
+        if(!target){toast('Número o enlace de WhatsApp inválido.',true);break;}
+        // Backwards-compatible click path. Open before any await to avoid
+        // browsers blocking popups after network delay.
+        if(mobile)window.location.assign(target);
+        else window.open(target,'chapa-whatsapp');
+        void fuOp(task.unit,{op:'open',...fields()});
+        break;
+      }
       case 'confirm': {
         const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: task.messages.join('\n\n') || task.message }, { label: 'Envío confirmado.' });
         if (r) { state.fu.task = null; await loadFollowup({ quiet: true }); render(); }
