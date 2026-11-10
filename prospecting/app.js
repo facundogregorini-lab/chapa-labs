@@ -2573,7 +2573,7 @@
     const snap=state.fu.n.units[x.unit];
     const stage=F.commercialStages(x.unit,snap).find(v=>!v.situation&&v.technical.includes(x.stage));
     const task=state.fu.task;
-    if(task?.item?.key===x.key&&task.mode==='ejecutar')
+    if(task?.item?.key===x.key)
       return '<aside class="os-fu-side os-fu-side-working" data-testid="followup-execution-aside">'+renderFuTask(task)+'</aside>';
     const locked=x.claim&&x.claim.by!==state.session?.user?.name;
     const ready=!q.closed&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
