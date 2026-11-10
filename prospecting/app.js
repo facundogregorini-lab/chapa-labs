@@ -2415,7 +2415,7 @@
                 ${!state.session?.open && v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${!state.session?.open && v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${!state.session?.open && v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
                 <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' && !state.session?.open ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
               ${fuVersionEditor(u.id,snap,s.key)}
-              <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns"><select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit" ${state.session?.open?'disabled title="Se requiere una sesión protegida"':''}>Guardar versión</button></div></form>
+              <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns">${u.id==='habita'?`<select class="input" name="action" aria-label="Acción del mensaje">${(snap.catalog?.actions?.[s.key]||[{key:'principal',label:'Acción principal'}]).map(a=>`<option value="${esc(a.key)}">${esc(a.label)}</option>`).join('')}</select>`:'' }<select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit" ${state.session?.open?'disabled title="Se requiere una sesión protegida"':''}>Guardar versión</button></div></form>
             </details>`;
           }).join('')}`;
       }).join('')}`;
@@ -2620,7 +2620,7 @@
     const it = task && task.item;
     if (form.matches('[data-fu-version-form]')) {
       const unit = form.dataset.fuUnitId;
-      const valores = { stage: form.dataset.fuStage, channel: 'whatsapp', trigger: '', body: fd.body, ctas: unit === 'habita' ? ['whatsapp', 'demo', 'copy'] : ['whatsapp', 'demo', 'copy'], status: fd.status };
+      const valores = { stage: form.dataset.fuStage, action: fd.action || 'principal', channel: 'whatsapp', trigger: '', body: fd.body, ctas: ['whatsapp', 'demo', 'copy'], status: fd.status };
       if (await fuOp(unit, { op: 'version-create', valores }, { label: 'Versión guardada.' })) loadFollowup();
       return;
     }
