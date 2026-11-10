@@ -2639,33 +2639,141 @@
   }
 }
 
+  function fuRulesState(unit) {
+  state.fu.rulesWorkspace ||= {};
+  return state.fu.rulesWorkspace[unit] ||= {
+    commercial: unit === 'habita' ? 'contactado' : 'saludado',
+    selected: null, creating: false, template: null, showMenu: false, picking: false,
+    technical: null, dirty: false, moving: false,
+  };
+}
+
+  function fuRulesMessage(unit, snap, rule, stage, create) {
+  if(create)return `<section class="fu-ref-message"><h3>Mensaje de esta acción</h3>
+    <p class="os-view-caption">Primero guardá la nueva regla. Después vas a poder asociarle un mensaje o reutilizar las versiones existentes de esa acción.</p></section>`;
+  const action=rule?.action||'principal';
+  const versions=F.versionRows(unit,snap).filter(v=>v.stage===stage&&v.action===action).sort((a,b)=>b.version-a.version);
+  const canEdit=!state.session?.open;
+  return `<section class="fu-ref-message" data-testid="followup-rule-message">
+    <div class="os-section-heading"><div><span class="os-kicker">MENSAJE VINCULADO A LA ACCIÓN</span><h3>${esc((snap.catalog?.actions?.[stage]||[]).find(a=>a.key===action)?.label||rule?.name||action)}</h3></div>
+    <span class="os-tag">${versions.length} VERSIONES</span></div>
+    ${versions.map(v=>`<article class="fu-ref-version">
+      <div class="fu-ref-version-top"><b>V${int(v.version)} · ${esc(v.status==='active'?'ACTIVA':v.status==='test'?'EN PRUEBA':'ARCHIVADA')}</b>
+        <small>${int(v.executed)} enviadas · ${int(v.conversions)} conversiones</small></div>
+      <p>${esc(v.body||'')}</p>
+      <div class="fu-ref-buttons">${canEdit?`${unit==='habita'?`<button type="button" class="btn small" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR</button>`:''}
+        ${v.status!=='active'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="active">ACTIVAR VERSIÓN</button>`:''}
+        ${v.status==='test'?`<button type="button" class="btn small" data-fu="version-status" data-fu-unit-id="${unit}" data-fu-version="${esc(v.id)}" data-fu-status="archived">DETENER PRUEBA</button>`:''}`:''}</div>
+      ${unit==='habita'?fuVersionEditor(unit,snap,stage):''}
+    </article>`).join('')||'<p class="os-view-caption">Todavía no hay versiones de esta acción.</p>'}
+    <details class="fu-ref-new-message">
+      <summary>+ NUEVA VERSIÓN DEL MENSAJE</summary>
+      <form data-fu-version-form data-fu-unit-id="${unit}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}">
+        <p class="os-view-caption">Cada versión queda registrada por separado para preservar las métricas de las anteriores.</p>
+        <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>
+        <div class="fu-ref-fields"><label class="field"><span>ACCIÓN</span><select class="input" name="action" aria-label="Acción">${(snap.catalog?.actions?.[stage]||[{key:action,label:action}]).map(a=>`<option value="${esc(a.key)}" ${a.key===action?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+        <label class="field"><span>ESTADO</span><select class="input" name="status"><option value="test">Probar 50/50</option><option value="active">Reemplazar versión activa</option></select></label></div>
+        <button class="btn primary" type="submit" ${canEdit?'':'disabled title="Requiere sesión protegida"'}>GUARDAR NUEVA VERSIÓN</button>
+      </form>
+    </details>
+  </section>`;
+}
+
+  function fuTurniaRuleEditor(snap, rule, stage) {
+  if(!rule)return `<section class="card glass"><p class="os-view-caption">Seleccioná una regla para ver sus condiciones.</p></section>`;
+  const canEdit=!state.session?.open && snap.catalog?.available;
+  const reason=canEdit?'Las condiciones de esta pantalla solo restringen la cadencia nativa de Turnia; no pueden adelantar mensajes ni modificar su consentimiento.':'Las reglas siguen el motor de Turnia. Para editarlas desde acá debe estar publicada la API de configuración y la sesión protegida.';
+  const days=['DO','LU','MA','MI','JU','VI','SA'];
+  return `<form class="card glass fu-ref-editor" data-fu-turnia-rule-form data-fu-unit-id="turnia" data-fu-stage="${esc(stage)}">
+    <div class="fu-ref-edit-head"><div><span class="os-kicker">REGLA DE TURNIA · ${esc(rule.stageTitle||stage)}</span><h3>${esc(rule.name||rule.title||rule.action||'Acción principal')}</h3></div><span class="os-tag">CADENCIA NATIVA</span></div>
+    <p class="os-view-caption">${esc(reason)}</p>
+    <label class="field"><span>NOMBRE</span><input class="input" name="name" value="${esc(rule.name||'')}" maxlength="120" ${canEdit?'':'disabled'}></label>
+    <label class="field"><span>QUÉ SE EJECUTA</span><input class="input" value="${esc(rule.action_label||rule.action||'Mensaje de la etapa')}" disabled></label>
+    <h3>Condiciones de la regla</h3>
+    <div class="fu-ref-classifiers">${Object.entries(snap.labels?.situations||{}).filter(([k])=>!['no_contactar','sin_whatsapp','numero_incorrecto','rechazo'].includes(k)).map(([key,label])=>`<label><input type="checkbox" name="sit" value="${esc(key)}" ${(rule.situations||[]).includes(key)?'checked':''} ${canEdit?'':'disabled'}><span>${esc(label)}</span></label>`).join('')}</div>
+    <div class="fu-ref-fields"><label class="field"><span>ESPERA MÍNIMA ADICIONAL (HORAS)</span><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(rule.after_hours??0)}" ${canEdit?'':'disabled'}></label>
+      <label class="field"><span>HORARIO DESDE</span><input class="input" name="hours_from" type="number" min="0" max="23" value="${Number(rule.hours_from??8)}" ${canEdit?'':'disabled'}></label>
+      <label class="field"><span>HORARIO HASTA</span><input class="input" name="hours_to" type="number" min="0" max="23" value="${Number(rule.hours_to??21)}" ${canEdit?'':'disabled'}></label></div>
+    <h3>Días habilitados</h3><div class="fu-ref-classifiers">${days.map((day,i)=>`<label><input type="checkbox" name="days" value="${i}" ${(rule.days||[1,2,3,4,5,6]).includes(i)?'checked':''} ${canEdit?'':'disabled'}><span>${day}</span></label>`).join('')}</div>
+    <label class="fu-ref-switch"><input type="checkbox" name="enabled" ${rule.enabled!==false?'checked':''} ${canEdit?'':'disabled'}> Regla activa</label>
+    <div class="fu-ref-buttons"><button type="submit" class="btn primary" ${canEdit?'':'disabled'}>GUARDAR CAMBIOS</button></div>
+  </form>`;
+}
+
   function fuSecuencias() {
-    const n = state.fu.n;
-    return `<section class="hero"><div><span class="eyebrow">REGLAS Y MENSAJES</span><h1>Las conversaciones, diseñadas.</h1><p>Cada producto mantiene su motor. Las versiones nuevas se miden por separado y las reglas se aplican respetando su orden y condiciones.</p></div></section>${state.session?.open?'<p class="os-warn-note">La sesión abierta no autoriza cambios sensibles de reglas o mensajes. Configurá PROSPECTING_PASSWORD en Vercel para habilitar su edición.</p>':''}
-      ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
-      ${fuUnits().filter((u) => n.units[u.id]).map((u) => {
-        const snap = n.units[u.id];
-        const rules = F.ruleRows(u.id, snap);
-        const versions = F.versionRows(u.id, snap);
-        const stages = snap.stages || [];
-        return `<section class="card glass"><div class="card-head"><div>${fuDot(u.id)}<h2>Reglas de ${esc(u.name)}</h2><p class="sub">${u.id === 'habita' ? 'Se editan sin deploy: gana la primera regla (por orden) que corresponde a la situación.' : 'Siguen la cadencia de Prospección de Turnia (días hábiles, tres mensajes como máximo).'}</p></div></div>
-          <div class="table-wrap"><table><thead><tr><th>Etapa</th><th>Cuándo</th><th>Acción</th><th>Espera</th>${u.id === 'habita' ? '<th>Horario</th><th></th>' : '<th>Sale cuando</th>'}</tr></thead><tbody>
-          ${rules.map((r) => `<tr><td>${esc(r.stageTitle)}</td><td>${esc(r.when)}</td><td>${esc(r.action)}</td><td>${esc(r.wait)}</td>${u.id === 'habita' ? `<td>${esc(r.window)}</td><td>${r.editable && !state.session?.open ? `<button class="btn small ghost" type="button" data-fu="rule-toggle" data-fu-unit-id="${u.id}" data-fu-rule="${esc(r.key)}">${r.enabled ? 'Apagar' : 'Prender'}</button> <button class="btn small" type="button" data-fu="rule-edit" data-fu-rule="${esc(r.key)}">EDITAR</button>` : ''}</td>` : `<td>${esc(r.exit)}</td>`}</tr>`).join('')}
-          </tbody></table></div></section>
-          ${fuRuleEditor(u.id,snap)}
-          ${stages.map((s) => {
-            const vs = versions.filter((v) => v.stage === s.key);
-            return `<details class="card glass"><summary><strong>${esc(s.title)}</strong> <span class="sub">· ${int(s.waiting || 0)} esperan · ${vs.filter((v) => v.status !== 'archived').length} versiones vigentes</span></summary>
-              ${u.id==='habita'&&!state.session?.open?`<button class="btn small" style="margin-top:10px" type="button" data-fu="rule-create" data-fu-stage="${esc(s.key)}">+ NUEVA REGLA PARA ESTA ETAPA</button>`:''}
-              ${vs.map((v) => `<div class="section" style="margin-top:10px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><strong>V${v.version}${v.action !== 'principal' ? ` · ${esc(v.actionLabel)}` : ''}</strong><span class="badge ${v.status === 'active' ? 'live' : v.status === 'test' ? 'demo' : 'plain'}">${{ active: 'Activa', test: 'A prueba', archived: 'Archivada' }[v.status] || esc(v.status)}</span><span class="sub">${int(v.executed)} enviadas · ${int(v.conversions)} avanzaron · ${pct(v.rate)}${v.small ? ' · muestra chica' : ''}${v.best ? ' · MEJOR' : ''}</span>
-                ${!state.session?.open && v.status !== 'active' ? `<button class="btn small" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="active">Hacerla la activa</button>` : ''}${!state.session?.open && v.status === 'archived' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="test">Probar 50/50</button>` : ''}${!state.session?.open && v.status === 'test' ? `<button class="btn small ghost" type="button" data-fu="version-status" data-fu-unit-id="${u.id}" data-fu-version="${esc(v.id)}" data-fu-status="archived">Detener la prueba</button>` : ''}</div>
-                <p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(v.body)}</p>${u.id==='habita' && !state.session?.open ? `<button class="btn small" type="button" data-fu="version-edit" data-fu-version="${esc(v.id)}">EDITAR ESTA VERSIÓN</button>` : ''}</div>`).join('') || '<p class="sub">Sin versiones.</p>'}
-              ${fuVersionEditor(u.id,snap,s.key)}
-              <form class="section" data-fu-version-form data-fu-unit-id="${u.id}" data-fu-stage="${esc(s.key)}" style="margin-top:10px"><h3>Nueva versión</h3><label class="field"><span class="sr">Texto</span><textarea name="body" rows="4" required placeholder="${u.id === 'habita' ? 'Hola {{decisor}}, …' : 'Hola {saludo}, …'}"></textarea></label><div class="btns">${u.id==='habita'?`<select class="input" name="action" aria-label="Acción del mensaje">${(snap.catalog?.actions?.[s.key]||[{key:'principal',label:'Acción principal'}]).map(a=>`<option value="${esc(a.key)}">${esc(a.label)}</option>`).join('')}</select>`:'' }<select class="input" name="status" aria-label="Cómo entra"><option value="test">A prueba (50/50 con la activa)</option><option value="active">Reemplaza a la activa</option></select><button class="btn small primary" type="submit" ${state.session?.open?'disabled title="Se requiere una sesión protegida"':''}>Guardar versión</button></div></form>
-            </details>`;
-          }).join('')}`;
-      }).join('')}`;
+  const n=state.fu.n,unit=fuScope();
+  if(unit==='todas'){
+    return `<section class="hero"><div><span class="eyebrow">GENERAL / REGLAS Y MENSAJES</span><h1>Dos motores, un mismo espacio.</h1>
+    <p>Entrá a cada negocio para configurar sus reglas en el mismo editor. Habita y Turnia conservan sus propias condiciones de avance.</p></div></section>
+    <div class="os-business-cards">${units().filter(u=>n.units[u.id]).map(u=>`<button type="button" class="os-business-card" data-goto="${u.id}" data-view-to="secuencias" data-business="${u.id}"><span class="os-kicker">REGLAS COMERCIALES</span><h2>${esc(u.name)}</h2><p>${int(n.units[u.id].rules?.length||0)} reglas · configurar flujo y mensajes</p></button>`).join('')}</div>`;
   }
+  const snap=n.units[unit];
+  if(!snap)return `<section class="card glass"><p>No hay reglas disponibles de ${esc(fuName(unit))}.</p></section>`;
+  const ui=fuRulesState(unit);
+  const commercial=F.commercialStages(unit,snap).filter(x=>!x.key.startsWith('etapa_'));
+  const active=commercial.find(s=>s.key===ui.commercial)||commercial[unit==='habita'?1:1]||commercial[0];
+  const tech=active?.technical||[];
+  const rules=F.ruleRows(unit,snap).filter(r=>tech.includes(r.stage))
+    .sort((a,b)=>Number(a.raw.position??999)-Number(b.raw.position??999)||String(a.key).localeCompare(String(b.key)));
+  const selected=ui.creating?null:rules.find(r=>r.key===ui.selected)||rules[0]||null;
+  const stage=ui.creating?(ui.technical&&tech.includes(ui.technical)?ui.technical:tech[0]):selected?.stage||tech[0]||null;
+  state.fu.ruleEdit=ui.creating?'__new':selected?.key||null;
+  state.fu.ruleDraftStage=stage;
+  state.fu.ruleTemplate=ui.creating?ui.template:null;
+  const readonly=state.session?.open||unit==='turnia'&&!snap.catalog?.available;
+  const versions=F.versionRows(unit,snap);
+  const raw=selected?.raw||null;
+  const labels=snap.labels?.situations||{};
+  const renderRules=rules.map((r,i)=>`<article class="fu-ref-rule ${selected?.key===r.key&&!ui.creating?'is-on':''}" draggable="${unit==='habita'&&!readonly&&!ui.dirty&&rules.length>1}" data-fu-drag-key="${esc(r.key)}" data-testid="followup-rule-row">
+    <div class="fu-ref-rule-actions">
+      <div class="fu-ref-pos">P${i+1}</div>
+      <button type="button" class="fu-ref-rule-label" data-fu="rules-select" data-fu-key="${esc(r.key)}">
+        <strong>${esc(r.raw.name||r.action||'Mensaje de la etapa')}</strong>
+        <small>${esc(r.when)}</small>
+        <small>${esc(r.wait)}${r.enabled?'':' · APAGADA'}</small>
+      </button>
+      ${unit==='habita'&&!readonly?`<div class="fu-ref-reorder"><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="up" ${!i||ui.dirty?'disabled':''} aria-label="Subir regla" title="Subir prioridad">↑</button><button type="button" class="fu-ref-move" data-fu="rules-move" data-fu-key="${esc(r.key)}" data-fu-dir="down" ${i===rules.length-1||ui.dirty?'disabled':''} aria-label="Bajar regla" title="Bajar prioridad">↓</button></div>`:''}
+    </div>
+  </article>`).join('');
+  const currentAction=raw?.action||'principal';
+  const form=ui.creating && !stage?'<section class="card glass"><p class="os-view-caption">Cliente es el último hito del embudo y no tiene reglas configurables.</p></section>'
+    :unit==='habita'?fuRuleEditor(unit,snap):fuTurniaRuleEditor(snap,raw,stage);
+  const message=stage&&!ui.creating?fuRulesMessage(unit,snap,raw,stage,false):fuRulesMessage(unit,snap,raw,stage,true);
+  const addAllowed=unit==='habita'&&!readonly&&tech.length>0;
+  const safeRules=rules.map(r=>r.raw);
+  return `<section class="hero"><div><span class="eyebrow">${esc(fuName(unit).toUpperCase())} / REGLAS Y MENSAJES</span><h1>Reglas que hacen avanzar.</h1>
+    <p>Elegí una etapa, seleccioná una regla a la izquierda y editá sus condiciones y mensajes a la derecha, igual que en el Follow-up de Habita.</p></div></section>
+    ${state.session?.open?'<p class="os-warn-note">La sesión abierta no permite editar reglas ni mensajes. Configurá PROSPECTING_PASSWORD en Vercel.</p>':''}
+    <section class="fu-ref-flowrow" data-testid="followup-flow"><span class="fu-ref-flow-label">ETAPAS COMERCIALES</span><nav class="fu-ref-flow" aria-label="Etapas comerciales">
+      ${commercial.map((s,i)=>`<button type="button" class="fu-ref-flowstep ${active?.key===s.key?'is-on':''}" data-fu="rules-stage" data-fu-stage="${esc(s.key)}" aria-pressed="${active?.key===s.key}" data-testid="followup-commercial-stage">
+        <span class="fu-ref-num">${i+1}</span><span><b>${esc(s.title)}</b><small>${int(s.waiting)} esperando</small></span></button>${i<commercial.length-1?'<span class="fu-ref-arrow" aria-hidden="true">›</span>':''}`).join('')}
+    </nav></section>
+    <section class="fu-ref-stage-head" data-testid="followup-stage-head"><div><div class="fu-ref-stage-title"><span class="fu-ref-num">${commercial.indexOf(active)+1}</span>
+      <h2>${esc(active?.title||'')}</h2><span class="os-tag">REGLAS DE LA ETAPA</span></div>
+      <p>Las condiciones de avance, las respuestas de WhatsApp y los eventos de producto se configuran dentro de cada regla.</p></div>
+      <p>Seleccioná una regla para editarla o creá una nueva. La cola de ejecución muestra a quién corresponde aplicarla.</p></section>
+    <div class="fu-ref-workspace" data-testid="followup-rules-workspace">
+      <aside class="fu-ref-list card glass" data-testid="followup-rules-list">
+        <div class="os-section-heading"><div><h3>Reglas de esta etapa</h3><p class="os-view-caption">${unit==='habita'?'Arrastrá las reglas o usá las flechas para ordenar su prioridad. P1 se evalúa primero.':'Las reglas de Turnia respetan su secuencia nativa.'}</p></div>
+          <div class="fu-ref-add-area"><button type="button" class="btn small" data-fu="rules-add-menu" ${addAllowed?'':'disabled'} data-testid="followup-rule-add">+ AGREGAR REGLA ▾</button>
+          ${ui.showMenu?`<div class="fu-ref-add-menu"><button type="button" data-fu="rules-new">+ CREAR UNA REGLA NUEVA</button><button type="button" data-fu="rules-pick">USAR UNA REGLA EXISTENTE</button></div>`:''}</div></div>
+        <div class="fu-ref-rule-list">${renderRules}${ui.creating?`<article class="fu-ref-rule is-on"><div class="fu-ref-rule-actions"><span class="fu-ref-pos">+</span><div class="fu-ref-rule-label"><strong>${ui.template?'Copia de regla existente':'Nueva regla'}</strong><small>Revisala a la derecha y guardala.</small></div></div></article>`:''}
+        ${!rules.length&&!ui.creating?'<p class="os-view-caption">Esta etapa no tiene reglas configuradas.</p>':''}</div>
+        <details class="fu-ref-classifier-link"><summary>Administrar clasificaciones de WhatsApp</summary><p class="os-view-caption">Las situaciones existentes y personalizadas se configuran en el mismo catálogo por etapa.</p><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></details>
+      </aside>
+      <div class="fu-ref-detail" data-testid="followup-rule-detail">
+        ${ui.creating && tech.length>1?`<div class="card glass fu-ref-step-switch"><label class="field"><span>PASO TÉCNICO DE LA REGLA</span><select class="input" data-fu-rules-tech>${tech.map(key=>`<option value="${esc(key)}" ${stage===key?'selected':''}>${esc(snap.stages.find(s=>s.key===key)?.title||key)}</option>`).join('')}</select></label></div>`:''}
+        ${form}
+        ${message}
+        ${!ui.creating&&selected&&unit==='habita'&&!readonly?`<div class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-delete" data-fu-key="${esc(selected.key)}">ELIMINAR REGLA</button></div>`:''}
+        ${unit==='turnia'&&!snap.catalog?.available?'<p class="os-warn-note">El editor de reglas de Turnia se activará al desplegar su catálogo y validar el motor; la lectura de reglas sigue disponible.</p>':''}
+      </div></div>
+    ${ui.picking?`<div class="fu-ref-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="fu-rule-pick-title"><div class="fu-ref-picker card glass">
+      <div class="os-section-heading"><h3 id="fu-rule-pick-title">Usar una regla existente</h3><button type="button" class="btn small" data-fu="rules-pick-close">CERRAR</button></div>
+      <p class="os-view-caption">Elegí cualquier regla como punto de partida. La copia se abre a la derecha para que la adaptes a esta etapa antes de guardar.</p>
+      <div class="fu-ref-picker-list">${(snap.rules||[]).map(r=>`<button type="button" data-fu="rules-template" data-fu-key="${esc(r.key)}"><b>${esc(snap.stages.find(s=>s.key===r.stage)?.title||r.stage)}</b><span>${esc(r.name||r.action)}</span><small>${esc((r.situations||[]).map(x=>labels[x]||x).join(', '))}</small></button>`).join('')}</div>
+    </div></div>`:''}`;
+}
 
   function fuRendimiento() {
     const n = state.fu.n;
