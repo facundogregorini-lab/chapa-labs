@@ -94,3 +94,16 @@ test('habita: after the greetings, its funnel counts what prospected agencies di
   const paths = habita.targets.slice(1).map((s) => s.metrics);
   assert.deepEqual(paths, ['prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.visitadas', 'prospeccion.periodo.conInteraccion', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
 });
+
+test('mobile order: both funnels first, then the queue of each product; no false «all on target»',()=>{
+  const t={...unit,id:'turnia',name:'Turnia',queueHtml:'<div data-testid="queue-turnia"></div>'};
+  const h={...unit,queueHtml:'<div data-testid="queue-habita"></div>'};
+  const html=O.render({units:[t,h],view:{period:'7',grain:'dia',step:{}},today:'2026-11-11'});
+  const at=s=>html.indexOf(s);
+  assert.ok(at('overview-funnel-turnia')<at('overview-funnel-habita'));
+  assert.ok(at('overview-funnel-habita')<at('queue-turnia'));
+  assert.ok(at('queue-turnia')<at('queue-habita'));
+  const empty=O.render({units:[{...unit,funnel:{steps:[steps[0],{...steps[1],rate:null}]}}],view:{period:'7',grain:'dia',step:{}},today:'2026-11-11'});
+  assert.doesNotMatch(empty,/Todos los pasos convierten en meta/);
+  assert.match(empty,/Todavía no hay conversiones en este período/);
+});

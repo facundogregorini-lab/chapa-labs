@@ -96,13 +96,15 @@
       const cls=s.actual==null?'is-none':(i?r:reach)>=1?'is-good':(i?r:reach)>=.8?'is-warn':'is-bad';
       return `<button type="button" class="ov-col ${selected===i?'is-on':''} ${worst&&worst.i===i&&worst.r<1?'is-worst':''}" data-fu="ov-step" data-fu-unit-id="${esc(u.id)}" data-fu-step="${i}" aria-pressed="${selected===i}" aria-label="${esc(s.label)}: ${num(s.actual)} de una meta de ${num(s.target)}">
           <span class="ov-val">${s.actual==null?'—':num(s.actual)}</span>
-          <span class="ov-bars"><i class="ov-goal" style="height:${h(s.target).toFixed(1)}px"></i><i class="ov-real" style="height:${h(s.actual||0).toFixed(1)}px"></i></span>
+          <span class="ov-bars"><i class="ov-goal" style="height:${h(s.target).toFixed(1)}px;--w:${(h(s.target)/1.5).toFixed(1)}%"></i><i class="ov-real" style="height:${h(s.actual||0).toFixed(1)}px;--w:${(h(s.actual||0)/1.5).toFixed(1)}%"></i></span>
           <span class="ov-name">${esc(s.label)}</span><small>meta ${num(s.target)}</small>
           <span class="ov-conv ${cls}" title="${i?`Conversión desde «${esc(steps[i-1].label)}»: ${pc(s.rate)}, esperada ${pc(s.targetRate)}`:`${pc(reach)} de la meta`}">${i?`<b>${s.rate==null?'—':pc(s.rate)}</b><small>esp. ${pc(s.targetRate)}</small>`:`<b>${pc(reach)}</b><small>de la meta</small>`}</span></button>`;}).join('');
     return `<section class="ov-card ov-funnel" style="--ov-c:${esc(u.color)}" data-testid="overview-funnel-${esc(u.id)}">
-      <div class="ov-head"><h3><i class="ov-dot"></i>${esc(u.name)}</h3><span class="ov-muted">${num(steps.at(-1).actual)} de ${num(steps.at(-1).target)} ${esc(steps.at(-1).label.toLowerCase())} · meta de ${num(u.perWeek)} saludos por semana</span></div>
+      <div class="ov-head"><h3><i class="ov-dot"></i>${esc(u.name)} <small class="ov-sub">· Embudo</small></h3><span class="ov-muted">${num(steps.at(-1).actual)} de ${num(steps.at(-1).target)} ${esc(steps.at(-1).label.toLowerCase())} · meta de ${num(u.perWeek)} saludos por semana</span></div>
       <div class="ov-cols">${cols}</div>
-      ${worst&&worst.r<1?`<p class="ov-flag">Acá se frena: ${esc(steps[worst.i-1].label)} → ${esc(steps[worst.i].label)} convierte ${times(worst.r)} lo esperado.</p>`:'<p class="ov-flag is-ok">Todos los pasos convierten en meta o por encima.</p>'}
+      ${worst&&worst.r<1?`<p class="ov-flag">Acá se frena: ${esc(steps[worst.i-1].label)} → ${esc(steps[worst.i].label)} convierte ${times(worst.r)} lo esperado.</p>`
+        :steps.slice(1).every(s=>s.rate!=null&&s.targetRate)?'<p class="ov-flag is-ok">Todos los pasos convierten en meta o por encima.</p>'
+        :'<p class="ov-flag is-none">Todavía no hay conversiones en este período para comparar con la meta.</p>'}
       <div class="ov-legend"><span><i class="is-real"></i>Logrado</span><span><i class="is-goal"></i>Meta del período</span><span>Debajo de cada paso: su conversión desde el anterior y la esperada. Tocá un paso para seguirlo abajo.</span></div>
     </section>`;
   }
@@ -176,7 +178,7 @@
     const r=pearson(a,b);
     const avg=l=>l.length?l.reduce((s,x)=>s+x,0)/l.length:null;
     const lift=avg(good)!==null&&avg(bad)?avg(good)/avg(bad):null;
-    return `<div class="ov-kpi" style="--ov-c:${esc(u.color)}"><span class="ov-kicker"><i class="ov-dot"></i>${esc(u.name)} · ${esc(step.label)}</span>
+    return `<div class="ov-kpi ${r===null?'is-empty':''}" style="--ov-c:${esc(u.color)}"><span class="ov-kicker"><i class="ov-dot"></i>${esc(u.name)} · ${esc(step.label)}</span>
       <strong class="${r===null?'':r>.6?'is-good':r>.3?'is-warn':'is-bad'}">${r===null?'—':r.toFixed(2).replace('.',',')}</strong>
       <small>${r===null?`Correlación entre lo ejecutado y lo que llegó cada día: hace falta al menos 14 días con datos (hay ${a.length}).`:`Correlación ${r>.6?'fuerte':r>.3?'moderada':'débil'} entre lo ejecutado cada día y los que llegaron a este paso.`}</small>
       ${lift!==null?`<small>Los días con 85% o más de la cola ejecutada llegan ${times(lift)} más que los días con menos de 70%.</small>`:''}</div>`;
@@ -221,13 +223,14 @@
     const todo=pts.filter(p=>p.kind!=='ok').sort((a,b)=>order[a.kind]-order[b.kind]||b.today-a.today).slice(0,5);
     return `<div class="ov" data-testid="overview">
       <section class="ov-top"><div><span class="ov-kicker">CHAPA LABS / GENERAL</span><h1>¿La ejecución está moviendo los embudos?</h1>
-        <p>Cada producto contra su meta y, debajo, cómo se ejecutó su cola. Después, cómo avanzó día a día y qué conviene hacer.</p></div>
+        <p>Primero el embudo de cada producto contra su meta; después, cómo se ejecutó la cola de cada uno, cómo avanzó y qué conviene hacer.</p>${ctx.loading?'<span class="ov-loading" role="status">Actualizando…</span>':''}</div>
         <div class="ov-filters">
           <nav class="ov-seg" aria-label="Período">${PERIODS.map(([k,l])=>`<button type="button" class="${view.period===k?'is-on':''}" aria-pressed="${view.period===k}" data-fu="ov-period" data-fu-period="${k}" data-testid="overview-period-${k}">${l}</button>`).join('')}</nav>
           <nav class="ov-seg" aria-label="Ver por">${GRAINS.map(([k,l])=>`<button type="button" class="${view.grain===k?'is-on':''}" aria-pressed="${view.grain===k}" data-fu="ov-grain" data-fu-grain="${k}">${l}</button>`).join('')}</nav>
         </div></section>
       ${ctx.notice?`<p class="ov-note">${esc(ctx.notice)}</p>`:''}
-      <div class="ov-units">${units.map(u=>`<div class="ov-unit" data-testid="overview-unit-${esc(u.id)}">${funnelCard(u,view)}${u.queueHtml||''}</div>`).join('')}</div>
+      <div class="ov-units" data-testid="overview-funnels">${units.map(u=>`<div class="ov-unit" data-testid="overview-unit-${esc(u.id)}">${funnelCard(u,view)}</div>`).join('')}</div>
+      <div class="ov-units" data-testid="overview-queues">${units.map(u=>`<div class="ov-unit" data-testid="overview-queue-${esc(u.id)}">${u.queueHtml||''}</div>`).join('')}</div>
       <section class="ov-card ov-wide" data-testid="overview-advance"><div class="ov-head"><div><h2>Cómo avanzó</h2>
         <p class="ov-muted">De los contactados cada ${view.grain==='semana'?'semana':'día'}, cuántos llegaron al paso elegido arriba, contra la meta (la misma cohorte del embudo). Abajo, las acciones ejecutadas de la cola que lleva a ese paso: si suben y no sube el avance, el problema no es ejecutar. Los últimos días todavía están madurando.</p></div></div>
         <div class="ov-units">${units.map(u=>advanceCard(u,view,days)).join('')}</div></section>
