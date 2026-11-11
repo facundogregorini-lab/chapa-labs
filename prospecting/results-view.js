@@ -1,9 +1,9 @@
 /* Resultados de Follow-up, en tres lecturas, para habita. y Turnia:
  *   1. ¿Se ejecutó la cola? Pendientes → ejecutadas (persona / bot) → exitosas, por día o período,
  *      con el score de ejecución; cada barra se abre en sus tipos de acción.
- *   2. Qué acciones convierten: una fila por tipo de acción; al abrirla, las etapas donde corrió
+ *   2. Cohortes con el embudo de Follow-up de cada unidad, como mapa de calor.
+ *   3. Qué acciones convierten: una fila por tipo de acción; al abrirla, las etapas donde corrió
  *      y sus versiones.
- *   3. Cohortes con las etapas del panel de cada unidad, como mapa de calor.
  * Muestra lo que manda cada producto (amoblaia results / turniasalud results) sin recalcular
  * conversiones: «exitosa» es una ejecución con conversión atribuida, con la definición de cada uno. */
 (function(root,factory){
@@ -207,7 +207,7 @@
       return `<svg class="rs-spark" viewBox="0 0 110 30" aria-hidden="true"><path d="${d} L${last[0]} 30 L3 30 Z" class="rs-spark-area"/><path d="${d}" class="rs-spark-line"/><circle cx="${last[0]}" cy="${last[1]}" r="2.6" class="rs-spark-dot"/></svg>`;
     };
     return `<section class="rs-card" data-testid="results-actions">
-      <div class="rs-head"><div><h2><span class="rs-step">2</span>Qué acciones convierten</h2>
+      <div class="rs-head"><div><h2><span class="rs-step">3</span>Qué acciones convierten</h2>
         <p>Una fila por tipo de acción, sumando todas las etapas donde corre. Tocá o hacé doble clic en una fila para ver en qué etapas se ejecutó y cómo le fue a cada versión.</p></div>
         ${unit==='habita'?`<nav class="rs-seg" aria-label="Ventana de conversión">${Object.entries(WINDOWS).map(([k,l])=>`<button type="button" class="${view.windowKey===k?'is-on':''}" aria-pressed="${view.windowKey===k}" data-fu="results-window" data-fu-window="${k}" data-testid="followup-window-${k}">${l}</button>`).join('')}</nav>`:'<span class="rs-muted">Conversión: avanzó de paso después del envío</span>'}</div>
       <div class="rs-act-head" aria-hidden="true"><span></span><span>Acción</span><span>Ejecutadas y conversiones</span><span>Ejec.</span><span>Conv.</span><span>Tasa · 8 semanas</span></div>
@@ -240,7 +240,7 @@
     const rows=first<0?[]:all.slice(first);
     const who=unit==='habita'?'inmobiliarias':'odontólogos';
     return `<section class="rs-card" data-testid="results-cohorts">
-      <div class="rs-head"><div><h2><span class="rs-step">3</span>Cohortes</h2>
+      <div class="rs-head"><div><h2><span class="rs-step">2</span>Cohortes</h2>
         <p>Con las etapas del embudo de Follow-up, desde ${unit==='habita'?'Contactado':'Saludado'}. Cada celda es el porcentaje de la cohorte que llegó a esa etapa: cuanto más oscura, mejor.</p></div>
         ${options.length>1?`<nav class="rs-seg" aria-label="Agrupación de cohortes">${options.map(([k,l])=>`<button type="button" class="${by===k?'is-on':''}" aria-pressed="${by===k}" data-fu="results-cohort" data-fu-cohort="${k}" data-testid="followup-cohort-${k}">${l}</button>`).join('')}</nav>`:''}</div>
       ${stages.length?`<div class="rs-table-scroll"><table class="rs-heat" data-testid="followup-results-cohorts"><thead><tr><th>${by==='version'?'Segmento':'Semana'}</th>${stages.map(s=>`<th>${esc(s.title)}</th>`).join('')}</tr></thead><tbody>
@@ -286,8 +286,8 @@
     const cohorts=ctx.cohorts||snap.results.cohortFunnel;
     return `<div class="rs" data-unit-results="${esc(unit)}" data-testid="followup-results">
       ${queueSection(unit,snap,v,stageTitle)}
-      ${actionRows(unit,snap,v,stageTitle,label)}
       ${cohortSection(unit,cohorts,v)}
+      ${actionRows(unit,snap,v,stageTitle,label)}
     </div>`;
   }
   /** Solo «¿Se ejecutó la cola?», para el Resumen general. */
