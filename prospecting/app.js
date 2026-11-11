@@ -141,7 +141,30 @@
   }
 
   // ─── Rutas ──────────────────────────────────────────────────
+  // ─── Modo extensión ─────────────────────────────────────────
+  // Una pestaña abierta con ?agente=1 es la de la extensión del navegador: lo que se confirme ahí se
+  // guarda como hecho por un bot (executed_by), en habita y en Turnia. Queda en esa pestaña
+  // (sessionStorage) aunque se navegue; ?agente=0 lo apaga. Las otras pestañas siguen siendo de personas.
+  const AGENT_KEY = 'cl-agente';
+  function agentMode() { try { return sessionStorage.getItem(AGENT_KEY) === '1'; } catch { return false; } }
+  function syncAgentMode() {
+    const q = new URLSearchParams(location.search).get('agente');
+    try { if (q === '1') sessionStorage.setItem(AGENT_KEY, '1'); else if (q === '0') sessionStorage.removeItem(AGENT_KEY); } catch { /* sin storage */ }
+    let bar = document.getElementById('agent-mode-banner');
+    if (!agentMode()) { if (bar) bar.remove(); return; }
+    if (bar) return;
+    bar = document.createElement('div');
+    bar.id = 'agent-mode-banner';
+    bar.setAttribute('role', 'status');
+    bar.setAttribute('data-testid', 'agent-mode-banner');
+    bar.style.cssText = 'position:sticky;top:0;z-index:50;padding:8px 16px;background:#1f3d2b;color:#fff;font-size:13px;text-align:center';
+    const exit = new URL(location.href); exit.searchParams.set('agente', '0');
+    bar.innerHTML = `<strong>Modo extensión</strong> · lo que se confirme en esta pestaña cuenta como hecho por la extensión, no por una persona. <a href="${esc(exit.pathname + exit.search)}" style="color:#fff;text-decoration:underline">Salir del modo extensión</a>`;
+    document.body.prepend(bar);
+  }
+
   function readRoute() {
+    syncAgentMode();
     const m = location.pathname.match(/^\/prospecting\/?(turnia|habita|todas)?/);
     state.unit = (m && m[1]) || 'todas';
     const v = new URLSearchParams(location.search).get('vista');
@@ -2453,7 +2476,7 @@
     if (state.fu.busy) return null;
     state.fu.busy = true;
     try {
-      const { result } = await api('task', { method: 'POST', body: { unit, followup } });
+      const { result } = await api('task', { method: 'POST', body: { unit, followup: agentMode() ? { ...followup, ejecutor: 'bot' } : followup } });
       if (!['queue', 'replies', 'whatsapp-search'].includes(followup.op)) state.fu.revision++;
       if (label) toast(label);
       if (result && result.warning) toast(result.warning, true);
