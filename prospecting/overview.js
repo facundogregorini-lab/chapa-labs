@@ -208,7 +208,7 @@
   // ── 0. Evolución semanal: cada paso del embudo, semana a semana (lunes a domingo) ──
   const EVO_WEEKS=[4,8,12];
   // Marcados de entrada: saludos, el primer interés (respondieron, si el producto lo mide) y la interacción con la demo.
-  const EVO_DEFAULT=['saludos','respondieron','interaccion'];
+  const EVO_DEFAULT=['saludos','interesados','interaccion'];
   const evoDefault=keys=>{const on=keys.filter(k=>EVO_DEFAULT.includes(k));return on.length>=3||keys.length<3?on:on.concat(keys.filter(k=>!on.includes(k)&&k!=='saludos').slice(0,3-on.length));};
   /** The days of the last `n` Mon–Sun weeks, the current one included (up to today). */
   function evoDays(today,n){

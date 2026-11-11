@@ -92,7 +92,7 @@ test('habita: after the greetings, its funnel counts what prospected agencies di
   const U = require('../prospecting/units.js');
   const habita = (U.UNITS || U).habita || U.list().find((u) => u.id === 'habita');
   const paths = habita.targets.slice(1).map((s) => s.metrics);
-  assert.deepEqual(paths, ['prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.visitadas', 'prospeccion.periodo.conInteraccion', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
+  assert.deepEqual(paths, ['prospeccion.periodo.interesados', 'prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
 });
 
 test('mobile order: both funnels first, then the queue of each product; no false «all on target»',()=>{
@@ -112,8 +112,8 @@ test('weekly evolution: Mon–Sun weeks, separate cards per product, before the 
   const days=O.evoDays('2026-11-11',4);
   assert.equal(days[0],'2026-10-19');assert.equal(days.at(-1),'2026-11-11');
   assert.deepEqual(O.buckets(days,'semana').map(w=>w.key),['2026-10-25','2026-11-01','2026-11-08','2026-11-15']);
-  assert.deepEqual(O.evoDefault(['saludos','respondieron','demos','visitadas','interaccion','llamadas','fundadores']),['saludos','respondieron','interaccion']);
-  assert.deepEqual(O.evoDefault(['saludos','demos','visitadas','interaccion','cuentas','activas','pagos']),['saludos','interaccion','demos']);
+  assert.deepEqual(O.evoDefault(['saludos','demos_enviadas','visitadas','interaccion','cuentas','activas','clientes']),['saludos','interaccion','demos_enviadas']);
+  assert.deepEqual(O.evoDefault(['saludos','interesados','demos_enviadas','cuentas_creadas','activas','pagos']),['saludos','interesados','demos_enviadas']);
   const evoSteps=[{key:'saludos',label:'Saludos enviados'},{key:'demos',label:'Demos enviadas'},{key:'interaccion',label:'Con interacción'}];
   const weekly=[{key:'2026-10-26',label:'Sem. al 26 oct',short:'26 oct',partial:false,steps:[100,10,4]},{key:'2026-11-02',label:'Sem. al 2 nov',short:'2 nov',partial:false,steps:[120,null,5]},
     {key:'2026-11-09',label:'Sem. al 9 nov',short:'9 nov',partial:false,steps:[150,12,6]},{key:'2026-11-16',label:'Sem. al 16 nov',short:'16 nov',partial:true,steps:[40,2,1]}];
