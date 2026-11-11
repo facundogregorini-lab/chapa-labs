@@ -2684,3 +2684,7 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard>.toolbar{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;min-width:0;margin:0!important;padding:0 10px 4px!important;width:100%!important;box-sizing:border-box}
   body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard>.toolbar>*{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 }
+
+/* Turnia: el mismo «Funnel comercial» de habita., con sus siete pasos. */
+body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat(7,minmax(105px,1fr));min-width:780px}
+@media(max-width:760px){body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat(7,102px);min-width:750px}}

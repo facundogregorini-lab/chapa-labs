@@ -3023,7 +3023,8 @@
 
   // Historical funnel status, commercial stage and conversation situation
   // are three independent dimensions, also for end-of-day review.
-  function fuFunnelReviewList(snap, historical, focus, chart) {
+  function fuFunnelReviewList(snap, historical, focus, chart, unit='habita') {
+    const turnia=unit==='turnia';
     const n=state.fu.n;
     const chosen=focus?historical.filter(x=>{
       const step=Number(x.step),selected=Number(focus.step);
@@ -3034,8 +3035,8 @@
       return step>=selected;
     }):historical;
     const index=new Map([...n.queue,...n.scheduled,...n.blocked,...(n.noInteresados||[])]
-      .filter(x=>x.unit==='habita').map(x=>[x.id,x]));
-    const stages=F.commercialStages('habita',snap).filter(v=>v.technical?.length&&!v.situation);
+      .filter(x=>x.unit===unit).map(x=>[x.id,x]));
+    const stages=F.commercialStages(unit,snap).filter(v=>v.technical?.length&&!v.situation);
     const situations=Object.entries(snap.labels?.situations||{});
     const limit=state.fu.funnelReviewLimit||80;
     const cards=chosen.slice(0,limit).map(x=>{
@@ -3049,40 +3050,49 @@
       const stageOpts=stages.map(st=>'<option value="'+esc(st.technical.includes(technical)?technical:st.technical[0])+'" '+(commercial?.key===st.key?'selected':'')+'>'+esc(st.title)+'</option>').join('');
       const situOpts=situations.map(([key,label])=>'<option value="'+esc(key)+'" '+(situation===key?'selected':'')+'>'+esc(label)+'</option>').join('');
       return '<article class="os-fu-funnel-review-item" data-testid="fu-funnel-review-item">'+
-        '<header><div><strong>'+esc(x.name||current?.name||'Inmobiliaria')+'</strong>'+
+        '<header><div><strong>'+esc(x.name||current?.name||(turnia?'Odontólogo':'Inmobiliaria'))+'</strong>'+
         '<span>Estado del embudo: <b>'+esc(step)+'</b>'+(x.lost?' · Perdida':'')+'</span></div>'+
         (webLink?'<a class="btn os-fu-funnel-wa" target="_blank" rel="noopener noreferrer" href="'+esc(webLink)+'">WhatsApp Web ↗</a>':'<span class="os-fu-caption">WhatsApp no disponible</span>')+
-        '</header><form data-fu-funnel-review data-fu-review-id="'+esc(x.agencyId)+'" data-fu-review-stage="'+esc(technical)+'" data-fu-review-situation="'+esc(situation)+'">'+
-        '<label>Etapa comercial<select name="etapa" class="input">'+
+        '</header><form data-fu-funnel-review data-fu-review-unit="'+esc(unit)+'" data-fu-review-id="'+esc(x.agencyId)+'" data-fu-review-stage="'+esc(technical)+'" data-fu-review-situation="'+esc(situation)+'">'+
+        // Turnia: the stage follows from what the person did (its engine has no manual stage change).
+        (turnia?'':'<label>Etapa comercial<select name="etapa" class="input">'+
         '<option value="" '+(!commercial?'selected':'')+'>'+(commercial?'Sin cambio':'Sin etapa asignada')+'</option>'+stageOpts+
-        '</select></label><label>Situación<select name="situacion" class="input">'+
+        '</select></label>')+'<label>Situación<select name="situacion" class="input">'+
         '<option value="" '+(!situation?'selected':'')+'>Sin clasificar</option>'+situOpts+
         '</select></label><button type="submit" class="btn os-fu-review-save">Guardar cambios</button></form>'+
         (commercial&&current?.stageTitle&&current.stageTitle!==commercial.title?'<small>Actividad actual: '+esc(current.stageTitle)+'</small>':'')+
         '</article>';
     }).join('');
-    return '<section class="os-fu-funnel-review" data-testid="fu-funnel-review" aria-label="Inmobiliarias del embudo">'+
+    return '<section class="os-fu-funnel-review" data-testid="fu-funnel-review" aria-label="'+(turnia?'Odontólogos':'Inmobiliarias')+' del embudo">'+
       '<div class="os-fu-funnel-review-heading"><span class="os-kicker">REVISIÓN DE JORNADA</span>'+
-      '<h2>Inmobiliarias · '+int(chosen.length)+'</h2>'+
-      '<p>Estado alcanzado, etapa comercial y situación son campos distintos. Guardá las correcciones antes de continuar.</p></div>'+
-      '<div class="os-fu-funnel-review-list">'+(cards||'<p>No hay inmobiliarias para este filtro.</p>')+'</div>'+
+      '<h2>'+(turnia?'Odontólogos':'Inmobiliarias')+' · '+int(chosen.length)+'</h2>'+
+      '<p>'+(turnia?'Estado alcanzado y situación son campos distintos: el estado sale de lo que hizo cada uno. Guardá las correcciones antes de continuar.':'Estado alcanzado, etapa comercial y situación son campos distintos. Guardá las correcciones antes de continuar.')+'</p></div>'+
+      '<div class="os-fu-funnel-review-list">'+(cards||'<p>No hay '+(turnia?'odontólogos':'inmobiliarias')+' para este filtro.</p>')+'</div>'+
       (chosen.length>limit?'<button type="button" class="btn" data-fu="funnel-review-more">Ver '+int(Math.min(80,chosen.length-limit))+' más</button>':'')+
       '</section>';
   }
 
-  function fuNativeChart(snap) {
+  function fuNativeChart(snap, unit='habita') {
   const chart=snap?.chart,lostAt=snap?.lostAt,rows=snap?.chartRows;
+  const turnia=unit==='turnia',who=turnia?'odontólogos':'inmobiliarias',lostWord=turnia?'perdidos':'perdidas';
   if(!Array.isArray(chart)||!Array.isArray(lostAt)||!Array.isArray(rows))
     return `<div class="os-funnel-note" data-testid="followup-native-chart-unavailable">El embudo histórico original todavía no está disponible en la API. El resumen de etapas y reglas se mantiene debajo.</div>`;
   const period=fuChartPeriod(),focus=state.fu.chartFocus||null;
   // The exact labels and source explanations of Habita's
   // CommercialFunnelChart, not generic "del paso anterior" placeholders.
-  const stayedLabels=[
+  // Turnia: its own steps (stepOf in turniasalud followup-stages.ts), from the greeting.
+  const stayedLabels=turnia?[
+    'Sin demo todavía','No abrieron la demo','Visitaron, sin conversar',
+    'Conversaron, sin cuenta','Cuentas sin actividad','Sin pago',
+  ]:[
     'Sin interés todavía','Interesados, sin demo','No se enviaron',
     'No abrieron la demo','Visitaron, sin interactuar',
     'Interactuaron, sin cuenta','Cuenta sin uso','Sin suscripción',
   ];
-  const previousLabels=[
+  const previousLabels=turnia?[
+    '', 'de los saludados','de las enviadas','de los que la visitaron',
+    'de los que conversaron','de las cuentas','de las activas',
+  ]:[
     '', 'de los contactados','de los interesados','de las creadas',
     'de las enviadas','de las visitadas','de las que interactuaron',
     'de las cuentas creadas','de las cuentas activas',
@@ -3100,7 +3110,7 @@
     if(count<=0)return '';
     const selected=focus?.step===i&&focus.mode===mode;
     return `<button type="button" class="os-native-segment is-${mode} ${selected?'is-on':''} ${extra}" style="${style}" data-fu="funnel-select" data-fu-step="${i}" data-fu-mode="${mode}"
-      aria-label="${int(count)} ${esc(label)}. Ver inmobiliarias" aria-pressed="${selected}" title="${int(count)} · ${esc(label)}">${int(count)}</button>`;
+      aria-label="${int(count)} ${esc(label)}. Ver ${who}" aria-pressed="${selected}" title="${int(count)} · ${esc(label)}">${int(count)}</button>`;
   };
   const picks=chart.map((x,i)=>{
     const count=Number(x.count)||0,last=i===chart.length-1,next=Number(chart[i+1]?.count||0);
@@ -3110,7 +3120,7 @@
     const label=x.label||`Paso ${i+1}`;
     return `<li class="os-native-step">
       <button type="button" class="os-native-step-top ${selected?'is-on':''}" aria-pressed="${selected}" data-fu="funnel-select" data-fu-step="${i}" data-fu-mode="arrived"
-        title="Ver las ${int(count)} que llegaron a ${esc(label)}"><strong>${int(count)}</strong><small>${i===0?'Base del período':x.ofPrevious==null?'—':`${int(x.ofPrevious)}% ${esc(previousLabels[i]||'del paso anterior')}`}</small></button>
+        title="Ver ${turnia?'los':'las'} ${int(count)} que llegaron a ${esc(label)}"><strong>${int(count)}</strong><small>${i===0?'Base del período':x.ofPrevious==null?'—':`${int(x.ofPrevious)}% ${esc(previousLabels[i]||'del paso anterior')}`}</small></button>
       <div class="os-native-step-plot">
         ${count?`<div class="os-native-bar ${broken&&count>limit?'is-broken':''}" style="height:max(${full.toFixed(3)}%,${(stayed>0?1:0)+(lost>0?1:0)+(advanced>0?1:0)*24}px)">
           ${segment(i,'stayed',stayed,`se quedaron en ${label}`,`flex-grow:${stayed+lost?(rest*stayed/(stayed+lost)).toFixed(3):0}`)}
@@ -3120,20 +3130,20 @@
         </div>`:'<span class="os-native-zero"></span>'}
       </div><div class="os-native-step-label"><b>${i+1}. ${esc(label)}</b>
         ${last?'<small class="is-went">Clientes pagos</small>':stayed>0?`<small class="is-stayed">${int(stayed)} ${esc((stayedLabels[i]||'sin avanzar').toLocaleLowerCase('es-AR'))}</small>`:(!lost?'<small>&nbsp;</small>':'')}
-        ${lost?`<small class="is-lost">${int(lost)} perdidas</small>`:''}
+        ${lost?`<small class="is-lost">${int(lost)} ${lostWord}</small>`:''}
       </div></li>`;
   }).join('');
   return `<section class="os-native-funnel" data-testid="followup-native-funnel">
-    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
+    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta ${turnia?'los odontólogos que llegaron':'las inmobiliarias que llegaron'} hasta ahí. El % compara con el paso anterior.</p></div>
       <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
         <form data-fu-chart-range><label>Desde <input class="input" type="date" name="desde" value="${esc(period.from||'')}"></label>
           <label>Hasta <input class="input" type="date" name="hasta" value="${esc(period.to||'')}"></label>
           <button class="btn small" type="submit">APLICAR</button></form></div></div>
     <div class="os-native-legend"><span><i class="is-went"></i>Pasaron al paso siguiente</span>
-      <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>Perdidas (no interesadas)</span></div>
-    <div class="os-native-chart-scroll"><ol class="os-native-chart" aria-label="Embudo comercial histórico">${picks}</ol></div>
-    <p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>
-    ${fuFunnelReviewList(snap,rows,focus,chart)}
+      <span><i class="is-stayed"></i>Se quedaron (seguimiento)</span><span><i class="is-lost"></i>${turnia?'Perdidos (cerrados)':'Perdidas (no interesadas)'}</span></div>
+    <div class="os-native-chart-scroll"><ol class="os-native-chart ${turnia?'is-turnia':''}" aria-label="Embudo comercial histórico">${picks}</ol></div>
+    ${turnia?`<p class="os-native-note">Tocá una parte de una barra para ver sus odontólogos: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no le interesa, sin WhatsApp o pidió la baja). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Cuenta a los saludados en el período (por la fecha del saludo), con las definiciones del embudo de Turnia: cada paso cuenta a quien llegó ahí o más lejos.</p>`:`<p class="os-native-note">Tocá una parte de una barra para ver sus inmobiliarias: lo verde pasó al paso siguiente; lo naranja se quedó ahí; lo gris se perdió (no interesadas). Una barra cortada no está a escala por encima del corte, para que se vean los pasos chicos. Los dos primeros pasos salen de la columna «Estado» de la planilla de prospección (se sincroniza cada hora) y el período los cuenta por la fecha del primer contacto; una inmobiliaria con demo cuenta también en esos pasos. «Con interacción» incluye descargas e imágenes generadas en la demo; «Cuenta con interacción»: la cuenta subió o importó una propiedad, o generó una imagen. Un envío a un número incorrecto o sin WhatsApp no cuenta como contacto. Las inmobiliarias de prueba (QA) no cuentan.</p>`}
+    ${fuFunnelReviewList(snap,rows,focus,chart,unit)}
   </section>`;
 }
 
@@ -3159,6 +3169,8 @@
   // The secondary generic stages/rules board was an extra Chapa invention,
   // so omit it here and keep it for Turnia only.
   if(scope==='habita')return fuNativeChart(snap);
+  // Turnia: the same «Funnel comercial» as habita., with its own steps, once its API sends the chart.
+  if(scope==='turnia'&&Array.isArray(snap.chart)&&Array.isArray(snap.lostAt)&&Array.isArray(snap.chartRows))return fuNativeChart(snap,'turnia');
   const stages=F.commercialStages(scope,snap);
   const customStageKeys=new Set((snap.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
@@ -4277,7 +4289,7 @@
     if(form.matches('[data-fu-stage-form], [data-fu-state-form]')){await submitCatalog(form);return;}
     if(form.matches('[data-fu-funnel-review]')){
       const id=String(form.dataset.fuReviewId||'');
-      const unit='habita', snap=state.fu.n?.units?.habita;
+      const unit=form.dataset.fuReviewUnit==='turnia'?'turnia':'habita', snap=state.fu.n?.units?.[unit];
       const data=new FormData(form);
       const stage=String(data.get('etapa')||'');
       const situation=String(data.get('situacion')||'');
