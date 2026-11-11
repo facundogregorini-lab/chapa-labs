@@ -124,7 +124,7 @@ test('weekly evolution: Mon–Sun weeks, separate cards per product, before the 
   assert.match(html,/data-testid="overview-evo-weeks-4"[^>]*|class="is-on" aria-pressed="true" data-fu="ov-evo-weeks" data-fu-weeks="4"/);
   const card=O.evolutionCard(h,{evoSel:{}});
   assert.equal((card.match(/aria-pressed="true"/g)||[]).length,3);
-  assert.match(card,/\+25% vs sem\. ant\./); // 150 vs 120, la semana en curso no cuenta
+  assert.match(card,/<small class="is-up">\+25%<\/small>/); // 150 vs 120, la semana en curso no cuenta
   assert.match(card,/class="is-open"/);       // el tramo de la semana en curso, punteado
   assert.match(card,/<path d="M[^"]* C/);       // curvas, no rectas
   assert.match(O.evolutionCard(h,{evoSel:{habita:[]}}),/Elegí al menos un paso/);

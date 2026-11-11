@@ -2485,22 +2485,22 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 :root[data-theme="dark"] .ov{--ov-e0:#3fb07e;--ov-e1:#8fb4f0;--ov-e2:#6fd1c8;--ov-e3:#f0b860;--ov-e4:#f08a6a;--ov-e5:#c39be6;--ov-e6:#ef8aa0}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .ov{--ov-e0:#3fb07e;--ov-e1:#8fb4f0;--ov-e2:#6fd1c8;--ov-e3:#f0b860;--ov-e4:#f08a6a;--ov-e5:#c39be6;--ov-e6:#ef8aa0}}
 /* Evolución semanal */
-.ov-evo-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px}
-.ov-evo-chip{display:grid;gap:3px;text-align:left;border:1.5px solid var(--glass-edge);border-radius:12px;padding:8px 10px;background:transparent;color:inherit;font:inherit;cursor:pointer;min-height:44px;opacity:.72}
-.ov-evo-chip.is-on{border-color:var(--sc);background:var(--glass-strong);opacity:1}
-.ov-evo-chip:hover{opacity:1}
-.ov-evo-name{display:flex;align-items:flex-start;gap:6px;font-size:11.5px;font-weight:700;line-height:1.2}
-.ov-evo-name i{flex:none;width:11px;height:11px;margin-top:1px;border-radius:3px;border:2px solid var(--sc);box-sizing:border-box}
+.ov-evo-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ov-evo-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--glass-edge);border-radius:999px;padding:4px 10px 4px 8px;background:transparent;color:var(--muted);font:inherit;font-size:11.5px;cursor:pointer;min-height:30px;white-space:nowrap}
+.ov-evo-chip.is-on{border-color:var(--sc);background:var(--glass-strong);color:var(--ink)}
+.ov-evo-chip:hover{border-color:var(--sc)}
+.ov-evo-name{display:inline-flex;align-items:center;gap:6px;font-weight:700}
+.ov-evo-name i{flex:none;width:9px;height:9px;border-radius:50%;border:2px solid var(--sc);box-sizing:border-box}
 .ov-evo-chip.is-on .ov-evo-name i{background:var(--sc)}
-.ov-evo-num{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px}
-.ov-evo-num b{font:600 17px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
-.ov-evo-num small{font-size:10px;font-weight:700;color:var(--muted);white-space:nowrap}
+.ov-evo-num{display:inline-flex;align-items:baseline;gap:5px}
+.ov-evo-num b{font:600 12px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.ov-evo-num small{font-size:10px;font-weight:700;color:var(--muted)}
 .ov-evo-num small.is-up{color:var(--ov-good)}.ov-evo-num small.is-down{color:var(--ov-bad)}
 .ov-evo-chart{display:flex;gap:6px;padding-right:6px}
-.ov-evo-y{position:relative;width:30px;flex:none;height:200px}
+.ov-evo-y{position:relative;width:30px;flex:none;height:240px}
 .ov-evo-y span{position:absolute;right:0;transform:translateY(-50%);font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums}
 .ov-evo-main{flex:1;min-width:0;display:grid;gap:6px}
-.ov-evo-plot{position:relative;height:200px}
+.ov-evo-plot{position:relative;height:240px}
 .ov-evo-grid i{position:absolute;left:0;right:0;height:1px;background:var(--grid)}
 .ov-evo-plot svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .ov-evo-plot path{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
@@ -2728,8 +2728,10 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat(7,minmax(105px,1fr));min-width:780px}
 @media(max-width:760px){body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat(7,102px);min-width:750px}}
 @media(max-width:760px){
-  .ov-evo-chips{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .ov-evo-plot,.ov-evo-y{height:170px}
+  .ov-evo-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -2px;padding:0 2px 2px}
+  .ov-evo-chips::-webkit-scrollbar{display:none}
+  .ov-evo-chip{flex:none;min-height:32px;padding:4px 9px 4px 7px;font-size:11px}
+  .ov-evo-plot,.ov-evo-y{height:190px}
   .ov-evo-x.is-some span.is-m2,.ov-evo-x.is-many span.is-m3{visibility:hidden}
   .ov-evo-tip{min-width:150px}
   .ov .ov-wide[data-testid="overview-evolution"]>.ov-head>.ov-seg{width:100%}
