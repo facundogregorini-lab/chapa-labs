@@ -52,10 +52,12 @@
     }
     return days.slice(-7);
   }
-  const ZERO=()=>({pending:0,human:0,bot:0,successHuman:0,successBot:0,blocked:0,unclaimed:0,failed:0,scheduled:0});
+  const ZERO=()=>({pending:0,human:0,bot:0,successHuman:0,successBot:0,blocked:0,unclaimed:0,failed:0,scheduled:0,executedCaptured:0});
+  const DONE=['human','bot','successHuman','successBot'];
   /**
-   * Suma los días: el total y cada tipo de acción. Solo los días con foto de la cola entran al total, así
-   * pendientes, ejecutadas y exitosas son del mismo período; lo ejecutado en días sin foto va aparte.
+   * Suma los días: el total y cada tipo de acción. Ejecutadas y exitosas suman todos los días; lo pendiente
+   * solo se sabe en los días con foto de la cola, así que el «% de pendientes» se mide con lo ejecutado en
+   * esos días (executedCaptured). `outside`: lo ejecutado en días sin foto.
    */
   function aggregate(list){
     const total=ZERO(),types=new Map();
@@ -63,22 +65,28 @@
     for(const d of list){
       if(d.captured)captured++;
       for(const t of d.types||[]){
-        if(!d.captured){outside+=(Number(t.human)||0)+(Number(t.bot)||0);continue;}
         if(!types.has(t.type))types.set(t.type,{type:t.type,stages:[],...ZERO()});
         const acc=types.get(t.type);
         for(const s of t.stages||[])if(!acc.stages.includes(s))acc.stages.push(s);
-        for(const k of Object.keys(total)){const n=Number(t[k])||0;acc[k]+=n;total[k]+=n;}
+        const done=(Number(t.human)||0)+(Number(t.bot)||0);
+        if(!d.captured){
+          outside+=done;
+          for(const k of DONE){const n=Number(t[k])||0;acc[k]+=n;total[k]+=n;}
+          continue;
+        }
+        for(const k of Object.keys(total)){if(k==='executedCaptured')continue;const n=Number(t[k])||0;acc[k]+=n;total[k]+=n;}
+        acc.executedCaptured+=done;total.executedCaptured+=done;
       }
     }
     const executed=total.human+total.bot,success=total.successHuman+total.successBot;
-    return {total,executed,success,captured,outside,days:list.length,types:[...types.values()].sort((a,b)=>b.pending-a.pending||a.type.localeCompare(b.type))};
+    return {total,executed,success,captured,outside,days:list.length,types:[...types.values()].filter(t=>t.pending||t.human||t.bot).sort((a,b)=>b.pending-a.pending||(b.human+b.bot)-(a.human+a.bot)||a.type.localeCompare(b.type))};
   }
   /** Score = 100 × (cobertura × peso + éxito × peso), solo con los días que tienen foto. */
   function score(list,view){
     const own=list.filter(d=>d.captured);
     if(!own.length)return null;
     const a=aggregate(own);
-    const cov=ratio(a.executed,a.total.pending)??0,ok=ratio(a.success,a.executed)??0;
+    const cov=Math.min(1,ratio(a.total.executedCaptured,a.total.pending)??0),ok=ratio(a.success,a.executed)??0;
     const w=(view.wCov+view.wOk)||1;
     return {value:Math.round(100*(cov*view.wCov+ok*view.wOk)/w),cov,ok};
   }
@@ -95,13 +103,13 @@
     const cells=t=>{
       const ex=t.human+t.bot,ok=t.successHuman+t.successBot;
       if(kind==='pending')return `<td>${num(t.pending)}</td><td>${num(ex)}</td><td>${num(t.blocked)}</td><td>${num(t.unclaimed)}</td><td>${num(t.failed)}</td>`;
-      if(kind==='executed')return `<td>${num(ex)}</td><td>${num(t.human)}</td><td>${num(t.bot)}</td><td>${pc(ratio(ex,t.pending))}</td>`;
+      if(kind==='executed')return `<td>${num(ex)}</td><td>${num(t.human)}</td><td>${num(t.bot)}</td><td>${pc(ratio(t.executedCaptured,t.pending))}</td>`;
       return `<td>${num(ok)}</td><td>${num(t.successHuman)}</td><td>${num(t.successBot)}</td><td>${pc(ratio(ok,ex))}</td>`;
     };
     const bar=t=>{
       const ex=t.human+t.bot,ok=t.successHuman+t.successBot;
       const base=kind==='pending'?t.pending:ex;
-      const fill=kind==='pending'?ex:kind==='executed'?t.human:ok;
+      const fill=kind==='pending'?t.executedCaptured:kind==='executed'?t.human:ok;
       return `<span class="rs-mini"><i class="is-base" style="width:${Math.round(base/max*100)}%"></i><i class="${kind==='executed'?'is-human':'is-ok'}" style="width:${Math.round(fill/max*100)}%"></i>${kind==='executed'&&t.bot?`<i class="is-bot" style="left:${Math.round(t.human/max*100)}%;width:${Math.round(t.bot/max*100)}%"></i>`:''}</span>`;
     };
     return `<div class="rs-table-scroll"><table class="rs-breakdown" data-testid="results-breakdown-${kind}"><thead><tr><th>Tipo de acción</th><th></th>${head}</tr></thead><tbody>
@@ -122,13 +130,13 @@
     const noPhoto=a.days-a.captured;
     const bars=[
       ['pending','Pendientes','en la cola del período',`<span class="is-pending" style="width:100%">${num(t.pending)} acciones</span>`,100,num(t.pending),a.captured?'100%':'sin foto'],
-      ['executed','Ejecutadas','persona + bot',`<span class="is-human" style="width:${human===null?0:human*100}%">${human?pc(human)+' persona':''}</span><span class="is-bot" style="width:${bot===null?0:bot*100}%">${bot?pc(bot)+' bot':''}</span>`,w(a.executed),num(a.executed),a.captured?pc(ratio(a.executed,t.pending))+' de pendientes':''],
+      ['executed','Ejecutadas','persona + bot',`<span class="is-human" style="width:${human===null?0:human*100}%">${human?pc(human)+' persona':''}</span><span class="is-bot" style="width:${bot===null?0:bot*100}%">${bot?pc(bot)+' bot':''}</span>`,w(a.executed),num(a.executed),a.captured?pc(ratio(t.executedCaptured,t.pending))+' de pendientes'+(a.outside?` (${num(t.executedCaptured)} en días con foto)`:''):''],
       ['success','Exitosas','con conversión atribuida',`<span class="is-ok" style="width:100%">${a.executed?pc(ratio(a.success,a.executed))+' de ejecutadas':''}</span>`,w(a.success),num(a.success),`persona ${pc(ratio(t.successHuman,t.human))} · bot ${pc(ratio(t.successBot,t.bot))}`],
     ];
     const chart=(view.period==='7'||view.period==='semana'||view.period==='custom')&&days.length;
     const shown=view.period==='7'?days.slice(-7):selectedDays(days,{...view,day:null});
-    // A day without the queue's photo still shows what was executed that day (only the pending is unknown).
-    const doneOn=x=>x.executed+x.outside;
+    // A day without the queue's photo still shows what was executed that day (only the pending is unknown): aggregate already counts it.
+    const doneOn=x=>x.executed;
     const dmax=Math.max(1,...shown.map(d=>{const x=aggregate([d]);return Math.max(x.total.pending,doneOn(x));}));
     const reasons=Array.isArray(snap?.results?.blocks)?snap.results.blocks:[];
     return `<section class="rs-card" data-testid="results-queue">
@@ -137,7 +145,7 @@
         <div class="rs-controls"><nav class="rs-seg" aria-label="Período">${Object.entries(PERIODS).map(([k,l])=>`<button type="button" class="${view.period===k&&!view.day?'is-on':''}" aria-pressed="${view.period===k&&!view.day}" data-fu="results-period" data-fu-period="${k}" data-testid="results-period-${k}">${l}</button>`).join('')}</nav>
         ${view.period==='custom'?`<div class="rs-dates"><label>Desde <input type="date" class="input" data-fu-results-date="from" value="${esc(view.from||days[0]?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label><label>hasta <input type="date" class="input" data-fu-results-date="to" value="${esc(view.to||days.at(-1)?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label></div>`:''}
         </div></div>
-      ${ex?.available===false?'<p class="rs-note">Todavía no se guarda la foto diaria de la cola de este producto: se ve lo ejecutado, pero no lo que quedó pendiente.</p>':noPhoto&&a.days&&opts.name?`<p class="rs-note">Se cuenta${a.captured===1?'':'n'} ${num(a.captured)} ${a.captured===1?'día':'días'} con foto de la cola; ${num(noPhoto)} sin foto ${noPhoto===1?'queda':'quedan'} fuera${a.outside?` (${num(a.outside)} acciones ejecutadas)`:''}.</p>`:noPhoto&&a.days?`<p class="rs-note">${num(noPhoto)} ${noPhoto===1?'día no tiene':'días no tienen'} foto de la cola (antes de que empezara a guardarse): quedan fuera de estos números${a.outside?` (en esos días se ejecutaron ${num(a.outside)} acciones)`:''}. Todo se cuenta sobre ${num(a.captured)} ${a.captured===1?'día':'días'} con foto.</p>`:''}
+      ${ex?.available===false?'<p class="rs-note">Todavía no se guarda la foto diaria de la cola de este producto: se ve lo ejecutado, pero no lo que quedó pendiente.</p>':noPhoto&&a.days?`<p class="rs-note">Ejecutadas y exitosas suman los ${num(a.days)} días${a.outside?` (${num(a.outside)} ejecutadas en ${noPhoto===1?'el día':`los ${num(noPhoto)} días`} sin foto de la cola)`:''}. Lo pendiente solo se conoce en ${a.captured===1?'el día':`los ${num(a.captured)} días`} con foto: el «% de pendientes» y el score se miden con ${a.captured===1?'ese día':'esos días'}.</p>`:''}
       ${view.day?`<p class="rs-note">Mostrando solo el ${esc(dayLabel(view.day))}. <button type="button" class="rs-link" data-fu="results-day" data-fu-day="">Ver todo el período</button></p>`:''}
       <div class="rs-exec">
         <div class="rs-funnel">

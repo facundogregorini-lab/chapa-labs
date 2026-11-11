@@ -50,12 +50,13 @@ test('1 · the queue: pending, executed by a person or a bot, successful, the le
   // Score: 60% × 3/6 + 40% × 1/3 = 43.
   assert.match(html,/class="rs-score-num">43</);
   const week=R.aggregate(R.selectedDays(habita.results.execution.days,{period:'7'}));
-  // Only days with a photo enter the totals; what was executed on a day without one goes apart.
+  // Executed and successful add up every day; the pending (and the coverage) only the days with a photo.
   assert.equal(week.total.pending,16);
-  assert.equal(week.executed,11);
+  assert.equal(week.total.executedCaptured,11);
+  assert.equal(week.executed,20);
   assert.equal(week.outside,9);
   assert.equal(R.score(R.selectedDays(habita.results.execution.days,{period:'7'}),{wCov:60,wOk:40}).value,Math.round(100*(.6*(11/16)+.4*(4/11))));
-  assert.match(R.render('habita',habita,{period:'7'}),/1 día no tiene foto de la cola/);
+  assert.match(R.render('habita',habita,{period:'7'}),/9 ejecutadas en el día sin foto de la cola/);
 });
 
 test('each bar opens into its types of action, for the chosen day',()=>{
