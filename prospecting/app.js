@@ -312,7 +312,7 @@
   function renderTop() {
   const segs = [['todas', 'General', 's1'], ...units().map(u => [u.id, u.name, u.color])];
   $('#units').innerHTML = segs.map(([id, name, color]) =>
-    `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
+    `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' || fuCount(id) === '' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
   ).join('');
   const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
   const tabs = state.unit === 'todas'
@@ -472,6 +472,11 @@
     if (p && !state.pending && state.view !== 'enviar' && !$('#confirm').classList.contains('on')) { state.pending = p; showConfirmBar(p, { again: true }); }
     window.LiquidGlass && window.LiquidGlass.scan();
     requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb));
+    // On the phone the tab row scrolls sideways: keep the open tab in view
+    // (horizontally only, so the page never jumps).
+    const tabRow = main.querySelector('.habita-fu-tabs'), onTab = tabRow && tabRow.querySelector('.is-on');
+    if (tabRow && onTab && tabRow.scrollWidth > tabRow.clientWidth)
+      tabRow.scrollLeft = Math.max(0, onTab.offsetLeft - tabRow.offsetLeft - (tabRow.clientWidth - onTab.offsetWidth) / 2);
     bindCharts();
   }
 
@@ -564,7 +569,7 @@
     const o = ovState();
     const snap = state.fu.n && state.fu.n.units[u.id];
     const base = { id: u.id, name: u.name, color: color(u), perWeek: u.targets ? u.targets[0].perWeek : 0, snap, queueSteps: u.queueSteps || {},
-      queueHtml: snap && window.ProspectingResults ? window.ProspectingResults.renderQueue(u.id, snap, fuResultsView())
+      queueHtml: snap && window.ProspectingResults ? window.ProspectingResults.renderQueue(u.id, snap, fuResultsView(), { name: u.name, color: color(u) })
         : `<section class="rs-card" role="alert" data-testid="overview-queue-error-${esc(u.id)}"><h3>No llegó la cola de ${esc(u.name)}</h3><p class="rs-muted">${esc((state.fu.n && state.fu.n.errors && state.fu.n.errors[u.id]) || 'Sin datos.')}</p><button class="btn small" type="button" data-fu="reload">Reintentar</button></section>` };
     if (!d || !d.accounts) return { ...base, loading: !(d && d.error) };
     const project = o.metrics && o.metrics.projects ? o.metrics.projects[u.metricsKey] : null;
@@ -589,7 +594,7 @@
     const list = units().filter((u) => state.fu.n.units[u.id] || state.data[u.id]);
     const errors = Object.entries(state.fu.n.errors || {}).map(([u, e]) => `${fuName(u)}: ${e}`).join(' · ');
     return window.ProspectingOverview.render({ units: list.map(ovUnit), view: ovState().view, today: C.today(),
-      notice: errors || (ovState().loading ? 'Cargando los embudos de cada producto…' : '') });
+      notice: errors, loading: ovState().loading });
   }
   const s = F.summary(state.fu.n, 'todas');
   const entries = units().map(u => {
@@ -2388,9 +2393,12 @@
   };
   const dayTime = (iso) => (iso ? new Date(iso).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }) : '');
 
+  // The last count seen per business: switching to one product drops the other's
+  // snapshot after a few minutes, and a «—» badge read as an error.
+  const fuCounts = {};
   function fuCount(scope) {
-    if (!state.fu.n || scope !== 'todas' && !state.fu.n.units[scope]) return '—';
-    return F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length;
+    if (!state.fu.n || scope !== 'todas' && !state.fu.n.units[scope]) return fuCounts[scope] ?? '';
+    return (fuCounts[scope] = F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length);
   }
 
   async function loadFollowup({ quiet } = {}) {
@@ -3099,8 +3107,8 @@
   }).join('');
   return `<section class="os-native-funnel" data-testid="followup-native-funnel">
     <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta las inmobiliarias que llegaron hasta ahí. El % compara con el paso anterior.</p></div>
-      <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}</nav>
-        <form data-fu-chart-range><label>Desde <input class="input" type="date" name="desde" value="${esc(period.from||'')}"></label>
+      <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${[['hoy','Hoy'],['7','7 días'],['30','30 días'],['mes','Este mes'],['todo','Todo']].map(([key,label])=>`<button type="button" data-fu="funnel-period" data-fu-period="${key}" class="${period.preset===key&&!period.from&&!period.to?'is-on':''}">${label}</button>`).join('')}<button type="button" class="os-mobile-only ${period.from||period.to?'is-on':''}" data-fu="funnel-dates" aria-expanded="${Boolean(state.fu.chartDatesOpen||period.from||period.to)}">Fechas</button></nav>
+        <form data-fu-chart-range class="${state.fu.chartDatesOpen||period.from||period.to?'is-open':''}"><label>Desde <input class="input" type="date" name="desde" value="${esc(period.from||'')}"></label>
           <label>Hasta <input class="input" type="date" name="hasta" value="${esc(period.to||'')}"></label>
           <button class="btn small" type="submit">APLICAR</button></form></div></div>
     <div class="os-native-legend"><span><i class="is-went"></i>Pasaron al paso siguiente</span>
@@ -3186,7 +3194,8 @@
     ${fuToolbar()}
     <div class="table-wrap"><table class="os-fu-table"><thead><tr><th>SCORE</th><th>CONTACTO</th><th>CIUDAD</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMA ACCIÓN</th><th>WHATSAPP</th><th>PRIORIDAD</th><th></th></tr></thead>
     <tbody>${rows.slice(0,100).map(x=>fuQueueTableRow(x)).join('')||'<tr><td colspan="9" class="empty">No hay contactos con seguimiento vigente en este filtro.</td></tr>'}</tbody></table></div>
-    ${rows.length>100?'<p class="os-fu-caption" style="padding:12px">Se muestran 100. Usá Prospectos para consultar la lista completa.</p>':''}</section>`;
+    <div class="os-fu-mobile-list" data-testid="fu-mobile-funnel-list">${rows.slice(0,30).map(x=>fuQueueMobileCard(x)).join('')||'<p class="os-fu-mobile-empty">No hay contactos con seguimiento vigente en este filtro.</p>'}</div>
+    ${rows.length>100?'<p class="os-fu-caption" style="padding:12px">Se muestran 100. Usá Prospectos para consultar la lista completa.</p>':rows.length>30?'<p class="os-fu-caption os-mobile-only" style="padding:12px">En el celular se muestran 30: tocá «Ir a la cola» para ver el resto.</p>':''}</section>`;
 }
 
   function fuProspectos() {
@@ -3947,6 +3956,9 @@
       case 'queue-more': fuQueueState().limit+=25;render();break;
       case 'queue-filters': {const q=fuQueueState();q.filtersOpen=!q.filtersOpen;render();break;}
       case 'queue-executor': {const q=fuQueueState();q.executor=ds.fuExecutor||null;q.limit=25;render();break;}
+      case 'funnel-dates': {
+        state.fu.chartDatesOpen=!state.fu.chartDatesOpen;render();break;
+      }
       case 'funnel-period': {
         const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
         state.fu.chartFocus=null;await loadFollowup({quiet:true});render();break;

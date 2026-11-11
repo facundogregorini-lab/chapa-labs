@@ -55,7 +55,7 @@ test('1 · the queue: pending, executed by a person or a bot, successful, the le
   assert.equal(week.executed,11);
   assert.equal(week.outside,9);
   assert.equal(R.score(R.selectedDays(habita.results.execution.days,{period:'7'}),{wCov:60,wOk:40}).value,Math.round(100*(.6*(11/16)+.4*(4/11))));
-  assert.match(R.render('habita',habita,{period:'7'}),/1 día no tiene foto de la cola/);
+  assert.match(R.render('habita',habita,{period:'7'}),/2 días con foto de la cola; 1 sin foto queda fuera/);
 });
 
 test('each bar opens into its types of action, for the chosen day',()=>{

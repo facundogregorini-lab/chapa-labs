@@ -109,7 +109,7 @@
     </tbody></table></div>`;
   }
 
-  function queueSection(unit,snap,view,stageTitle){
+  function queueSection(unit,snap,view,stageTitle,opts={}){
     const ex=snap?.results?.execution;
     const days=Array.isArray(ex?.days)?ex.days:[];
     const list=selectedDays(days,view);
@@ -132,12 +132,12 @@
     const dmax=Math.max(1,...shown.map(d=>{const x=aggregate([d]);return Math.max(x.total.pending,doneOn(x));}));
     const reasons=Array.isArray(snap?.results?.blocks)?snap.results.blocks:[];
     return `<section class="rs-card" data-testid="results-queue">
-      <div class="rs-head"><div><h2><span class="rs-step">1</span>¿Se ejecutó la cola?</h2>
+      <div class="rs-head"><div><h2>${opts.name?`<i class="rs-dot" style="--rs-c:${esc(opts.color||'currentColor')}"></i>${esc(opts.name)} · Cola`:'<span class="rs-step">1</span>¿Se ejecutó la cola?'}</h2>
         <p>Lo que la cola le asignó a cada día (los saludos, hasta el cupo diario): cuántas se ejecutaron, quién las hizo y cuántas tuvieron conversión. Tocá una barra para ver los tipos de acción.</p></div>
         <div class="rs-controls"><nav class="rs-seg" aria-label="Período">${Object.entries(PERIODS).map(([k,l])=>`<button type="button" class="${view.period===k&&!view.day?'is-on':''}" aria-pressed="${view.period===k&&!view.day}" data-fu="results-period" data-fu-period="${k}" data-testid="results-period-${k}">${l}</button>`).join('')}</nav>
         ${view.period==='custom'?`<div class="rs-dates"><label>Desde <input type="date" class="input" data-fu-results-date="from" value="${esc(view.from||days[0]?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label><label>hasta <input type="date" class="input" data-fu-results-date="to" value="${esc(view.to||days.at(-1)?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label></div>`:''}
         </div></div>
-      ${ex?.available===false?'<p class="rs-note">Todavía no se guarda la foto diaria de la cola de este producto: se ve lo ejecutado, pero no lo que quedó pendiente.</p>':noPhoto&&a.days?`<p class="rs-note">${num(noPhoto)} ${noPhoto===1?'día no tiene':'días no tienen'} foto de la cola (antes de que empezara a guardarse): quedan fuera de estos números${a.outside?` (en esos días se ejecutaron ${num(a.outside)} acciones)`:''}. Todo se cuenta sobre ${num(a.captured)} ${a.captured===1?'día':'días'} con foto.</p>`:''}
+      ${ex?.available===false?'<p class="rs-note">Todavía no se guarda la foto diaria de la cola de este producto: se ve lo ejecutado, pero no lo que quedó pendiente.</p>':noPhoto&&a.days?`<p class="rs-note" title="Antes de que empezara a guardarse la foto diaria de la cola">Se cuenta${a.captured===1?'':'n'} ${num(a.captured)} ${a.captured===1?'día':'días'} con foto de la cola; ${num(noPhoto)} sin foto ${noPhoto===1?'queda':'quedan'} fuera${a.outside?` (${num(a.outside)} acciones ejecutadas)`:''}.</p>`:''}
       ${view.day?`<p class="rs-note">Mostrando solo el ${esc(dayLabel(view.day))}. <button type="button" class="rs-link" data-fu="results-day" data-fu-day="">Ver todo el período</button></p>`:''}
       <div class="rs-exec">
         <div class="rs-funnel">
@@ -296,10 +296,10 @@
     </div>`;
   }
   /** Solo «¿Se ejecutó la cola?», para el Resumen general. */
-  function renderQueue(unit,snap,view){
+  function renderQueue(unit,snap,view,opts={}){
     if(!snap?.results)return '<section class="rs-card" role="alert"><p>No se pudo consultar la ejecución de la cola.</p></section>';
     const titles=Object.fromEntries((snap.stages||[]).map(s=>[s.key,s.title]));
-    return `<div class="rs" data-unit-results="${esc(unit)}">${queueSection(unit,snap,defaults(view),k=>titles[k]||snap.results.execution?.stages?.[k]||k)}</div>`;
+    return `<div class="rs" data-unit-results="${esc(unit)}">${queueSection(unit,snap,defaults(view),k=>titles[k]||snap.results.execution?.stages?.[k]||k,opts)}</div>`;
   }
   return {render,renderQueue,turniaCohorts,selectedDays,aggregate,score,defaults};
 });
