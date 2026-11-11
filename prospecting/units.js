@@ -290,6 +290,8 @@
     // el panel opera sobre la planilla como antes.
     api: { urlEnv: 'HABITA_PROSPECTING_API_URL', url: 'https://www.habitaia.app/api/prospeccion', secretEnvs: ['HABITA_PROSPECTING_SECRET', 'HABITA_METRICS_SECRET'], rows: true, sync: true, templates: false, targets: false, fallback: 'sheet' },
     appUrl: 'https://www.habitaia.app/admin/prospeccion',
+    // Prospectos: las inmobiliarias antes de la cola, con su ranking y los aprendizajes (GET ?vista=prospectos de su API).
+    pool: true,
     appName: 'el panel de habita.',
     // «Responder»: las respuestas abiertas de su bandeja de Follow-up (las registra su extensión de WhatsApp o el equipo).
     inbox: 'bandeja',
