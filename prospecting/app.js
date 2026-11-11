@@ -1350,9 +1350,14 @@
       const o = plan.template ? fromTemplate(plan.template) : fromReply(plan.reply);
       if (o) { o.register = plan.register || o.register; o.then = plan.then || o.then || null; if (o.then && o.then.outcome === 'perdido' && !o.then.detail) o.then.detail = String(row.inbound.text || '').slice(0, 200); o.suggested = true; add(o); }
     }
-    if (u.id === 'turnia' && !a.touches) ['whatsapp_permiso', 'whatsapp_permiso_turno', 'whatsapp_entrega'].forEach((k) => add(fromTemplate(k)));
+    if (u.id === 'turnia' && !a.touches) ['whatsapp_permiso', 'whatsapp_permiso_turno', 'whatsapp_permiso_profesional', 'whatsapp_entrega', 'whatsapp_entrega_profesional', 'whatsapp_hablaste_doctor'].forEach((k) => add(fromTemplate(k)));
     for (const r of u.replies || []) add(fromReply(r));
-    if (u.id === 'turnia') add(fromTemplate('whatsapp_feedback', { register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: { type: 'outcome', outcome: 'perdido', detail: String(row.inbound.text || '').slice(0, 200) } }));
+    if (u.id === 'turnia') {
+      const lost = { type: 'outcome', outcome: 'perdido', detail: String(row.inbound.text || '').slice(0, 200) };
+      add(fromTemplate('whatsapp_feedback', { register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: lost }));
+      add(fromTemplate('whatsapp_feedback_sistema', { register: { type: 'conversation', detail: 'Feedback: ya tienen un sistema' }, then: lost }));
+      add(fromTemplate('whatsapp_feedback_desconfianza', { register: { type: 'conversation', detail: 'Desconfían del link' }, then: null }));
+    }
     return out.filter((o) => o.text);
   }
 
@@ -2667,7 +2672,7 @@
       : x.dueAt ? `<span class="badge plain">Sale ${esc(dayTime(x.dueAt))}</span>` : '';
     const action = !button ? '' : other || x.blocked || x.dueAt || !x.action ? '' : `<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">${icon.wa} ${esc(x.action)}</button>`;
     return `<div class="arow" data-testid="fu-item" data-fu-unit-id="${esc(x.unit)}" data-fu-open="${esc(x.key)}" data-priority="${esc(x.priority)}" data-group="${esc(x.group)}" tabindex="0" role="button" aria-label="Abrir ${esc(x.name)}">
-      <div class="who"><strong>${esc(x.name)}</strong><div class="meta">${fuDot(x.unit)}${x.sub && x.sub !== x.name ? `<span>${esc(x.sub)}</span>·` : ''}${x.zone ? `<span>${esc(x.zone)}</span>` : ''}<span class="stage">${esc(x.stageTitle)}</span>${x.situation && x.situation !== 'sin_respuesta' ? `<span class="signal">${esc(x.situationLabel)}</span>` : ''}<span class="badge ${pill}">${esc(F.PRIORITY_LABEL[x.priority])}</span>${x.owner ? `<span>· ${esc(x.owner)}</span>` : ''}${x.since ? `<span>· últ. ${esc(ago(x.since))}</span>` : ''}${x.ads ? '<span class="signal">Paga anuncios</span>' : ''}${status}</div>
+      <div class="who"><strong>${esc(x.name)}</strong><div class="meta">${fuDot(x.unit)}${x.sub && x.sub !== x.name ? `<span>${esc(x.sub)}</span>·` : ''}${x.zone ? `<span>${esc(x.zone)}</span>` : ''}<span class="stage">${esc(x.stageTitle)}</span>${fuLineBadges(x)}${x.situation && x.situation !== 'sin_respuesta' ? `<span class="signal">${esc(x.situationLabel)}</span>` : ''}<span class="badge ${pill}">${esc(F.PRIORITY_LABEL[x.priority])}</span>${x.owner ? `<span>· ${esc(x.owner)}</span>` : ''}${x.since ? `<span>· últ. ${esc(ago(x.since))}</span>` : ''}${x.ads ? '<span class="signal">Paga anuncios</span>' : ''}${status}</div>
       ${x.blocked ? `<div class="meta" style="color:var(--bad-text)">${esc(x.blocked)}</div>` : ''}</div>
       <div class="acts">${action}</div></div>`;
   }
@@ -2712,7 +2717,7 @@
   function fuQueueState() {
   return state.fu.queueView || (state.fu.queueView = {
     kpi:'listas',commercial:null,situation:null,rule:null,tech:null,closed:false,
-    order:'comercial',limit:25,search:'',group:null,
+    order:'comercial',limit:25,search:'',group:null,line:null,
   });
 }
 
@@ -2752,17 +2757,35 @@
   const executors={extension:0,facu:0,axel:0};
   for(const x of filtered)executors[fuExecutor(x)]++;
   const byExecutor=q.executor?filtered.filter(x=>fuExecutor(x)===q.executor):filtered;
-  return {q,snap,stages,current,all:base,rows:byExecutor,executors};
+  // La línea de WhatsApp (Turnia): para operar las dos en paralelo, cada una con su cola.
+  const lines={};
+  for(const x of byExecutor)for(const l of (x.lines?.length?x.lines:['—']))lines[l]=(lines[l]||0)+1;
+  const byLine=q.line?F.filter(byExecutor,{line:q.line}):byExecutor;
+  return {q,snap,stages,current,all:base,rows:byLine,executors,lines};
 }
 
+  // ¿Tienen WhatsApp? (Turnia, op whatsapp-check): fijo o celular salió de cómo venía escrito el número y
+  // falla en los dos sentidos. Turnia se lo pregunta a WhatsApp de a 20 (no le manda nada a nadie).
+  function fuPhoneCheck() {
+    const r = state.fu.phoneCheck;
+    const list = (title, xs) => xs.length ? `<p class="os-fu-caption" style="margin:6px 0 0"><strong>${esc(title)}:</strong> ${xs.slice(0, 12).map((x) => esc(`${x.name} (${x.to})`)).join(' · ')}${xs.length > 12 ? ` y ${int(xs.length - 12)} más` : ''}</p>` : '';
+    return `<div class="os-tutorial-note" data-testid="fu-phone-check"><strong>¿Tienen WhatsApp?</strong> Fijo o celular salió de cómo venía escrito el número: hay celulares guardados como fijos y fijos guardados como celulares. Turnia le pregunta a WhatsApp, de a 20 números y despacio, sin mandarle nada a nadie, y los corrige.
+      <div class="btns" style="margin-top:8px"><button class="btn small" type="button" data-fu="phone-check" ${state.fu.phoneBusy ? 'disabled' : ''}>${state.fu.phoneBusy ? 'Verificando… (1 minuto)' : 'Verificar 20 números'}</button></div>
+      ${r ? `<p class="os-fu-caption" style="margin:8px 0 0" data-testid="fu-phone-check-result">${r.problem ? esc(r.problem) + ' · ' : ''}Verificados ${int(r.checked)}${r.line ? ` con la ${esc(r.line)}` : ''}: ${int(r.toWhatsapp.length)} pasaron a celular, ${int(r.toLandline.length)} a fijo y ${int(r.same)} estaban bien. Faltan ${int(r.left)}.</p>${list('Ahora con WhatsApp', r.toWhatsapp)}${list('Sin WhatsApp (quedan para llamar)', r.toLandline)}` : ''}
+    </div>`;
+  }
+  /** La línea de WhatsApp de su chat (Turnia): «0022», «5483». */
+  function fuLineBadges(x) {
+    return (x.lines||[]).map(l=>` <span class="badge plain" data-testid="fu-line" title="Ya hay un chat o la línea está confirmada">${esc(l)}</span>`).join('');
+  }
   function fuQueueTableRow(x,{closed=false,selected=false}={}) {
     const snap=state.fu.n?.units?.[x.unit];
     const stages=F.commercialStages(x.unit,snap).filter(v=>v.technical?.length&&!v.situation);
     const situations=fuSituationOptions(snap?.labels?.situations||{},x.stage,x.unit);
     const owner=x.owner||'Todos';
     const opts=(field,choices,value)=>'<select class="os-fu-inline-select" data-fu-row-field="'+field+'" data-fu-key="'+esc(x.key)+'" aria-label="'+esc(field+' de '+x.name)+'">'+choices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===value?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
-    return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item">
-      <td class="os-fu-name"><span class="os-fu-agency-name"><span class="os-fu-agency-icon" aria-hidden="true">${icon.building}</span><span class="os-fu-agency-copy"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></span></span></td>
+    return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item" data-line="${esc((x.lines||[]).join(' '))}">
+      <td class="os-fu-name"><span class="os-fu-agency-name"><span class="os-fu-agency-icon" aria-hidden="true">${icon.building}</span><span class="os-fu-agency-copy"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}${fuLineBadges(x)}</small></span></span></td>
       <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
       <td>${opts('situation',situations,x.situation)}</td>
       <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
@@ -2785,7 +2808,7 @@
       <div class="os-fu-mobile-item-main">
         <div class="os-fu-mobile-item-body">
           <strong class="os-fu-mobile-item-name">${esc(x.name)}</strong>
-          <span class="os-fu-mobile-item-stage">${esc(x.stageTitle||'')} · ${esc(x.situationLabel||'Sin clasificar')}</span>
+          <span class="os-fu-mobile-item-stage">${esc(x.stageTitle||'')} · ${esc(x.situationLabel||'Sin clasificar')}${fuLineBadges(x)}</span>
           <span class="os-fu-mobile-item-action">${esc(x.action||x.actionReason||'Sin acción programada')}</span>
         </div>
         <div class="os-fu-mobile-item-control">
@@ -2852,7 +2875,7 @@
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
-  const {q,snap,stages,current,rows,executors}=fuQueueSelection(scope);
+  const {q,snap,stages,current,rows,executors,lines}=fuQueueSelection(scope);
   const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
   const customStages=stages.filter(x=>customStageKeys.has(x.key));
@@ -2915,6 +2938,7 @@
       <button type="button" class="${!q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="0">Pendientes de acción</button>
       <button type="button" class="${q.closed?'is-on':''}" data-fu="queue-closed" data-fu-closed="1">No interesados <b>${closedCount}</b></button>
       </div><span class="os-fu-caption">Cerrados · sin envíos automáticos</span></div>`:''}
+    ${current?.key==='prospectado'&&scope==='turnia'?fuPhoneCheck():''}
     ${current?.key==='prospectado'&&snap?.summary?.cap?`<div class="os-tutorial-note" data-testid="followup-first-contact-cap">Primeros contactos · ventana móvil de 24 h: <strong>${int(snap.summary.newToday||0)}/${int(snap.summary.cap)}</strong> registrados. <strong>${int(snap.summary.newRemaining??Math.max(0,snap.summary.cap-(snap.summary.newToday||0)))}</strong> cupos restantes · <strong>${int(snap.summary.newWaiting||0)}</strong> esperan cupo. Los mensajes enviados fuera de Habita no se pueden contar automáticamente.</div>`:''}
     </div></details>
     <details class="os-fu-table-filters" data-testid="fu-queue-sort-options" ${q.sortOpen?'open':''}><summary>Orden y filtros de la lista</summary><div class="os-fu-tools">
@@ -2928,6 +2952,10 @@
         .filter(([k])=>!k||k==='extension'||executors[k]>0||q.executor===k)
         .map(([k,l])=>`<button type="button" data-fu="queue-executor" data-fu-executor="${k}" data-executor="${k||'todos'}" aria-pressed="${(q.executor||'')===k}" class="${(q.executor||'')===k?'is-on':''}">${k==='extension'?'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':''}${l}</button>`).join('')}
     </div>`}
+    ${!q.closed&&scope==='turnia'&&Object.keys(lines).some(l=>l!=='—')?`<div class="os-fu-executor-bar" role="group" aria-label="Línea de WhatsApp" data-testid="fu-queue-line">
+      ${[['','Todas las líneas'],...Object.keys(lines).filter(l=>l!=='—').sort().map(l=>[l,'Línea '+l]),...(lines['—']?[['—','Sin chat']]:[])]
+        .map(([k,l])=>`<button type="button" data-fu="queue-line" data-fu-line="${esc(k)}" aria-pressed="${(q.line||'')===k}" class="${(q.line||'')===k?'is-on':''}">${esc(l)}${k?` <b>${int(lines[k]||0)}</b>`:''}</button>`).join('')}
+    </div>`:''}
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
@@ -4035,6 +4063,7 @@
       case 'queue-more': fuQueueState().limit+=25;render();break;
       case 'queue-filters': {const q=fuQueueState();q.filtersOpen=!q.filtersOpen;render();break;}
       case 'queue-executor': {const q=fuQueueState();q.executor=ds.fuExecutor||null;q.limit=25;render();break;}
+      case 'queue-line': {const q=fuQueueState();q.line=ds.fuLine||null;q.limit=25;render();break;}
       case 'funnel-period': {
         const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
         state.fu.chartFocus=null;await loadFollowup({quiet:true});render();break;
@@ -4083,6 +4112,16 @@
       }
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
       case 'reload': loadFollowup(); break;
+      case 'phone-check': {
+        if (state.fu.phoneBusy) break;
+        state.fu.phoneBusy = true; render();
+        const r = await fuOp('turnia', { op: 'whatsapp-check', limit: 20 });
+        state.fu.phoneBusy = false;
+        if (r && r.check) { state.fu.phoneCheck = r.check; if (r.check.problem) toast(r.check.problem, true); }
+        render();
+        loadFollowup({ quiet: true });
+        break;
+      }
       case 'wa-sync': {
         state.fu.waBusy = true; render();
         const r = await fuOp('turnia', { op: 'whatsapp-sync' });

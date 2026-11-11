@@ -45,6 +45,8 @@
       lastAction: q.lastAction || null,
       zone: q.zone || '',
       phone: q.phone || '',
+      // Las líneas de WhatsApp (0022, 5483) con un chat o confirmadas para su número (Turnia).
+      lines: Array.isArray(q.lines) ? q.lines.map(String) : [],
       stage: q.stage,
       stageTitle: q.stageTitle || titles[q.stage] || q.stage || '',
       situation: q.situation || '',
@@ -202,7 +204,7 @@
       || String(a.since).localeCompare(String(b.since));
   }
 
-  /** Filtros de la bandeja: unidad, responsable, prioridad, grupo y texto. */
+  /** Filtros de la bandeja: unidad, responsable, prioridad, grupo, línea de WhatsApp («—»: sin chat) y texto. */
   function filter(list, f = {}) {
     const q = String(f.q || '').trim().toLowerCase();
     return list.filter((x) =>
@@ -210,6 +212,7 @@
       && (!f.owner || (f.owner === '—' ? !x.owner : x.owner === f.owner))
       && (!f.priority || x.priority === f.priority)
       && (!f.group || x.group === f.group)
+      && (!f.line || (f.line === '—' ? !(x.lines || []).length : (x.lines || []).includes(f.line)))
       && (!q || `${x.name} ${x.sub} ${x.zone} ${x.code} ${x.stageTitle} ${x.situationLabel} ${x.phone}`.toLowerCase().includes(q)));
   }
 

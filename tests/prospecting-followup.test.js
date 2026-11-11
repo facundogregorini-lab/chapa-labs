@@ -117,3 +117,16 @@ test('WhatsApp: la última lectura de Turnia, con cada pendiente vinculado a su 
   assert.equal(F.whatsapp(n, 'habita'), null);
   assert.equal(F.whatsapp(F.normalize({ turnia: { queue: [], whatsapp: null } }, NOW)).never, true);
 });
+
+test('Cola: la línea de WhatsApp de cada fila (Turnia) y el filtro por línea', () => {
+  const n = F.normalize({ turnia: { queue: [
+    { id: '1', code: 'a', name: 'A', stage: 'sin-saludo', lines: ['0022'] },
+    { id: '2', code: 'b', name: 'B', stage: 'sin-saludo', lines: ['0022', '5483'] },
+    { id: '3', code: 'c', name: 'C', stage: 'sin-saludo' },
+  ] } });
+  assert.deepEqual(n.queue.map((x) => x.lines).sort(), [[], ['0022'], ['0022', '5483']].sort());
+  assert.deepEqual(F.filter(n.queue, { line: '5483' }).map((x) => x.code), ['b']);
+  assert.deepEqual(F.filter(n.queue, { line: '0022' }).map((x) => x.code).sort(), ['a', 'b']);
+  assert.deepEqual(F.filter(n.queue, { line: '—' }).map((x) => x.code), ['c']);
+  assert.equal(F.filter(n.queue, {}).length, 3);
+});

@@ -492,7 +492,7 @@ async function doScript(req,res,user){
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
 // va a la app de su unidad a nombre de quien opera.
-const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'handoff', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search']);
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'handoff', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search', 'whatsapp-check']);
 
 async function doFollowup(req, res) {
   const startedAt = Date.now();
@@ -557,7 +557,7 @@ async function doTask(req, res, user) {
   if (sensitiveOps.has(f.op) && session.open() && unit.id !== 'habita')
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones de Turnia configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
-    const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: f.op === 'whatsapp-sync' || f.op === 'whatsapp-search' ? 280000 : 45000 });
+    const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: ['whatsapp-sync', 'whatsapp-search', 'whatsapp-check'].includes(f.op) ? 280000 : 45000 });
     if (f.op !== 'queue' && f.op !== 'replies' && f.op !== 'whatsapp-search')
       followupCache.invalidate(unit.id + '|');
     return res.status(200).json({ result: out });

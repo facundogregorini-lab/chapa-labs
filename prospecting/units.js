@@ -15,6 +15,22 @@
   const respondedGreeting = (a) => Boolean(a.permissionSent || a.replied) || ['respondio', 'interesado'].includes(a.stage)
     || Boolean(a.lastReply && a.lastReply > (a.greetingSent || a.firstContact || ''));
 
+  // «Responder» de Turnia (10/11): lo que pasó en las respuestas reales y pide otra variante.
+  const fold = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  /** Desconfían del link («no abrimos links», «parece una estafa»): no se insiste con el link. */
+  const DISTRUST = /estafa|\bvirus\b|hacke|phishing|fraude|desconf[ií]|no (confiamos|conf[ií]o)|no (abrimos|abro|tocamos|toco|hacemos clic en|abrimos ning[uú]n) (los |ning[uú]n )?(links?|enlaces?)|(links?|enlaces?) (raros?|sospechos|de desconocidos)|parece (spam|una estafa|trucho)/i;
+  /** El «no» ya trae el motivo: tienen un sistema («contamos con un sistema»). */
+  const SYSTEM = /\b(sistema|software|programa|plataforma|aplicaci[oó]n|app|doctoralia|dentalink|agenda (online|web|electr[oó]nica)|bot|asistente( virtual)?)\b/i;
+  /** El filtro de la recepción: «¿Ya hablaste con el Dr./la Dra. por esto?». */
+  const ASKED_DOCTOR = /(hablaste|hablaron|charlaste|te comunicaste|te contactaste|lo consultaste|est[aá] al tanto|sabe(n)? de esto)\b.{0,40}\b(dr|dra|doc|doctor|doctora|odont[oó]log[oa]|con [eé]l|con ella|due[nñ]o|due[nñ]a)\b/i;
+  /** ¿Contestó el profesional en persona? («Soy la Dra. …», «Soy Camila, ¿qué necesitabas?» si se llama Camila). */
+  const isProfessional = (a, text) => {
+    const t = fold(text);
+    if (/\bsoy (el |la )?(dr|dra|doctor|doctora|odontolog[oa])\b/.test(t)) return true;
+    const names = [fold(a.greeting).split(/\s+/)[0], fold(String(a.name || '').split(/\s+/)[0]), fold(lastName(a.name))].filter((n) => n && n.length >= 3);
+    return names.some((n) => new RegExp(`\\bsoy (el |la )?(dr\\.? |dra\\.? )?${n.replace(/[^a-z]/g, '')}\\b`).test(t));
+  };
+
   // ─── Turnia ─────────────────────────────────────────────────
   const turnia = {
     id: 'turnia',
@@ -131,9 +147,21 @@
         title: 'Paso 2 · Si creen que sos un paciente', hint: 'Cuando contestan el Paso 1 como a un paciente («¿Es por un turno?»). Aclara que no y sigue como el Paso 2. Sin link; no cuenta.', channel: 'whatsapp',
         text: 'No, tranqui, no es por un turno! Soy Axel. Sé que en recepción viven a mil con el WhatsApp, así que les armé gratis una ayudante virtual cargada con los datos de {destinatario}.\n\nContesta sola las preguntas repetidas de obras sociales, precios y horarios, también fuera de hora, así no llegan el lunes a la mañana con 100 mensajes atrasados.\n\nSeguro tiene algún error porque la armé rápido con la info que encontré en internet. ¿Te paso el link por acá y la probás 20 segundos como paciente a ver si le pifié en algo?',
       },
+      whatsapp_permiso_profesional: {
+        title: 'Paso 2 · Si contesta el profesional', hint: 'Cuando el Paso 1 lo contesta el odontólogo en persona («Soy la Dra. …»). Le habla directo a él. Sin link; no cuenta.', channel: 'whatsapp',
+        text: 'Qué tal! Soy Axel. Te armé gratis una ayudante virtual para el WhatsApp del consultorio, cargada con tus datos.\n\nContesta sola las preguntas repetidas de obras sociales, precios y horarios, también fuera de hora, y te rellena los huecos de turnos que se cancelan sobre la hora.\n\nSeguro tiene algún error porque la armé rápido con la info que encontré en internet. ¿Te paso el link por acá y la probás 20 segundos como si fueras un paciente?',
+      },
       whatsapp_entrega: {
         title: 'Paso 3 · La entrega y el puente al médico', hint: 'Cuando dicen «Dale, pasame». Lleva el link de su demo.', channel: 'whatsapp',
         text: 'Acá tenés: {link}\n\nMandale un audio o escribile haciéndole alguna pregunta difícil como si fueras un paciente real!\n\nSi ves que responde bien, reenviale el link a los doctores: además de sacarte preguntas repetidas a vos, a ellos les rellena solos los huecos de turnos que se cancelan sobre la hora. Avisame si le encontraste algún error!',
+      },
+      whatsapp_entrega_profesional: {
+        title: 'Paso 3 · Si es el profesional', hint: 'Cuando el profesional dice «Dale, pasame». Lleva el link, sin el «reenviáselo a los doctores».', channel: 'whatsapp',
+        text: 'Acá tenés: {link}\n\nMandale un audio o escribile una pregunta difícil como si fueras un paciente real!\n\nSi te gusta cómo responde, en 15 minutos te muestro cómo quedaría con tu agenda. Avisame si le encontrás algún error!',
+      },
+      whatsapp_hablaste_doctor: {
+        title: 'Paso 3 · «¿Ya hablaste con el doctor?»', hint: 'El filtro de la recepción: transparencia y el link.', channel: 'whatsapp',
+        text: 'No, todavía no! Primero armé la prueba gratis con los datos públicos del consultorio, para que la puedan chusmear ustedes en recepción antes de molestar a {destinatario}. Acá tenés el link: {link}\n\nHacele una pregunta difícil como si fueras un paciente. Si ves que responde bien, ahí sí se la pasás!',
       },
       whatsapp_sin_respuesta: {
         title: 'Seguimiento 1 · Sin respuesta al Paso 2', hint: 'A las 24 horas del Paso 2: el link directo igual.', channel: 'whatsapp',
@@ -150,6 +178,14 @@
       whatsapp_feedback: {
         title: 'Feedback de no interesados', hint: 'A quien respondió que no: una vez, cierra la charla. No cuenta como uno de los tres.', channel: 'whatsapp',
         text: 'Gracias por contestarme. No te escribo más. Si me decís en una línea por qué no te sirve, me ayudás un montón.',
+      },
+      whatsapp_feedback_sistema: {
+        title: 'Feedback · Ya tienen un sistema', hint: 'Cuando el «no» ya trae el motivo: pregunta cuál usan, no por qué.', channel: 'whatsapp',
+        text: 'Genial, gracias por contarme! No te escribo más. Si me decís en una línea qué sistema usan hoy, me ayudás un montón.',
+      },
+      whatsapp_feedback_desconfianza: {
+        title: 'Si desconfían del link', hint: 'No insiste con el link: ofrece mostrarla en una llamada corta. No cierra la cuenta.', channel: 'whatsapp',
+        text: 'Te entiendo, hacés bien en cuidarte con los links. No te mando nada más por acá. Si en algún momento te da curiosidad, te la muestro en una llamada de 5 minutos, sin tocar nada.',
       },
       instagram: { title: 'Instagram', hint: 'Sin link: los pedidos de mensaje con links se filtran.', channel: 'instagram', text: 'Hola {saludo}! Soy Axel, de Turnia. Armé una demo de Sofi con tu consultorio: contesta el WhatsApp cuando estás atendiendo o fuera de horario y da los turnos sola. ¿Te paso el link para probarla? Es un minuto.' },
       llamada: { title: 'Guion de llamada', hint: 'No se envía. El objetivo es el WhatsApp de quien decide.', channel: 'llamada', text: 'Hola, ¿qué tal? ¿Es el consultorio de {destinatario}? Soy Axel, de Turnia. Le preparé una demo de una asistente que contesta el WhatsApp del consultorio y da turnos cuando nadie puede atender. ¿Me pasás un WhatsApp para mandársela? Si es el de {saludo}, mejor: así la prueba directo.' },
@@ -177,18 +213,28 @@
     ],
     // Antes del link manda la secuencia: el Paso 2 (o su variante si creyeron que eras un paciente) y, si respondió
     // el Paso 2, el Paso 3 con la demo. Un «no, gracias» va al feedback y cierra. Después del link, `replies`.
+    // Variantes (10/11): si contesta el profesional en persona, si la recepción pregunta si ya hablaste con el
+    // doctor, y si el «no» ya trae el motivo (ya tienen un sistema) o desconfían del link.
     replyPlan(a, inbound, { pick, negative }) {
       const text = String((inbound && inbound.text) || '');
-      if (negative) return { key: 'whatsapp_feedback', template: 'whatsapp_feedback', register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: { type: 'outcome', outcome: 'perdido', detail: text.slice(0, 200) } };
+      const lost = { type: 'outcome', outcome: 'perdido', detail: text.slice(0, 200) };
+      if (DISTRUST.test(text)) return { key: 'whatsapp_feedback_desconfianza', template: 'whatsapp_feedback_desconfianza', register: { type: 'conversation', detail: 'Desconfían del link' } };
+      if (negative && SYSTEM.test(text)) return { key: 'whatsapp_feedback_sistema', template: 'whatsapp_feedback_sistema', register: { type: 'conversation', detail: 'Feedback: ya tienen un sistema' }, then: lost };
+      if (negative) return { key: 'whatsapp_feedback', template: 'whatsapp_feedback', register: { type: 'conversation', detail: 'Feedback de no interesados' }, then: lost };
       if (a.touches) return null;
       const deriv = pick('derivacion');
       if (deriv && deriv.test.test(text)) return { key: 'derivacion', reply: deriv, register: { type: 'conversation', detail: deriv.title } };
+      if (ASKED_DOCTOR.test(text)) return { key: 'whatsapp_hablaste_doctor', template: 'whatsapp_hablaste_doctor', register: { type: 'sent', template: 'whatsapp_hablaste_doctor' } };
+      const pro = isProfessional(a, text);
       if (a.greetingSent && !a.permissionSent) {
         const patient = /\bturnos?\b|paciente|para cu[aá]ndo|qu[eé] (d[ií]a|fecha|horario)|obra social|primera vez|consulta (de|por|para)|una urgencia/i.test(text);
-        const key = patient ? 'whatsapp_permiso_turno' : 'whatsapp_permiso';
+        const key = pro ? 'whatsapp_permiso_profesional' : patient ? 'whatsapp_permiso_turno' : 'whatsapp_permiso';
         return { key, template: key, register: { type: 'sent', template: key } };
       }
-      if (a.permissionSent) return { key: 'whatsapp_entrega', template: 'whatsapp_entrega', register: { type: 'sent', template: 'whatsapp_entrega' } };
+      if (a.permissionSent) {
+        const key = pro ? 'whatsapp_entrega_profesional' : 'whatsapp_entrega';
+        return { key, template: key, register: { type: 'sent', template: key } };
+      }
       return null;
     },
     // Embudo con metas: la base es por semana; cada paso, la conversión esperada del anterior.

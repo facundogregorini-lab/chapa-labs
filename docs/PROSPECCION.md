@@ -132,6 +132,12 @@ La bandeja de quienes escribieron último, en las dos unidades. **Enviar** traba
 
 - **Buscar en el historial de WhatsApp (Turnia, 10/11):** al pie de Respuestas y de la bandeja de WhatsApp anterior. Busca palabras («precio costo cuanto») en lo que escribieron las personas en las dos líneas, en los últimos 100 mensajes de cada chat; la lectura diaria guarda solo el último. Sin tildes ni mayúsculas y sin las respuestas automáticas. Turnia la hace (tiene las claves de WAHA) y solo lee. En habita. no hace falta: su bandeja ya guarda cada respuesta.
 
+**Feedback de la operación del 10/11 (Turnia):**
+- **La cola de «Prospectado» ya no trae números con chat.** Turnia saca de «Sin saludar» cualquier número con un chat nuestro en alguna línea o con la línea confirmada, aunque lo comparta con un colega. Y la lectura de WhatsApp registra con su fecha lo que se mandó por fuera del panel (saludo, permiso, link) a quien no tenía nada registrado.
+- **La línea de cada uno en la cola:** cada fila muestra 0022 o 5483 si ya hay un chat o la línea está confirmada, y hay un filtro por línea («Línea 0022», «Línea 5483», «Sin chat») para operar las dos en paralelo.
+- **¿Tienen WhatsApp?** En la etapa Prospectado de Turnia, «Verificar 20 números»: Turnia le pregunta a WhatsApp si cada número tiene WhatsApp (no le manda nada a nadie) y corrige fijo o celular. Va de a 20 y despacio, para no exponer la línea.
+- **Respuestas sugeridas nuevas en Responder:** si contesta el profesional en persona («Soy la Dra. …»), el Paso 2 y el Paso 3 le hablan a él; si la recepción pregunta «¿ya hablaste con la Dra.?», la respuesta transparente con el link; si el «no» ya dice que tienen un sistema, se pregunta cuál; si desconfían del link, no se insiste y se ofrece una llamada. Los textos se editan en Turnia (Panel → Prospección → Mensajes).
+
 **En todo el panel (09/11):**
 - **Buscador global**, arriba: por nombre, consultorio o inmobiliaria, código (el de la demo, `perez-a1b`) o teléfono (alcanzan los últimos 3 números). Encuentra a cualquiera, esté o no en la cola del día, y abre su ficha.
 - **Las filas de Hoy** llevan `data-phone`, `data-wa-url` (con el mensaje que le toca), `data-demo-url`, `data-state` y `data-line`. Muestran los mensajes usados (x/3), la línea y si comparten el número.

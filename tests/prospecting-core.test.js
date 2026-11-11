@@ -486,6 +486,35 @@ test('Responder: quienes escribieron último, sin los bots, una vez por número 
   assert.deepEqual(bots.map((r) => r.a.id), ['bot']);
 });
 
+test('Responder: variantes del 10/11 (profesional, «¿ya hablaste con el doctor?», sistema, desconfianza)', () => {
+  const plan = (a, text) => C.replyPlan(a, { text }, turnia).key;
+  const greeted = acc({ id: 'x', name: 'Ana Pérez', greeting: 'Ana', greetingSent: '2026-11-08 09:00' });
+  const asked = { ...greeted, permissionSent: '2026-11-08 10:00' };
+  // Contesta el profesional en persona: el Paso 2 y el Paso 3 le hablan a él.
+  assert.equal(plan(greeted, 'Hola como estás? Soy Ana, ¿qué necesitabas?'), 'whatsapp_permiso_profesional');
+  assert.equal(plan(greeted, 'Hola! Soy la Dra. Pérez'), 'whatsapp_permiso_profesional');
+  assert.equal(plan(asked, 'Soy Ana, dale pasame'), 'whatsapp_entrega_profesional');
+  // La secretaria que se presenta no es el profesional.
+  assert.equal(plan(greeted, 'Soy María, la secretaria de la doctora. ¿En qué te ayudo?'), 'whatsapp_permiso');
+  // El filtro de la recepción: transparencia y el link (cuenta como uno de los tres).
+  assert.equal(plan(greeted, '¿Ya hablaste con la Dra. por esto?'), 'whatsapp_hablaste_doctor');
+  assert.deepEqual(C.replyPlan(greeted, { text: '¿Ya hablaste con la Dra. por esto?' }, turnia).register, { type: 'sent', template: 'whatsapp_hablaste_doctor' });
+  // El «no» con el motivo ya dicho: se pregunta cuál sistema, no por qué.
+  const system = C.replyPlan(asked, { text: 'Por el momento no estamos interesados ya que contamos con un sistema' }, turnia);
+  assert.equal(system.key, 'whatsapp_feedback_sistema');
+  assert.equal(system.then.outcome, 'perdido');
+  // Desconfían del link: no se insiste y no se cierra.
+  const distrust = C.replyPlan(greeted, { text: 'No abrimos links de desconocidos' }, turnia);
+  assert.equal(distrust.key, 'whatsapp_feedback_desconfianza');
+  assert.equal(distrust.then, undefined);
+  for (const k of ['whatsapp_permiso_profesional', 'whatsapp_entrega_profesional', 'whatsapp_hablaste_doctor', 'whatsapp_feedback_sistema', 'whatsapp_feedback_desconfianza']) {
+    assert.ok(turnia.templates[k] && turnia.templates[k].text, k);
+    // Ningún WhatsApp le habla a la persona por su nombre de pila (como en Turnia).
+    assert.ok(!turnia.templates[k].text.includes('{saludo}'), k);
+  }
+  assert.ok(turnia.templates.whatsapp_hablaste_doctor.text.includes('{link}'));
+});
+
 test('Responder: la respuesta sugerida según lo que escribió (Turnia)', () => {
   const plan = (a, text) => C.replyPlan(a, { text }, turnia);
   const greeted = acc({ id: 'x', greetingSent: '2026-11-08 09:00' });
