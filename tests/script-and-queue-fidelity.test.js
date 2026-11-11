@@ -1,0 +1,61 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const at=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
+const app=at('prospecting/app.js'),api=at('api/prospecting.js'),css=at('prospecting/commercial-os.css'),html=at('prospecting/index.html');
+
+test('SCRIPT is a real section in both product navigation and in HABITA top tabs',()=>{
+  assert.doesNotThrow(()=>new vm.Script(app));
+  assert.doesNotThrow(()=>new vm.Script(api));
+  assert.match(app,/\['script','SCRIPT','▣'\]/);
+  assert.match(app,/\['script','SCRIPT'\]/);
+  assert.match(app,/const UNIT_VIEWS = \['script',/);
+  assert.match(app,/state\.view === 'script'\) main\.innerHTML = renderScript/);
+  assert.match(app,/isFu\(\)\|\|state\.view==='script'/);
+  assert.match(app,/data-testid="commercial-script"/);
+});
+test('HABITA script reads original source and TURNIA script is separately persistent',()=>{
+  assert.match(api,/const SCRIPT_TAB = 'Script'/);
+  assert.match(api,/async function doScript\(req,res,user\)/);
+  assert.match(api,/query:\{vista:'script'\}/);
+  assert.match(api,/followup:\{op:'script-save',body\}/);
+  assert.match(api,/google\.readTabs\(sheet\.id,\[SCRIPT_TAB\]\)/);
+  assert.match(api,/google\.writeRange\(sheet\.id,SCRIPT_TAB,1/);
+  assert.match(api,/if\(session\.open\(\)\)return fail\(res,403/);
+  assert.match(api,/if \(op === 'script'\) return await doScript\(req, res, user\)/);
+  assert.match(app,/data-script-form/);
+  assert.match(app,/data-script-body/);
+  assert.match(app,/data-script-discard/);
+  assert.match(app,/data-script-refresh/);
+  assert.match(app,/const saved=await api\('script',\{method:'POST'/);
+  assert.match(app,/if\(saved\.body!==body\)throw Error/);
+  assert.doesNotMatch(app,/HABITA · Guía de ejecución para la extensión[\s\S]{0,1000}RECORRIDO RÁPIDO/);
+});
+test('Approved visual reference is represented in committed design tokens, not inherited random defaults',()=>{
+  assert.match(html,/family=Inter/);
+  assert.match(css,/MOCKUP-LOCKED VISUAL SYSTEM/);
+  assert.match(css,/grid-template-columns:minmax\(0,1\.76fr\) minmax\(478px,1fr\)!important/);
+  assert.match(css,/\.os-fu-agency-icon/);
+  assert.match(css,/\.os-fu-preview-back/);
+  assert.match(css,/\.os-fu-preview-actions\s*\{/);
+  assert.match(css,/grid-template-columns:1\.08fr 1fr 1\.16fr/);
+  assert.match(css,/\.os-script-editor textarea/);
+  const start=app.indexOf('function fuRecommended('),end=app.indexOf('function fuHoy()',start);
+  const aside=app.slice(start,end);
+  for(const key of ['os-fu-preview-back','os-fu-preview-head','os-fu-preview-contact','os-fu-preview-context','os-fu-preview-said','os-fu-preview-message-card','os-fu-preview-notes-card'])assert.ok(aside.includes(key),key);
+  const idx=[aside.indexOf('Información del contacto'),aside.indexOf('Resumen / Contexto'),aside.indexOf('Qué dijo'),aside.indexOf('Próxima acción'),aside.indexOf('Mensaje de WhatsApp'),aside.indexOf('Observaciones')];
+  assert.ok(idx.every(x=>x>=0));
+  assert.deepEqual(idx.slice().sort((a,b)=>a-b),idx);
+});
+test('Current execution safety and mobile remain intact',()=>{
+  assert.match(app,/case 'confirm-and-next':/);
+  assert.match(app,/if\(advanceAfterConfirmed\)await fuNext\(t\)/);
+  assert.match(app,/data-testid="fu-mobile-queue"/);
+  assert.match(app,/data-fu="queue-focus-stage"/);
+  assert.match(app,/data-fu="queue-focus-situation"/);
+  assert.match(app,/data-fu="queue-whatsapp"/);
+  assert.match(css,/@media\(max-width:760px\)/);
+});
