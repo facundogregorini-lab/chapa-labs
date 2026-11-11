@@ -287,5 +287,11 @@
       ${cohortSection(unit,cohorts,v)}
     </div>`;
   }
-  return {render,turniaCohorts,selectedDays,aggregate,score,defaults};
+  /** Solo «¿Se ejecutó la cola?», para el Resumen general. */
+  function renderQueue(unit,snap,view){
+    if(!snap?.results)return '<section class="rs-card" role="alert"><p>No se pudo consultar la ejecución de la cola.</p></section>';
+    const titles=Object.fromEntries((snap.stages||[]).map(s=>[s.key,s.title]));
+    return `<div class="rs" data-unit-results="${esc(unit)}">${queueSection(unit,snap,defaults(view),k=>titles[k]||snap.results.execution?.stages?.[k]||k)}</div>`;
+  }
+  return {render,renderQueue,turniaCohorts,selectedDays,aggregate,score,defaults};
 });

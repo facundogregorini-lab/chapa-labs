@@ -208,6 +208,9 @@
       { key: 'llamadas', label: 'Llamadas agendadas', hint: 'Reunión de 15 minutos («Reunión» en Turnia)', rate: 0.45, sheet: (a) => Boolean(a.meeting) || a.stage === 'reunion' },
       { key: 'fundadores', label: 'Clientes Fundadores', hint: 'Setup y mes 1 cobrados («Cliente» en Turnia)', rate: 0.5, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
     ],
+    // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`):
+    // el Resumen cruza cuánto se ejecutó cada etapa con cuánto convirtió su paso.
+    queueSteps: { 'sin-saludo': 0, 'saludo-sin-demo': 2, 'demo-sin-abrir': 3, 'abrio-sin-conversar': 4, 'converso-sin-cuenta': 5, 'cuenta-sin-actividad': 6, 'activa-sin-pago': 6 },
     // Las versiones de su demo personal (/p/<código>), para ver cuál convierte mejor. El corte es el de
     // turniasalud src/lib/demo-version.ts (el deploy de #138, en hora de Argentina): si cambia, cambiar los dos.
     demoVersions: [
@@ -334,6 +337,8 @@
       { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia', rate: 0.5, metrics: 'prospeccion.activados' },
       { key: 'pagos', label: 'Clientes pagos', hint: 'Primer pago aprobado', rate: 0.25, metrics: 'prospeccion.clientes' },
     ],
+    // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`).
+    queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 1, 'sin-enviar': 1, 'no-abrio': 2, 'sin-interaccion': 3, 'sin-cuenta': 4, 'sin-uso': 5, 'sin-suscripcion': 6 },
     product: [
       { label: 'Demos publicadas', path: 'demos.publicadas' },
       { label: 'Vinculadas', path: 'prospeccion.vinculados', hint: 'Crearon o reclamaron su cuenta' },

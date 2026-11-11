@@ -524,11 +524,63 @@
   }
 
   // ─── Resumen general (todas las unidades) ───────────────────
+  // ── Resumen general (overview.js): cada embudo contra su meta, la ejecución de su cola y el cruce ──
+  const ovState = () => state.ov || (state.ov = { view: { period: '7', grain: 'dia', step: { habita: 1, turnia: 1 } }, metrics: null, metricsKey: null, loading: false });
+  function ovRange() {
+    const days = window.ProspectingOverview.periodDays(ovState().view.period, C.today());
+    return { from: days[0], to: days[days.length - 1] };
+  }
+  /** Las cuentas de cada producto y sus métricas del período: una sola vez, después de la cola (nunca en paralelo con ella). */
+  async function ovLoad() {
+    const o = ovState();
+    if (o.loading || state.demo || !state.session || !state.session.user || state.fu.loading) return;
+    const r = ovRange();
+    const key = `${r.from}:${r.to}`;
+    const missing = units().filter((u) => !state.data[u.id] || (!state.data[u.id].accounts && !state.data[u.id].loading && !state.data[u.id].error));
+    if (!missing.length && o.metricsKey === key) return;
+    o.loading = true;
+    try {
+      for (const u of missing) await loadUnit(u.id, { quiet: true, noSync: true });
+      if (o.metricsKey !== key) {
+        try { o.metrics = await (await fetch(`/api/metricas?desde=${r.from}&hasta=${r.to}`)).json(); }
+        catch { o.metrics = { projects: {}, errors: { all: 'Sin conexión' } }; }
+        o.metricsKey = key;
+      }
+    } finally { o.loading = false; }
+    if (state.unit === 'todas' && state.view === 'resumen') render();
+  }
+  function ovUnit(u0) {
+    const u = withTargets(u0);
+    const d = state.data[u.id];
+    const o = ovState();
+    const snap = state.fu.n && state.fu.n.units[u.id];
+    const base = { id: u.id, name: u.name, color: color(u), perWeek: u.targets ? u.targets[0].perWeek : 0, snap, queueSteps: u.queueSteps || {},
+      queueHtml: snap && window.ProspectingResults ? window.ProspectingResults.renderQueue(u.id, snap, fuResultsView()) : '' };
+    if (!d || !d.accounts) return { ...base, loading: !(d && d.error) };
+    const project = o.metrics && o.metrics.projects ? o.metrics.projects[u.metricsKey] : null;
+    const r = ovRange();
+    const funnel = C.targetFunnel(d.accounts, u, { range: r, metrics: project });
+    const perDay = new Map(((project && project.prospeccion && project.prospeccion.porDia) || []).map((x) => [x.date, x]));
+    const daily = window.ProspectingOverview.periodDays(o.view.period, C.today()).map((date) => {
+      const row = perDay.get(date);
+      const tf = C.targetFunnel(d.accounts, u, { range: { from: date, to: date }, metrics: row ? { prospeccion: row } : null });
+      return { date, steps: tf ? tf.steps.map((x) => x.actual) : [], targets: tf ? tf.steps.map((x) => x.target) : [] };
+    });
+    return { ...base, funnel, daily };
+  }
+
   function renderCommercialOverview() {
   if (state.demo) return renderOverview();
   if (!state.fu.n) return state.fu.error
     ? `<section class="card glass"><h2>No se pudo cargar la operación comercial</h2><p>${esc(state.fu.error)}</p><button class="btn primary" type="button" data-fu="reload">Reintentar</button></section>`
     : '<div class="skeleton"></div><div class="skeleton"></div>';
+  if (window.ProspectingOverview) {
+    ovLoad();
+    const list = units().filter((u) => state.fu.n.units[u.id] || state.data[u.id]);
+    const errors = Object.entries(state.fu.n.errors || {}).map(([u, e]) => `${fuName(u)}: ${e}`).join(' · ');
+    return window.ProspectingOverview.render({ units: list.map(ovUnit), view: ovState().view, today: C.today(),
+      notice: errors || (ovState().loading ? 'Cargando los embudos de cada producto…' : '') });
+  }
   const s = F.summary(state.fu.n, 'todas');
   const entries = units().map(u => {
     const snap = state.fu.n.units[u.id];
@@ -3802,6 +3854,15 @@
           if(row){row.focus();row.click();}else render();
         }
         break;
+      }
+      case 'ov-period': {
+        ovState().view.period = ds.fuPeriod; render(); ovLoad(); break;
+      }
+      case 'ov-grain': {
+        ovState().view.grain = ds.fuGrain; render(); break;
+      }
+      case 'ov-step': {
+        ovState().view.step[ds.fuUnitId] = Number(ds.fuStep); render(); break;
       }
       case 'results-window': {
         const r=fuResultsView();
