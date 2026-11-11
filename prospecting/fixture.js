@@ -165,7 +165,7 @@
   const metrics = () => ({
     projects: {
       turnia: { uso: { clinicas: 2, clinicas_activas: 1 }, demos: { iniciadas: 31 }, pedidos: { pedidos: 6 } },
-      'amobla-ia': { prospeccion: { vinculados: 4, activados: 2, clientes: 1, demos: { sent: 19, entered: 13, interacted: 7 } }, demos: { publicadas: 22 }, ingresos: { ingresos: 54000 } },
+      'amobla-ia': { prospeccion: { vinculados: 4, activados: 2, clientes: 1, demos: { sent: 19, entered: 13, interacted: 7 }, periodo: { demosEnviadas: 19, visitadas: 13, conInteraccion: 7, cuentas: 4, activas: 2, clientes: 1 } }, demos: { publicadas: 22 }, ingresos: { ingresos: 54000 } },
     },
     errors: {},
   });

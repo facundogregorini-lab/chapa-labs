@@ -199,6 +199,8 @@
     // ahí va el Paso 2. Cuenta la respuesta que leyó la lectura de WhatsApp («Última respuesta» después del
     // saludo), el estado «Respondió» y el Paso 2 enviado. Las metas de fábrica (20 % y 75 %) dejan igual la
     // de demos enviadas (15 % de los saludos); se cambian en Embudo.
+    // Después del saludo, lo que hicieron en el período las inmobiliarias prospectadas, saludadas cuando sea
+    // (/api/metricas de habita, prospeccion.periodo): una demo enviada hoy a una saludada la semana pasada cuenta hoy.
     targets: [
       { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
       { key: 'respondieron', label: 'Respondieron el saludo', hint: 'Contestaron el Paso 1 (lo leyó la lectura de WhatsApp o se marcó «Respondió»)', rate: 0.2, sheet: respondedGreeting },
@@ -330,12 +332,12 @@
     },
     targets: [
       { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.firstContact) || a.stage !== 'por_contactar' && a.stage !== 'invalido' && a.stage !== 'baja' },
-      { key: 'demos', label: 'Demos enviadas', hint: 'Demos publicadas de las cuentas prospectadas', rate: 0.15, metrics: 'prospeccion.demos.sent' },
-      { key: 'visitadas', label: 'Visitadas', hint: 'Entraron a su demo', rate: 0.65, metrics: 'prospeccion.demos.entered' },
-      { key: 'interaccion', label: 'Con interacción', hint: 'Interactuaron con su demo', rate: 0.5, metrics: 'prospeccion.demos.interacted' },
-      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta', rate: 0.5, metrics: 'prospeccion.vinculados' },
-      { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia', rate: 0.5, metrics: 'prospeccion.activados' },
-      { key: 'pagos', label: 'Clientes pagos', hint: 'Primer pago aprobado', rate: 0.25, metrics: 'prospeccion.clientes' },
+      { key: 'demos', label: 'Demos enviadas', hint: 'Inmobiliarias prospectadas a las que se les envió la demo en el período', rate: 0.15, metrics: 'prospeccion.periodo.demosEnviadas' },
+      { key: 'visitadas', label: 'Visitadas', hint: 'Entraron a su demo en el período', rate: 0.65, metrics: 'prospeccion.periodo.visitadas' },
+      { key: 'interaccion', label: 'Con interacción', hint: 'Interactuaron con su demo en el período', rate: 0.5, metrics: 'prospeccion.periodo.conInteraccion' },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta en el período', rate: 0.5, metrics: 'prospeccion.periodo.cuentas' },
+      { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia en el período', rate: 0.5, metrics: 'prospeccion.periodo.activas' },
+      { key: 'pagos', label: 'Clientes pagos', hint: 'Primer pago aprobado en el período', rate: 0.25, metrics: 'prospeccion.periodo.clientes' },
     ],
     // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`).
     queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 1, 'sin-enviar': 1, 'no-abrio': 2, 'sin-interaccion': 3, 'sin-cuenta': 4, 'sin-uso': 5, 'sin-suscripcion': 6 },

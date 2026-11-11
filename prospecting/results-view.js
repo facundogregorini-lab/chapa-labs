@@ -127,7 +127,9 @@
     ];
     const chart=(view.period==='7'||view.period==='semana'||view.period==='custom')&&days.length;
     const shown=view.period==='7'?days.slice(-7):selectedDays(days,{...view,day:null});
-    const dmax=Math.max(1,...shown.map(d=>{const x=aggregate([d]);return Math.max(x.total.pending,x.executed);}));
+    // A day without the queue's photo still shows what was executed that day (only the pending is unknown).
+    const doneOn=x=>x.executed+x.outside;
+    const dmax=Math.max(1,...shown.map(d=>{const x=aggregate([d]);return Math.max(x.total.pending,doneOn(x));}));
     const reasons=Array.isArray(snap?.results?.blocks)?snap.results.blocks:[];
     return `<section class="rs-card" data-testid="results-queue">
       <div class="rs-head"><div><h2><span class="rs-step">1</span>¿Se ejecutó la cola?</h2>
@@ -143,13 +145,13 @@
             <span class="rs-flabel"><b>${title}</b><small>${sub}</small></span>
             <span class="rs-ftrack"><span class="rs-fbar" style="width:${width}%">${inner}</span></span>
             <span class="rs-fval"><strong>${value}</strong><small>${esc(hint)}</small></span></button>
-            ${key==='executed'&&a.captured?`<div class="rs-leak"><span>Sin ejecutar <b>${num(Math.max(0,t.pending-a.executed))}</b></span><span>bloqueadas ${num(t.blocked)}</span><span>sin tomar ${num(t.unclaimed)}</span><span>no salieron ${num(t.failed)}</span><span class="rs-muted" title="Saludos fuera del cupo diario, programadas para otro día y las que esperan que la persona conteste">para otro día ${num(t.scheduled)} (no cuentan)</span></div>`:''}
+            ${key==='executed'&&a.captured&&view.open==='executed'?`<div class="rs-leak" data-testid="results-leak"><span>Sin ejecutar <b>${num(Math.max(0,t.pending-a.executed))}</b></span><span>bloqueadas ${num(t.blocked)}</span><span>sin tomar ${num(t.unclaimed)}</span><span>no salieron ${num(t.failed)}</span><span class="rs-muted" title="Saludos fuera del cupo diario, programadas para otro día y las que esperan que la persona conteste">para otro día ${num(t.scheduled)} (no cuentan)</span></div>`:''}
             ${view.open===key?`<div class="rs-open" data-testid="results-open-${key}"><h3>${BARS[key]} por tipo de acción</h3>${breakdown(key,a,stageTitle)}</div>`:''}`).join('')}
           ${chart?`<div class="rs-days" aria-label="Detalle por día">${shown.map(d=>{const x=aggregate([d]);const s=score([d],view);const [,c]=band(s?s.value:null);
-            return `<button type="button" class="rs-day ${view.day===d.day?'is-on':''}" aria-pressed="${view.day===d.day}" data-fu="results-day" data-fu-day="${esc(d.day)}" title="${esc(dayLabel(d.day))}: ${num(x.total.pending)} pendientes, ${num(x.executed)} ejecutadas">
-              <span class="rs-cols"><i class="is-base" style="height:${Math.round(x.total.pending/dmax*64)}px"></i><i class="is-ok" style="height:${Math.round(x.executed/dmax*64)}px"></i></span>
+            return `<button type="button" class="rs-day ${view.day===d.day?'is-on':''}" aria-pressed="${view.day===d.day}" data-fu="results-day" data-fu-day="${esc(d.day)}" title="${esc(dayLabel(d.day))}: ${d.captured?`${num(x.total.pending)} pendientes, `:'sin foto de la cola, '}${num(doneOn(x))} ejecutadas">
+              <span class="rs-cols"><i class="is-base" style="height:${Math.round(x.total.pending/dmax*64)}px"></i><i class="is-ok" style="height:${Math.round(doneOn(x)/dmax*64)}px"></i></span>
               <b class="${c}">${s?s.value:'—'}</b><small>${esc(dayLabel(d.day))}</small></button>`;}).join('')}</div>
-            <p class="rs-muted">Columnas: pendientes (gris) y ejecutadas (verde); abajo, el score del día. Tocá un día para ver solo ese día.</p>`:''}
+            <p class="rs-muted">Columnas: pendientes (gris) y ejecutadas (verde); abajo, el score del día. Los días sin foto de la cola muestran solo lo ejecutado. Tocá un día para ver solo ese día.</p>`:''}
         </div>
         <aside class="rs-score" data-testid="results-score">
           <span class="rs-kicker">Score de ejecución</span>
