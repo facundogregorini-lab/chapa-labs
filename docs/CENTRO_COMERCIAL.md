@@ -205,6 +205,7 @@ La vista **Responder** (`/prospecting/<unidad>?vista=responder`) es la bandeja d
    - Edición de versiones (hoy se crea la siguiente).
    - Mostrar situaciones, tomas y bloqueos en su propio Panel → Follow-up, que sigue como antes.
 7. **Rendimiento:** en habita. no hay tiempo entre etapas por persona, porque su embudo no guarda cuándo se llegó a cada paso; solo hay tiempo hasta la conversión por versión.
+   **Resultados en tres lecturas (11/11/2026, `prospecting/results-view.js`):** (1) «¿Se ejecutó la cola?»: pendientes → ejecutadas (persona / bot) → exitosas (con conversión atribuida, con la definición de cada producto), por hoy, ayer, 7 días o fechas elegidas, con el score de ejecución (60% cobertura + 40% éxito, configurable); cada barra se abre en sus tipos de acción y cada día del gráfico filtra el período. Los datos son `results.execution` de cada API (habita.: foto diaria `followup_queue_days`, migración 202612110001 de amoblaia; Turnia: `sales_followup_queue_days` en su schema.sql). (2) «Qué acciones convierten»: una fila por tipo de acción (`results.actionLabels`), con su tendencia de 8 semanas (`weeklyByType`); al abrirla (clic o doble clic), las etapas donde corrió y sus versiones. (3) Cohortes como mapa de calor con las etapas del panel: Inmobiliarias en habita. (`results.cohortFunnel`) y Odontólogos en Turnia (calculadas en Chapa desde sus cuentas). En «General» se muestran las dos unidades por separado, sin mezclar tasas.
 
 ## Reglas que no se rompen
 

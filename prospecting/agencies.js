@@ -263,6 +263,8 @@
         hasOwner: isDate(a.accountAt), subscribed: isDate(a.accountActive), client,
         score: null, touches: a.touches || 0, lastActivity: facts[0] || null,
         createdAt: iso(a.firstContact) || iso(a.greetingSent) || '2000-01-01T00:00:00.000Z',
+        // Cuándo respondió por primera vez (las cohortes por semana de respuesta en Resultados).
+        repliedAt: isDate(a.replied) ? iso(a.replied) : null,
         test: false, phone: a.phone, phoneKind: a.phoneKind, demoUrl: a.demoUrl || '', audioAt: iso(a.audioAt) || '',
         // La búsqueda encuentra también por zona, lista («lista 4»), «google ads», «meta ads» y «ads».
         googleAds: Boolean(a.googleAds), metaAds: Boolean(a.metaAds),

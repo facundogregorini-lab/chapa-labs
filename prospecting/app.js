@@ -1904,6 +1904,8 @@
   // Un clic afuera o Escape cierran los menús.
   document.addEventListener('mousedown', (e) => { if ((state.agMenu || state.agMore) && !e.target.closest('#agpop, [data-ag-menu], [data-ag-more]')) { state.agMenu = null; state.agMore = null; agPop(); } });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && (state.agMenu || state.agMore)) { state.agMenu = null; state.agMore = null; agPop(); } });
+  // Resultados: las filas de acciones se abren también con Enter o espacio.
+  document.addEventListener('keydown', (e) => { const t = e.target.closest && e.target.closest('[data-fu="results-action"]'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); } });
   async function agencyAction(body) {
     if (state.demo) { toast('En el ejemplo no se cambia nada.', true); return null; }
     return api('agency', { method: 'POST', body: { unit: state.unit, ...body } });
@@ -3560,14 +3562,33 @@
     </div></div>`:''}`;
 }
 
+  function fuResultsView(){
+    return window.ProspectingResults.defaults(state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto',period:'7'}));
+  }
+  /** Las cohortes con las etapas del panel: habita. las manda calculadas; Turnia, desde sus cuentas (Odontólogos). */
+  function fuResultsCohorts(id,snap){
+    if(id==='habita')return snap.results&&snap.results.cohortFunnel;
+    const rows=agData(id)&&agData(id).rows;
+    if(!rows)return null;
+    const cfg=AG.TURNIA;
+    const stages=cfg.stages.filter((k)=>k!=='closed').map((k)=>({key:k,title:cfg.stageStep[k]}));
+    return window.ProspectingResults.turniaCohorts(rows,stages);
+  }
+
   function fuRendimiento() {
     const n = state.fu.n;
     const scope = fuScope();
-    if(scope==='habita'&&window.ProspectingHabitaResults)
-      return window.ProspectingHabitaResults.render(
-        n.units.habita,
-        state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'})
-      );
+    // Resultados en tres lecturas (results-view.js): la cola, las acciones y las cohortes del panel.
+    if(window.ProspectingResults){
+      const view=fuResultsView();
+      const one=(id)=>{
+        const snap=n.units[id];
+        if(!snap)return `<section class="card glass" role="alert"><p>No pudimos consultar los resultados de ${esc(fuName(id))}.</p></section>`;
+        return window.ProspectingResults.render(id,snap,view,{cohorts:fuResultsCohorts(id,snap)});
+      };
+      if(scope!=='todas')return one(scope);
+      return fuUnits().filter((u)=>n.units[u.id]).map((u)=>`<section class="hero"><div>${fuDot(u.id)}<h1>${esc(u.name)}</h1><p>Cada producto con su definición de conversión: no se mezclan tasas.</p></div></section>${one(u.id)}`).join('');
+    }
     const actors = F.actorRows(n, scope);
     return `<section class="hero"><div><span class="eyebrow">Rendimiento</span><h1>Qué mensajes y quién convierten</h1><p>Conversión: que la persona o la inmobiliaria avanzó de etapa después del envío, con la definición de cada producto. Con menos de 30 envíos, la muestra es chica.</p></div></section>
       ${state.unit === 'todas' ? fuToolbar({ search: false, groups: false, filters: false }) : ''}
@@ -3783,12 +3804,35 @@
         break;
       }
       case 'results-window': {
-        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        const r=fuResultsView();
         r.windowKey=ds.fuWindow;render();break;
       }
       case 'results-cohort': {
-        const r=state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto'});
+        const r=fuResultsView();
         r.cohortBy=ds.fuCohort;render();break;
+      }
+      case 'results-period': {
+        const r=fuResultsView();
+        r.period=ds.fuPeriod;r.day=null;render();break;
+      }
+      case 'results-day': {
+        const r=fuResultsView();
+        r.day=ds.fuDay&&r.day!==ds.fuDay?ds.fuDay:null;render();break;
+      }
+      case 'results-open': {
+        const r=fuResultsView();
+        r.open=r.open===ds.fuBar?null:ds.fuBar;render();break;
+      }
+      case 'results-action': {
+        // A double click opens the row too: its second click is ignored instead of closing it again.
+        if(e.detail>1)break;
+        const r=fuResultsView();
+        r.action=r.action===ds.fuActionType?null:ds.fuActionType;render();break;
+      }
+      case 'results-weights-toggle': {
+        e.preventDefault();
+        const r=fuResultsView();
+        r.weightsOpen=!r.weightsOpen;render();break;
       }
       case 'queue-stage': {
         const q=fuQueueState();q.commercial=ds.fuStage||null;q.tech=null;q.situation=null;q.rule=null;q.closed=false;q.limit=25;render();break;
@@ -4222,6 +4266,13 @@
     }
   }, true);
   document.addEventListener('change', async (e) => {
+    // Resultados: las fechas del período y los pesos del score.
+    if(e.target.matches('[data-fu-results-date]')&&window.ProspectingResults){
+      const r=fuResultsView();r[e.target.dataset.fuResultsDate]=e.target.value||null;r.day=null;render();return;
+    }
+    if(e.target.matches('[data-fu-results-weight]')&&window.ProspectingResults){
+      const r=fuResultsView();r[e.target.dataset.fuResultsWeight]=Number(e.target.value)||0;r.weightsOpen=true;render();return;
+    }
     if(!e.target.matches('[data-fu-rule-version]')&&
       e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
       fuRulesState(state.unit).dirty=true;
