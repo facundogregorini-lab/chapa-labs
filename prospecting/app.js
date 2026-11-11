@@ -219,7 +219,7 @@
         :'<form class="os-script-editor" data-script-form>'
           +'<div class="os-script-editor-top"><div><h3>GUÍA DE TRABAJO</h3><p>'+(habita?'Fuente oficial: HABITA · /admin/script':'El texto queda guardado en la planilla operativa de TURNIA')+'</p></div>'
           +(editing?'<span class="os-script-editing-label">● EDITANDO DESDE CHAPA LABS</span>'
-            :'<button class="btn primary os-script-edit-button" type="button" data-script-edit '+(d.editable?'':'disabled title="Para editar necesitás una sesión protegida con contraseña"')+'>✎ Editar script</button>')+'</div>'
+            :'<button class="btn primary os-script-edit-button" type="button" data-script-edit '+(d.editable?'':'disabled title="No se puede editar mientras no haya conexión con el documento"')+'>✎ Editar script</button>')+'</div>'
           +'<textarea name="body" data-script-body maxlength="20000" rows="21" aria-label="Script comercial de '+title+'"'
           +(!editing?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
           +'<footer class="os-script-bottom"><div class="os-script-meta"><span data-script-dirty>'+(dirty?'Cambios sin guardar':date?'Guardado el '+esc(date):'Todavía sin guardar')+'</span>'
@@ -227,7 +227,7 @@
           +(editing?'<button class="btn" type="button" data-script-cancel>Cancelar edición</button>'
             +'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar cambios')+'</button>'
             :d.editable?'<span class="os-script-readonly">Usá «Editar script» para modificarlo aquí mismo.</span>'
-            :'<span class="os-script-readonly">Para editarlo desde Chapa Labs, iniciá una sesión protegida por contraseña.</span>')
+            :'<span class="os-script-readonly">No se pudo habilitar la edición. Reintentá cargar el documento.</span>')
           +'</div></footer></form>')
       +(habita?'<p class="os-script-original-link">Fuente: <a href="https://www.habitaia.app/admin/script" target="_blank" rel="noopener noreferrer">Abrir script original en HABITA ↗</a></p>':'')
       +'</section>';
@@ -253,7 +253,7 @@
     if(!button||!main.contains(button))return;
     const unit=state.unit,src=state.scripts[unit];if(!src)return;
     if(button.hasAttribute('data-script-edit')){
-      if(!src.editable){toast('Para editar el script necesitás una sesión protegida con contraseña.',true);return;}
+      if(!src.editable){toast('El documento todavía no está disponible para editar. Actualizá y reintentá.',true);return;}
       state.scriptEditing[unit]=true;render();main.querySelector('[data-script-body]')?.focus();
     }else if(button.hasAttribute('data-script-cancel')||button.hasAttribute('data-script-discard')){
       state.scriptDrafts[unit]=src.body||'';state.scriptEditing[unit]=false;render();
