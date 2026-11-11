@@ -555,7 +555,8 @@
     const o = ovState();
     const snap = state.fu.n && state.fu.n.units[u.id];
     const base = { id: u.id, name: u.name, color: color(u), perWeek: u.targets ? u.targets[0].perWeek : 0, snap, queueSteps: u.queueSteps || {},
-      queueHtml: snap && window.ProspectingResults ? window.ProspectingResults.renderQueue(u.id, snap, fuResultsView()) : '' };
+      queueHtml: snap && window.ProspectingResults ? window.ProspectingResults.renderQueue(u.id, snap, fuResultsView())
+        : `<section class="rs-card" role="alert" data-testid="overview-queue-error-${esc(u.id)}"><h3>No llegó la cola de ${esc(u.name)}</h3><p class="rs-muted">${esc((state.fu.n && state.fu.n.errors && state.fu.n.errors[u.id]) || 'Sin datos.')}</p><button class="btn small" type="button" data-fu="reload">Reintentar</button></section>` };
     if (!d || !d.accounts) return { ...base, loading: !(d && d.error) };
     const project = o.metrics && o.metrics.projects ? o.metrics.projects[u.metricsKey] : null;
     const r = ovRange();
@@ -3619,7 +3620,8 @@
   }
   /** Las cohortes con las etapas del panel: habita. las manda calculadas; Turnia, desde sus cuentas (Odontólogos). */
   function fuResultsCohorts(id,snap){
-    if(id==='habita')return snap.results&&snap.results.cohortFunnel;
+    // Las dos apps mandan sus cohortes con su embudo de Follow-up; sin eso, Turnia se arma con sus cuentas.
+    if(id==='habita'||snap.results&&snap.results.cohortFunnel)return snap.results&&snap.results.cohortFunnel;
     const rows=agData(id)&&agData(id).rows;
     if(!rows)return null;
     const cfg=AG.TURNIA;
