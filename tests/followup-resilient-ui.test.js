@@ -40,7 +40,7 @@ test('A successful update replaces stale data and clears the warning', () => {
 test('The browser requests only the open business and lazily loads legacy data', () => {
   assert.doesNotThrow(() => new vm.Script(app));
   assert.match(app, /unit: scope, periodo: period\.preset/);
-  assert.match(app, /if \(state\.demo \|\| !state\.session \|\| !state\.session\.user \|\| isFu\(\)\) return/);
+  assert.match(app, /if \(state\.demo \|\| !state\.session \|\| !state\.session\.user \|\| isFu\(\) \|\| state\.view===\x27script\x27\) return/);
   assert.match(app, /followup-unavailable/);
   assert.match(app, /REINTENTAR CONEXIÓN/);
   assert.match(app, /F\.mergeUnits\(prior, response\.units\)/);
