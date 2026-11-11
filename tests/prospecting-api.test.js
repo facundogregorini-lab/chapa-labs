@@ -516,6 +516,39 @@ test('Follow-up: junta la cola de cada unidad y manda cada acción a su app a no
   }
 });
 
+test('Prospectos: lee la vista de habita. y pasa cada operación a nombre de quien opera', async () => {
+  process.env.HABITA_METRICS_SECRET = 'h'.repeat(40);
+  const realFetch = global.fetch;
+  const calls = [];
+  global.fetch = async (url, opts = {}) => {
+    const u = String(url);
+    calls.push({ url: u, method: opts.method || 'GET', body: opts.body ? JSON.parse(opts.body) : null });
+    if (opts.method === 'POST' && JSON.parse(opts.body).prospectos.op === 'crear') return { ok: false, status: 409, json: async () => ({ error: 'Ya está en la base como «Ficticia».', code: 'DUPLICATE' }) };
+    if (opts.method === 'POST') return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    return { ok: true, status: 200, json: async () => ({ available: true, rows: [{ id: 'p1' }], counts: { total: 1 } }) };
+  };
+  try {
+    assert.equal((await call('pool', { query: { unit: 'habita' } })).statusCode, 401);
+    const view = await call('pool', { query: { unit: 'habita', mensaje: 'Saludo V2' }, cookie });
+    assert.equal(view.statusCode, 200, JSON.stringify(view.body));
+    assert.equal(view.body.rows[0].id, 'p1');
+    assert.match(calls[0].url, /habitaia.*vista=prospectos&mensaje=Saludo\+V2/);
+    const ok = await call('pool', { method: 'POST', cookie, body: { unit: 'habita', prospectos: { op: 'cola', cuenta: 'p1' } } });
+    assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
+    assert.deepEqual(calls[1].body, { by: 'Axel', prospectos: { op: 'cola', cuenta: 'p1' } });
+    // El código del producto llega al panel: así avisa que ya está en la base.
+    const dup = await call('pool', { method: 'POST', cookie, body: { unit: 'habita', prospectos: { op: 'crear', nombre: 'Ficticia' } } });
+    assert.equal(dup.statusCode, 409);
+    assert.equal(dup.body.code, 'DUPLICATE');
+    assert.equal((await call('pool', { method: 'POST', cookie, body: { unit: 'habita', prospectos: { op: 'borrar' } } })).statusCode, 400);
+    // Turnia todavía no tiene Prospectos.
+    assert.equal((await call('pool', { query: { unit: 'turnia' }, cookie })).statusCode, 404);
+  } finally {
+    global.fetch = realFetch;
+    delete process.env.HABITA_METRICS_SECRET;
+  }
+});
+
 test('WhatsApp de Turnia: el cron diario pide la lectura sin sesión y solo devuelve los totales', async () => {
   const realFetch = global.fetch;
   const calls = [];

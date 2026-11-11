@@ -190,7 +190,7 @@ async function callApi(unit, { method = 'GET', body, query, timeout = 20000, raw
     const json = await r.json().catch(() => ({}));
     if (!r.ok) {
       const msg = r.status === 401 ? `${unit.name} rechazó la clave: revisá que sea la misma en los dos proyectos.` : json.error || `${unit.name} respondió ${r.status}.`;
-      throw Object.assign(new Error(msg), { status: r.status === 401 ? 502 : r.status });
+      throw Object.assign(new Error(msg), { status: r.status === 401 ? 502 : r.status, code: json.code });
     }
     return json;
   } catch (err) {
@@ -566,6 +566,30 @@ async function doTask(req, res, user) {
   }
 }
 
+// Prospectos: las inmobiliarias antes de la cola, con su ranking y los aprendizajes. El producto
+// (habita.) define datos, estados y ranking; acá solo se pasa el pedido a nombre de quien opera.
+const POOL_OPS = new Set(['guardar', 'cola', 'sacar', 'descartar', 'reabrir', 'llenar', 'crear', 'recalcular']);
+async function doPool(req, res, user) {
+  const unit = UNITS[req.method === 'GET' ? req.query.unit : (req.body || {}).unit];
+  if (!unit) return fail(res, 404, 'No existe esa unidad.');
+  if (!unit.pool) return fail(res, 404, `${unit.name} todavía no tiene Prospectos.`);
+  if (!unit.api || !apiOf(unit)) return fail(res, 403, `Para ver Prospectos de ${unit.name} falta la clave de su API.`);
+  try {
+    if (req.method === 'GET') {
+      const mensaje = String(req.query.mensaje || '').trim().slice(0, 120);
+      return res.status(200).json(await callApi(unit, { query: { vista: 'prospectos', ...(mensaje ? { mensaje } : {}) }, timeout: 30000 }));
+    }
+    const p = req.body.prospectos && typeof req.body.prospectos === 'object' ? req.body.prospectos : null;
+    if (!p || !POOL_OPS.has(p.op)) return fail(res, 400, 'Operación de Prospectos desconocida.');
+    const out = await callApi(unit, { method: 'POST', body: { by: user.name, prospectos: p }, timeout: p.op === 'llenar' || p.op === 'recalcular' ? 120000 : 45000 });
+    // La cola cambia cuando una inmobiliaria entra o sale.
+    followupCache.invalidate(unit.id + '|');
+    return res.status(200).json({ result: out });
+  } catch (err) {
+    return res.status(err.status && err.status < 500 ? err.status : 502).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   const op = (req.query && req.query.op) || '';
@@ -696,6 +720,7 @@ module.exports = async (req, res) => {
     if (op === 'script') return await doScript(req, res, user);
     if (op === 'followup' && req.method === 'GET') return await doFollowup(req, res);
     if (op === 'task' && req.method === 'POST') return await doTask(req, res, user);
+    if (op === 'pool' && (req.method === 'GET' || req.method === 'POST')) return await doPool(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {
     console.error('prospecting_error', op, err.message);

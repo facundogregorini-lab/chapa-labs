@@ -27,6 +27,7 @@
     editing: null,   // mensaje en edición: { unit, key, text, subject }
     agent: { replied: null, fails: 0, override: false }, // modo Enviar
     scripts: {}, scriptDrafts: {}, scriptEditing: {}, scriptSaving: false,
+    pool: {}, poolView: {}, poolSaving: false, poolDuplicate: null,
     editingTargets: null, // unidad cuyas metas del embudo se están editando
     busy: false,     // una acción en curso: un doble clic no la repite
   };
@@ -295,6 +296,119 @@
       toast('Script guardado en '+(unit==='habita'?'HABITA':'TURNIA')+'.');
     }catch(err){toast(err.message||'No se pudo guardar el script.',true);}
     finally{state.scriptSaving=false;if(state.unit===unit&&state.view==='script')render();}
+  });
+
+  // ─── Prospectos: antes de la cola ───────────────────────────
+  // Las inmobiliarias que todavía no recibieron el saludo, con su ranking, lo que les falta para
+  // entrar a la cola y los aprendizajes. Los datos, los estados y el ranking son del producto
+  // (prospecting/pool-view.js los muestra); acá se piden y se manda cada operación.
+  const Pool = window.ProspectingPool;
+  const poolUnit = () => { const u = state.unit !== 'todas' ? unitOf(state.unit) : null; return u && u.pool && Pool ? u : null; };
+  const poolOn = () => Boolean(poolUnit()) && state.view === 'prospectos' && !state.demo;
+  const poolViewOf = (unit) => Pool.defaults(state.poolView[unit] || (state.poolView[unit] = {}));
+  async function loadPool(unit, { quiet = false } = {}) {
+    const prev = state.pool[unit] || {};
+    if (prev.loading) return;
+    state.pool[unit] = { ...prev, loading: true, error: quiet ? prev.error : null };
+    if (!quiet) render();
+    try {
+      const message = poolViewOf(unit).message;
+      const data = await api('pool', { query: { unit, ...(message ? { mensaje: message } : {}) } });
+      state.pool[unit] = { data, loading: false, error: null, at: Date.now() };
+    } catch (err) {
+      state.pool[unit] = { ...prev, loading: false, error: err.message || 'Sin conexión.' };
+    }
+    if (state.unit === unit && state.view === 'prospectos') render();
+  }
+  function renderPool(u) {
+    const p = state.pool[u.id];
+    if (!p) { state.pool[u.id] = { loading: true }; setTimeout(() => { state.pool[u.id] = {}; loadPool(u.id, { quiet: true }); }, 0); }
+    const d = state.pool[u.id] || {};
+    return Pool.render(d.data || null, poolViewOf(u.id), { name: u.name.toUpperCase(), loading: d.loading, error: d.error, saving: state.poolSaving, duplicate: state.poolDuplicate });
+  }
+  /** Manda una operación de Prospectos y relee la lista. Devuelve el resultado o null si falló. */
+  async function poolOp(unit, prospectos, done) {
+    if (state.poolSaving) return null;
+    state.poolSaving = true; render();
+    try {
+      const { result } = await api('pool', { method: 'POST', body: { unit, prospectos } });
+      if (done) toast(typeof done === 'function' ? done(result) : done);
+      state.poolSaving = false;
+      if (prospectos.op !== 'guardar' && prospectos.op !== 'recalcular') loadFollowup({ quiet: true }); // la cola cambia cuando una entra o sale
+      await loadPool(unit, { quiet: true });
+      return result;
+    } catch (err) {
+      state.poolSaving = false;
+      if (err.body && err.body.code === 'DUPLICATE') state.poolDuplicate = err.message;
+      else toast(err.message || 'No se pudo guardar.', true);
+      render();
+      return null;
+    }
+  }
+  document.addEventListener('click', async (e) => {
+    const t = e.target.closest && e.target.closest('[data-pool]');
+    if (!t || !poolOn()) return;
+    // Un enlace, un campo o un botón de formulario dentro de la fila no abren la ficha.
+    if (t.dataset.pool === 'open' && e.target.closest('a, input, select, textarea, label')) return;
+    const unit = state.unit, view = poolViewOf(unit), id = t.dataset.id, act = t.dataset.pool;
+    if (act === 'tab') { view.tab = t.dataset.value; render(); }
+    else if (act === 'status') { view.status = t.dataset.value; view.shown = 50; render(); }
+    else if (act === 'more') { view.shown += 50; render(); }
+    else if (act === 'open') { view.open = view.open === id ? null : id; view.adding = false; render(); if (view.open) main.querySelector('[data-testid="pool-detail"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    else if (act === 'close') { view.open = null; render(); }
+    else if (act === 'add-toggle') { view.adding = !view.adding; view.open = null; state.poolDuplicate = null; render(); }
+    else if (act === 'reload') loadPool(unit);
+    else if (act === 'queue') await poolOp(unit, { op: 'cola', cuenta: id }, 'Pasó a la cola: ya puede recibir el saludo.');
+    else if (act === 'explore') await poolOp(unit, { op: 'cola', cuenta: id, explorar: true }, 'Pasó a la cola por exploración.');
+    else if (act === 'unqueue') await poolOp(unit, { op: 'sacar', cuenta: id }, 'Salió de la cola y volvió a Prospectos.');
+    else if (act === 'reopen') await poolOp(unit, { op: 'reabrir', cuenta: id }, 'Reabierta.');
+    else if (act === 'recalc') await poolOp(unit, { op: 'recalcular' }, (r) => `Ranking recalculado en ${int(r.changed)} prospectos.`);
+  });
+  document.addEventListener('keydown', (e) => {
+    const row = e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-pool="open"]') ? e.target : null;
+    if (row && poolOn()) row.click();
+  });
+  document.addEventListener('submit', async (e) => {
+    const form = e.target && e.target.closest ? e.target.closest('[data-pool-form]') : null;
+    if (!form || !poolOn()) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    const unit = state.unit, view = poolViewOf(unit), kind = form.dataset.poolForm, values = Object.fromEntries(new FormData(form));
+    const data = (state.pool[unit] || {}).data;
+    if (!data) return;
+    if (kind === 'save') {
+      const row = data.rows.find((r) => r.id === form.dataset.id);
+      if (!row) return;
+      const valores = Pool.changes(row, data.catalog, values);
+      const body = { op: 'guardar', cuenta: row.id, valores };
+      if ((values.__zona || '').trim() !== (row.zone || '')) body.zona = (values.__zona || '').trim();
+      if ((values.__decisor || '').trim() !== (row.decisor || '')) body.decisor = (values.__decisor || '').trim();
+      if (!Object.keys(valores).length && body.zona === undefined && body.decisor === undefined) { toast('No hay cambios para guardar.'); return; }
+      await poolOp(unit, body, 'Datos guardados: ranking y estado actualizados.');
+    } else if (kind === 'discard') {
+      if (await poolOp(unit, { op: 'descartar', cuenta: form.dataset.id, motivo: values.motivo }, 'Descartada.')) { view.open = null; render(); }
+    } else if (kind === 'fill') {
+      await poolOp(unit, { op: 'llenar', cantidad: Number(values.cantidad) }, (r) => r.added.length
+        ? `${int(r.added.length)} a la cola${r.added.some((x) => x.explore) ? ` (${int(r.added.filter((x) => x.explore).length)} por exploración)` : ''}.`
+        : 'No había calificadas para sumar.');
+    } else if (kind === 'create') {
+      state.poolDuplicate = null;
+      const valores = {};
+      for (const k of ['source_channel', 'source_batch']) if ((values[k] || '').trim()) valores[k] = values[k].trim();
+      const r = await poolOp(unit, { op: 'crear', nombre: values.nombre, web: values.web, whatsapp: values.whatsapp, zona: values.zona, valores, confirmar: values.confirmar === '1' }, 'Agregada a Prospectos.');
+      if (r) { view.adding = false; view.open = r.id; view.status = 'todos'; view.q = ''; render(); }
+    }
+  });
+  document.addEventListener('input', (e) => {
+    if (!e.target.matches || !e.target.matches('[data-pool-search]') || !poolOn()) return;
+    const view = poolViewOf(state.unit);
+    view.q = e.target.value; view.shown = 50;
+    clearTimeout(loadPool.t);
+    loadPool.t = setTimeout(() => { render(); const box = main.querySelector('[data-pool-search]'); if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); } }, 180);
+  });
+  document.addEventListener('change', (e) => {
+    if (!e.target.matches || !e.target.matches('[data-pool-message]') || !poolOn()) return;
+    poolViewOf(state.unit).message = e.target.value || null;
+    loadPool(state.unit);
   });
 
   // ─── Período ────────────────────────────────────────────────
@@ -3307,6 +3421,8 @@
 }
 
   function fuProspectos() {
+    const pu = poolUnit();
+    if (pu && !state.demo) return renderPool(pu);
     const n = state.fu.n;
     const f = state.fu.f;
     const all = F.filter([...n.queue, ...n.scheduled, ...n.blocked], { ...f, unit: fuScope() });

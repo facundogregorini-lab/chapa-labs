@@ -305,3 +305,15 @@ Cada paso de la planilla incluye a los siguientes (quien conversó en la demo ta
 - Crear una demo de habita. desde Chapa: falta una API segura en amoblaia; por ahora, «Su panel» abre el editor.
 - Login por persona (hoy el panel queda abierto, por decisión del usuario).
 - Pasar de la planilla a una base cuando el volumen lo pida: el motor no cambia, solo `api/prospecting.js`.
+
+## Prospectos: antes de la cola (habita.)
+
+`/prospecting/habita?vista=prospectos`. Es la base de inmobiliarias que todavía no recibieron el saludo: se les cargan los datos, se ordenan por ranking y las mejores pasan a la cola de Follow-up. Lo que pasa después vuelve como aprendizaje.
+
+- **Lista y ranking:** una fila por inmobiliaria con su ranking (0 a 100), sus tres partes (contacto, encaje, demo), el estado, cuánto de los datos clave está cargado y qué le falta para entrar a la cola. Filtros por estado y búsqueda por nombre, zona o número.
+- **Ficha:** al tocar una fila. Un campo por cada dato del catálogo; lo que ya decía la planilla se muestra como referencia y no se guarda solo. «Guardar datos» recalcula ranking y estado. Según el estado: «Pasar a la cola», «Pasar por exploración» (cuando lo único que falta es el encaje mínimo), «Sacar de la cola», «Descartar» (con motivo) o «Reabrir».
+- **Sumar las mejores:** pasa a la cola las calificadas de mejor ranking; de cada tanda de 5 o más, 15% entra al azar entre las demás que ya tienen WhatsApp y aviso para la demo.
+- **Agregar:** nombre, web, WhatsApp, zona, fuente y lote. Si se parece a una que ya está (nombre, web o WhatsApp), avisa y pide confirmar.
+- **Aprendizajes:** cada variable contra el resultado. «Número válido» es sobre las intentadas; el resto, sobre las de número válido. Elegir un primer mensaje deja solo las contactadas con ese mensaje, para no mezclar prospecto y mensaje.
+
+Datos, estados y ranking son de habita. (amoblaia `docs/PROSPECCION.md` §12). Si falta aplicar su migración, la lista se ve pero no deja guardar, y lo dice. Turnia: pendiente.
