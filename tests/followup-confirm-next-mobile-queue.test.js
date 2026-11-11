@@ -127,7 +127,7 @@ test('Eight commercial funnel stage icons remain above execution shortcuts',()=>
 
 test('Reclassify forms are intercepted and persist via backend instead of reloading the page',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
-  const start=app.indexOf("document.addEventListener('submit'");
+  const start=app.indexOf("document.addEventListener('submit'",app.indexOf('function fuQueueTableRow'));
   assert.ok(start>0);
   const handler=app.slice(start,app.indexOf("  //",start+1000)>start?app.indexOf("  //",start+1000):start+12000);
   const routing=app.slice(start,start+9300);
@@ -185,7 +185,7 @@ test('Funnel review lists agencies under chart, editable commercial stage and in
   assert.match(css,/\.os-fu-funnel-review-item>form/);
 });
 test('Funnel review changes submit, wait for verified server receipt, release stale claim',()=>{
-  const start=app.indexOf("document.addEventListener('submit'");
+  const start=app.indexOf("document.addEventListener('submit'",app.indexOf('function fuQueueTableRow'));
   const end=app.indexOf("const fd = Object.fromEntries(new FormData(form))",start);
   const handler=app.slice(start,end);
   assert.match(handler,/\[data-fu-funnel-review\]/);
