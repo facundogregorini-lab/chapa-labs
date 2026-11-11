@@ -2532,7 +2532,7 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 .rs-frow{padding:8px 10px}
 .rs-ftrack{height:36px;border-radius:999px;background:#eef3ef}
 .rs-fbar{border-radius:999px}
-.rs-fbar .is-human,.rs-fbar .is-bot,.rs-fbar .is-ok{font-size:0;padding:0}
+.rs-fbar .is-bot,.rs-fbar .is-ok{font-size:0;padding:0}
 .rs-fbar .is-pending{background:#7d8f84}
 .rs-fval strong{font-size:22px;color:var(--ink)}
 .rs-leak{gap:5px;font-size:11px}
@@ -2604,11 +2604,9 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .toolbar>select.input{flex:1 1 140px;min-width:0;max-width:100%}
 }
 
-/* Mobile más limpio (11/11/2026): misma interacción, menos texto y los datos
-   arriba. General: primero los embudos de los dos productos y después sus
-   colas. En cada producto, las etapas de la cola en una fila que se desplaza,
-   los filtros en una sola línea y sin párrafos explicativos. */
-.os-mobile-only{display:none}
+/* Resumen general (11/11/2026): primero los embudos de los dos productos y
+   después la cola de cada uno. En el celular, el embudo contra la meta en filas,
+   los períodos en una fila y sin párrafos. Solo afecta al Resumen (.ov). */
 .ov-sub{font-size:12px;font-weight:700;color:var(--muted)}
 .ov-flag.is-none{color:var(--muted);font-weight:600}
 .ov-loading{display:inline-block;margin-top:6px;font-size:11px;font-weight:700;color:var(--muted)}
@@ -2616,42 +2614,20 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 @keyframes ov-pulse{from{opacity:.3}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.ov-loading::before{animation:none}}
 .rs-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--rs-c);margin-right:8px;vertical-align:1px}
-/* Las reglas de cada etapa en el Embudo de Turnia: una tarjeta legible (antes el texto se pegaba). */
-.os-fu-rules{display:grid;gap:8px;margin-top:10px}
-.os-fu-rule{display:grid;gap:3px;padding:11px 13px;border:1px solid #e0eae2;border-radius:12px;background:#fff}
-.os-fu-rule small{font-size:11px;color:#6f8576}
-.os-fu-rule strong{font-size:13.5px;color:#173e2c}
-.os-fu-rule span{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#207447}
-.os-fu-rule div{font-size:11.5px;color:#4d6455}
-.os-fu-rule div b{font-size:13px;color:#173e2c}
-/* El corte de una barra no tapa el número. */
-.os-native-bar.is-broken .os-native-segment.is-advanced{place-items:end center;padding-bottom:8px}
-
 @media(max-width:760px){
-  .os-mobile-only{display:revert}
-  /* Pestañas: una fila compacta. */
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs{scroll-behavior:smooth;scrollbar-width:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs::-webkit-scrollbar{display:none}
-  /* Texto explicativo fuera en el celular: se va directo a los números. */
-  .rs-head p,.rs-days+.rs-muted,.rs-card>.rs-muted:last-child,.rs-scale .rs-muted,
+  .ov,.ov .rs{grid-template-columns:minmax(0,1fr)}
+  .ov-top,.ov-top>*,.ov-filters,.ov-unit,.ov .rs-head,.ov .rs-head>div,.ov .rs-controls,.ov .rs-card{min-width:0;max-width:100%}
+  .ov .rs-head>div,.ov .rs-controls{flex:1 1 100%}
   .ov-top p,.ov-top .ov-kicker,.ov-legend>span:last-child,.ov-wide .ov-head p,.ov-wide>.ov-muted:last-child,
-  .os-native-head p,.os-native-note,.os-native-period>span,
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .hero p,
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .hero .eyebrow{display:none!important}
-  /* Selectores de período: una sola fila que se desplaza, nunca en dos renglones. */
+  .ov .rs-head p,.ov .rs-days+.rs-muted{display:none!important}
   .ov-filters{flex-wrap:nowrap;width:100%;gap:6px}
-  .ov-seg,.rs-seg{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
-  .ov-seg::-webkit-scrollbar,.rs-seg::-webkit-scrollbar{display:none}
+  .ov-seg,.ov .rs-seg{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .ov-seg::-webkit-scrollbar,.ov .rs-seg::-webkit-scrollbar{display:none}
   .ov-filters>.ov-seg:first-child{flex:1 1 auto;min-width:0}
   .ov-filters>.ov-seg:last-child{flex:none}
-  .ov-seg button,.rs-seg button{flex:none;white-space:nowrap;padding:6px 10px;min-height:34px;font-size:12px}
-  .rs-seg{display:flex;width:100%}
-  .rs-seg button{flex:1 0 auto}
-  /* Las filas que se desplazan no estiran la página. */
-  .ov,.rs{grid-template-columns:minmax(0,1fr)}
-  .ov-top,.ov-top>*,.ov-filters,.ov-unit,.rs-head,.rs-head>div,.rs-controls,.rs-card,.os-native-period,.os-native-head>div{min-width:0;max-width:100%}
-  .rs-head>div,.rs-controls{flex:1 1 100%}
-  /* General */
+  .ov-seg button,.ov .rs-seg button{flex:none;white-space:nowrap;padding:6px 10px;min-height:34px;font-size:12px}
+  .ov .rs-seg{width:100%}
+  .ov .rs-seg button{flex:1 0 auto}
   .ov{gap:12px}
   .ov-top{gap:10px}
   .ov-top h1{font-size:19px;line-height:1.2;margin:0}
@@ -2661,7 +2637,6 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   .ov-head h3{font-size:15px}
   .ov-head .ov-muted{font-size:11.5px}
   .ov-card{padding:13px;gap:10px}
-  /* El embudo contra la meta, en filas horizontales: entra entero sin desplazar. */
   .ov-funnel .ov-cols{display:grid;grid-template-columns:1fr;gap:2px;overflow:visible;padding:0}
   .ov-funnel .ov-col{display:grid;grid-template-columns:minmax(0,1fr) 46px 64px;grid-template-areas:"name val conv" "bars bars bars";
     align-items:center;justify-items:stretch;gap:3px 8px;padding:6px 8px;text-align:left}
@@ -2679,81 +2654,33 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   .ov-funnel .ov-legend{font-size:11px}
   .ov-kpi.is-empty{display:none}
   .ov-corr>div{order:-1}
-  /* La cola en el resumen: el score compacto y los números, sin repetir texto. */
   .ov-unit .rs-card{padding:13px;gap:10px}
   .ov-unit .rs-score{grid-template-columns:72px minmax(0,1fr);padding:10px 12px;row-gap:4px}
-  .ov-unit .rs-score svg{width:72px;height:72px}
-  .rs-score .rs-kicker{display:none}
-  .rs-score .rs-band{grid-column:2;font-size:13px}
-  .rs-score svg{grid-row:span 2}
-  .rs-note{font-size:11.5px;padding:6px 10px}
-  .rs-weights summary{font-size:12px}
-  .rs-frow{padding:6px 8px}
-  .rs-frow>.rs-ftrack{height:14px}
-  .rs-fbar span{font-size:0!important;padding:0!important}
-  .rs-flabel small{font-size:11px}
-  .rs-leak{flex-wrap:wrap;overflow:visible}
-  .rs-heat{min-width:0}
-  .rs-heat td{padding:5px 2px;min-width:56px}
-  .rs-heat-lbl{white-space:normal;min-width:64px!important}
-  /* Cola de cada producto: las etapas en una fila que se desplaza (antes ocupaban la pantalla entera). */
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"],
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[data-testid="followup-funnel-stages"]{
-    display:flex;overflow-x:auto;gap:6px;padding:2px 2px 6px;margin:0 0 6px;scroll-snap-type:x proximity;scrollbar-width:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid::-webkit-scrollbar{display:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage,
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-funnel-stages"] .os-fu-stage{
-    flex:0 0 auto;min-width:0;min-height:0;padding:7px 11px;border-radius:11px;scroll-snap-align:start;
-    display:grid;grid-template-columns:auto;grid-template-rows:auto auto;gap:1px;box-shadow:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid .os-fu-stage-icon,
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid .os-fu-reference-spark{display:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid .os-fu-stage-label{font-size:9.5px;white-space:nowrap;grid-column:1;grid-row:1}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid .os-fu-stage strong{font-size:19px!important;grid-column:1;grid-row:2;line-height:1.1}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-tablecard{min-height:0}
-  /* General · Cola: los negocios como fichas chicas, igual que las etapas. */
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[aria-label="Unidades"]{display:flex;overflow-x:auto;gap:6px;padding:2px 2px 6px;margin:0 0 6px;scrollbar-width:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[aria-label="Unidades"] .os-fu-stage{flex:0 0 auto;min-width:0;min-height:0;padding:7px 12px;border-radius:11px;display:flex;align-items:baseline;gap:8px;font-size:10px;box-shadow:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[aria-label="Unidades"] .os-fu-stage::before{display:none}
-  /* Respuestas: los cuatro indicadores en una fila y la bandeja vacía sin alto fijo. */
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"].os-fu-kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi{min-height:0;padding:8px 6px;gap:2px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi span{font-size:8.5px;line-height:1.2}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi strong{font-size:20px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi small{display:none}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-inbox-grid{min-height:0}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-list{gap:7px;padding:8px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item{padding:10px 12px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more{margin-top:6px;padding-top:2px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more summary{min-height:30px}
-  /* Embudo de cada producto */
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .hero{padding:0}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .hero h1{font-size:19px;margin:0}
-  .os-funnel-title{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:nowrap}
-  .os-funnel-title h2{font-size:16px}
-  .os-funnel-title .btn{flex:none;font-size:10.5px;padding:7px 9px;min-height:32px}
-  .os-fu-chipbar .os-fu-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
-  .os-fu-chipbar .os-fu-chips::-webkit-scrollbar{display:none}
-  .os-fu-chipbar .os-fu-chips>button{flex:none;white-space:nowrap}
-  .os-fu-banner{gap:6px}
+  .ov-unit .rs-score svg{width:72px;height:72px;grid-row:span 2}
+  .ov-unit .rs-score .rs-kicker{display:none}
+  .ov-unit .rs-score .rs-band{grid-column:2;font-size:13px}
+  .ov-unit .rs-note{font-size:11.5px;padding:6px 10px}
+  .ov-unit .rs-frow{padding:6px 8px}
+  .ov-unit .rs-frow>.rs-ftrack{height:14px}
+  .ov-unit .rs-fbar span{font-size:0!important;padding:0!important}
+  .ov-unit .rs-leak{flex-wrap:wrap;overflow:visible}
+}
+
+/* Arreglos de cosas rotas (sin cambios de diseño):
+   - Embudo de Turnia: el texto de las reglas de la etapa se encimaba.
+   - El corte de una barra del Funnel comercial tapaba su número.
+   - La barra de ejecutadas cortaba su texto («100% per…»).
+   - Embudo de Turnia en el celular: los filtros se salían de la pantalla. */
+.os-fu-rules{display:grid;gap:8px;margin-top:10px}
+.os-fu-rule{display:grid;gap:3px;padding:11px 13px;border:1px solid #e0eae2;border-radius:12px;background:#fff}
+.os-fu-rule small{font-size:11px;color:#6f8576}
+.os-fu-rule strong{font-size:13.5px;color:#173e2c}
+.os-fu-rule span{font-size:10.5px;font-weight:800;letter-spacing:.04em;color:#207447}
+.os-fu-rule div{font-size:11.5px;color:#4d6455}
+.os-fu-rule div b{font-size:13px;color:#173e2c}
+.os-native-bar.is-broken .os-native-segment.is-advanced{place-items:end center;padding-bottom:8px}
+.rs-fbar .is-human{font-size:0;padding:0}
+@media(max-width:760px){
   body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard>.toolbar{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important;min-width:0;margin:0!important;padding:0 10px 4px!important;width:100%!important;box-sizing:border-box}
-  .os-fu-tablecard .toolbar>*{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
-  .os-fu-tablehead{gap:8px}
-  /* «Funnel comercial»: el período en una fila; las fechas se abren con «Fechas». */
-  .os-native-funnel{padding:13px}
-  .os-native-head{gap:8px}
-  .os-native-head h2{margin:0}
-  .os-native-period{gap:6px}
-  .os-native-period nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
-  .os-native-period nav::-webkit-scrollbar{display:none}
-  .os-native-period nav button{flex:none;padding:7px 10px}
-  .os-native-period form:not(.is-open){display:none}
-  .os-native-legend{margin:10px 0 6px;gap:4px 10px}
-  .os-native-legend span{font-size:10px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-chart{grid-template-columns:repeat(9,88px);min-width:830px;gap:6px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step{grid-template-rows:56px 190px minmax(60px,auto)}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-plot{height:190px}
-  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-top strong{font-size:21px}
-  /* Reglas: el aviso en una línea y sin los párrafos de ayuda. */
-  .os-warn-note{padding:6px 10px;font-size:10.5px}
-  .fu-ref-stage-head p,.fu-ref-stage-head>div>p{display:none}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard>.toolbar>*{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 }
