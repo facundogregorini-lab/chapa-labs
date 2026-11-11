@@ -140,3 +140,17 @@ test('«Esta semana» is the default and starts on Saturday, like the Follow-up 
   assert.deepEqual(R.selectedDays(days,{period:'semana'}).map(d=>d.day),['2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
   assert.match(R.render('habita',habita,{}),/aria-pressed="true" data-fu="results-period" data-fu-period="semana"/);
 });
+
+test('the detail of the executed (sin ejecutar, bloqueadas…) shows only after tapping its bar',()=>{
+  assert.doesNotMatch(R.render('habita',habita,{period:'hoy'}),/data-testid="results-leak"/);
+  const open=R.render('habita',habita,{period:'hoy',open:'executed'});
+  assert.match(open,/data-testid="results-leak"[\s\S]*?Sin ejecutar <b>3<\/b>/);
+});
+
+test('a day without the queue photo still shows what was executed, not an empty column',()=>{
+  const html=R.render('habita',habita,{period:'7'});
+  const col=html.slice(html.indexOf('data-fu-day="2026-11-05"'),html.indexOf('</button>',html.indexOf('data-fu-day="2026-11-05"')));
+  assert.match(col,/sin foto de la cola, 9 ejecutadas/);
+  assert.match(col,/class="is-ok" style="height:(\d+)px"/);
+  assert.notEqual(col.match(/class="is-ok" style="height:(\d+)px"/)[1],'0');
+});

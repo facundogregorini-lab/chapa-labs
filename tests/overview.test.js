@@ -85,3 +85,10 @@ test('«Esta semana» runs from Saturday to today',()=>{
   assert.deepEqual(O.periodDays('semana','2026-11-07'),['2026-11-07']);
   assert.equal(O.PERIODS[0][0],'semana');
 });
+
+test('habita: after the greetings, its funnel counts what prospected agencies did in the period, not only the cohort greeted in it', () => {
+  const U = require('../prospecting/units.js');
+  const habita = (U.UNITS || U).habita || U.list().find((u) => u.id === 'habita');
+  const paths = habita.targets.slice(1).map((s) => s.metrics);
+  assert.deepEqual(paths, ['prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.visitadas', 'prospeccion.periodo.conInteraccion', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
+});

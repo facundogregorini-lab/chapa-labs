@@ -405,7 +405,8 @@
     if (!state.demo && !s.google) { main.innerHTML = setupScreen(); return after(); }
     if (!state.demo && !s.user) { main.innerHTML = loginScreen(); return after(); }
     if (isFu() && !state.demo && !state.fu.loading && !state.fu.error &&
-        (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])))
+        (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()]) ||
+         (fuScope() === 'todas' && units().some((u) => !state.fu.n.units[u.id] && !state.fu.n.errors[u.id]))))
       setTimeout(() => loadFollowup(), 0);
     if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
     else if (state.view === 'script') main.innerHTML = renderScript(state.unit);
@@ -2371,7 +2372,9 @@
     f: store('fu-filters') || {}, task: null, busy: false, sub: store('fu-sub') || 'hoy', open: {} };
   const isFu = () => (state.unit === 'todas' ? [...FU_VIEWS,'resumen'].includes(state.view) : UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder');
   const fuView = () => state.view === 'followup' ? (state.fu.sub || 'hoy') : state.view;
-  const fuScope = () => (state.unit === 'todas' ? state.fu.f.unit || 'todas' : state.unit);
+  // El Resumen general muestra la cola de todas las unidades: nunca hereda el filtro de la Cola de ejecución
+  // (si quedaba en habita, Turnia no se pedía y su tarjeta decía «Sin datos» sin motivo).
+  const fuScope = () => (state.unit === 'todas' ? (state.view === 'resumen' ? 'todas' : state.fu.f.unit || 'todas') : state.unit);
   const fuUnits = () => units().filter((u) => fuScope() === 'todas' || u.id === fuScope());
   const fuName = (id) => (unitOf(id) || { name: id }).name;
   const fuDot = (id) => { const u = unitOf(id); return u ? `<span class="eyebrow" style="color:${color(u)};font-size:12px">● ${esc(u.name)}</span>` : ''; };
