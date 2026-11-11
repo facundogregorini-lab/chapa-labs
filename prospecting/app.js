@@ -2774,6 +2774,16 @@
       ${r ? `<p class="os-fu-caption" style="margin:8px 0 0" data-testid="fu-phone-check-result">${r.problem ? esc(r.problem) + ' · ' : ''}Verificados ${int(r.checked)}${r.line ? ` con la ${esc(r.line)}` : ''}: ${int(r.toWhatsapp.length)} pasaron a celular, ${int(r.toLandline.length)} a fijo y ${int(r.same)} estaban bien. Faltan ${int(r.left)}.</p>${list('Ahora con WhatsApp', r.toWhatsapp)}${list('Sin WhatsApp (quedan para llamar)', r.toLandline)}` : ''}
     </div>`;
   }
+  // «Leer WhatsApp ahora» (Turnia): la lectura de las dos líneas se hace sola a las 8; este botón la trae
+  // en el momento. Muestra cuándo fue la última y cómo salió cada línea.
+  function fuWhatsappBar() {
+    const w = F.whatsapp(state.fu.n, 'turnia');
+    const btn = `<button class="btn small primary" type="button" data-fu="wa-sync" data-testid="fu-wa-sync" ${state.fu.waBusy ? 'disabled' : ''}>${state.fu.waBusy ? 'Leyendo los chats… (1 a 3 minutos)' : 'Leer WhatsApp ahora'}</button>`;
+    const info = !w ? 'La lectura de WhatsApp todavía no está disponible.'
+      : w.never ? 'Todavía no se leyeron los chats.'
+      : `Leído ${esc(ago(w.at))} · ${w.lines.map((l) => `<span class="badge ${l.ok ? 'live' : 'off'}" title="${esc(l.text)}">${esc(l.line)}</span>`).join(' ')}`;
+    return `<div class="os-tutorial-note" data-testid="fu-whatsapp-bar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span><strong>WhatsApp de las dos líneas:</strong> ${info} · se lee solo todos los días a las 8.</span>${btn}</div>`;
+  }
   /** La línea de WhatsApp de su chat (Turnia): «0022», «5483». */
   function fuLineBadges(x) {
     return (x.lines||[]).map(l=>` <span class="badge plain" data-testid="fu-line" title="Ya hay un chat o la línea está confirmada">${esc(l)}</span>`).join('');
@@ -3028,6 +3038,7 @@
   return `${scope!=='todas'?'':`<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
     <h1>Conversaciones que importan.</h1><p>El mensaje original, la clasificación, el contexto y la siguiente acción pertenecen al motor del producto.</p></div>
     ${any?`<button class="btn" type="button" data-view="responder-legado">BANDEJA DE WHATSAPP ↗</button>`:''}</section>`}
+    ${scope==='turnia'?fuWhatsappBar():''}
     <section class="os-fu-kpis" data-testid="followup-inbox">
       <div class="os-fu-kpi"><span>SIN CLASIFICAR</span><strong>${int(without)}</strong><small>${scope==='habita'?'la extensión no estaba segura o no las clasificó':'Requieren revisión'}</small></div>
       <div class="os-fu-kpi"><span>PARA FACU</span><strong>${int(facu)}</strong><small>${scope==='habita'?'audios, preguntas no cubiertas, confianza baja':'Respuestas especiales'}</small></div>
@@ -4126,7 +4137,12 @@
         state.fu.waBusy = true; render();
         const r = await fuOp('turnia', { op: 'whatsapp-sync' });
         state.fu.waBusy = false;
-        if (r && r.whatsapp) toast(r.whatsapp.reused ? 'Se leyó hace menos de 10 minutos: es la última lectura.' : `Listo: ${int(r.whatsapp.totals.nuevas)} respuestas nuevas.`);
+        if (r && r.whatsapp) {
+          const t = r.whatsapp.totals || {};
+          const bad = (r.whatsapp.lines || []).filter((l) => l.status !== 'ok').map((l) => `${l.line}: ${l.problem || 'sin conectar'}`);
+          toast(r.whatsapp.reused ? 'Se leyó hace menos de 10 minutos: es la última lectura.' : `Listo: ${int(t.nuevas)} respuestas nuevas${t.registradas ? ` y ${int(t.registradas)} con pasos registrados` : ''}.`);
+          if (bad.length) toast(bad.join(' · '), true);
+        }
         loadFollowup();
         break;
       }
