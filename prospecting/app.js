@@ -26,7 +26,7 @@
     more: {},        // bloques de Hoy desplegados completos
     editing: null,   // mensaje en edición: { unit, key, text, subject }
     agent: { replied: null, fails: 0, override: false }, // modo Enviar
-    scripts: {}, scriptDrafts: {}, scriptSaving: false,
+    scripts: {}, scriptDrafts: {}, scriptEditing: {}, scriptSaving: false,
     editingTargets: null, // unidad cuyas metas del embudo se están editando
     busy: false,     // una acción en curso: un doble clic no la repite
   };
@@ -205,7 +205,7 @@
       if(!state.demo)setTimeout(()=>loadScript(unit,{quiet:true}),0);
     }
     const d=state.scripts[unit],body=state.scriptDrafts[unit]??d.body??'';
-    const habita=unit==='habita',dirty=body!==(d.body||'');
+    const habita=unit==='habita',dirty=body!==(d.body||''),editing=Boolean(state.scriptEditing[unit]&&d.editable);
     const date=d.updated_at&&!Number.isNaN(Date.parse(d.updated_at))
       ?new Date(d.updated_at).toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'})
       :null;
@@ -218,14 +218,16 @@
         :d.error?'<div class="os-script-error" role="alert">No se pudo leer el script: '+esc(d.error)+' <button class="btn small" type="button" data-script-refresh>Reintentar</button></div>'
         :'<form class="os-script-editor" data-script-form>'
           +'<div class="os-script-editor-top"><div><h3>GUÍA DE TRABAJO</h3><p>'+(habita?'Fuente oficial: HABITA · /admin/script':'El texto queda guardado en la planilla operativa de TURNIA')+'</p></div>'
-          +'<button class="btn os-script-reload" type="button" data-script-refresh '+(dirty?'disabled':'')+'>↻ Actualizar</button></div>'
+          +(editing?'<span class="os-script-editing-label">● EDITANDO DESDE CHAPA LABS</span>'
+            :'<button class="btn primary os-script-edit-button" type="button" data-script-edit '+(d.editable?'':'disabled title="Para editar necesitás una sesión protegida con contraseña"')+'>✎ Editar script</button>')+'</div>'
           +'<textarea name="body" data-script-body maxlength="20000" rows="21" aria-label="Script comercial de '+title+'"'
-          +(!d.editable||state.demo?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
+          +(!editing?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
           +'<footer class="os-script-bottom"><div class="os-script-meta"><span data-script-dirty>'+(dirty?'Cambios sin guardar':date?'Guardado el '+esc(date):'Todavía sin guardar')+'</span>'
           +'<span data-script-count>'+int(body.length)+' / 20.000 caracteres</span></div><div class="os-script-actions">'
-          +'<button class="btn" type="button" data-script-discard '+(dirty?'':'disabled')+'>Descartar</button>'
-          +(d.editable&&!state.demo?'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar script')+'</button>'
-            :'<span class="os-script-readonly">Solo lectura · configurá una sesión protegida para editar.</span>')
+          +(editing?'<button class="btn" type="button" data-script-cancel>Cancelar edición</button>'
+            +'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar cambios')+'</button>'
+            :d.editable?'<span class="os-script-readonly">Usá «Editar script» para modificarlo aquí mismo.</span>'
+            :'<span class="os-script-readonly">Para editarlo desde Chapa Labs, iniciá una sesión protegida por contraseña.</span>')
           +'</div></footer></form>')
       +(habita?'<p class="os-script-original-link">Fuente: <a href="https://www.habitaia.app/admin/script" target="_blank" rel="noopener noreferrer">Abrir script original en HABITA ↗</a></p>':'')
       +'</section>';
@@ -247,22 +249,26 @@
     if(save)save.disabled=!dirty||state.scriptSaving;
   });
   document.addEventListener('click',(e)=>{
-    const button=e.target.closest?.('[data-script-refresh],[data-script-discard]');
+    const button=e.target.closest?.('[data-script-edit],[data-script-cancel],[data-script-refresh],[data-script-discard]');
     if(!button||!main.contains(button))return;
     const unit=state.unit,src=state.scripts[unit];if(!src)return;
-    if(button.hasAttribute('data-script-discard')){state.scriptDrafts[unit]=src.body||'';render();}
-    else if(src.error||state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
+    if(button.hasAttribute('data-script-edit')){
+      if(!src.editable){toast('Para editar el script necesitás una sesión protegida con contraseña.',true);return;}
+      state.scriptEditing[unit]=true;render();main.querySelector('[data-script-body]')?.focus();
+    }else if(button.hasAttribute('data-script-cancel')||button.hasAttribute('data-script-discard')){
+      state.scriptDrafts[unit]=src.body||'';state.scriptEditing[unit]=false;render();
+    }else if(src.error||state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
   });
   document.addEventListener('submit',async(e)=>{
     if(!e.target?.matches?.('[data-script-form]'))return;
     e.preventDefault();e.stopImmediatePropagation();
     const unit=state.unit,src=state.scripts[unit],body=state.scriptDrafts[unit]??'';
-    if(!src?.editable||state.demo||state.scriptSaving||body===(src.body||''))return;
+    if(!src?.editable||!state.scriptEditing[unit]||state.demo||state.scriptSaving||body===(src.body||''))return;
     state.scriptSaving=true;render();
     try{
       const saved=await api('script',{method:'POST',body:{unit,body}});
       if(saved.body!==body)throw Error('El servidor no confirmó el contenido del script.');
-      state.scripts[unit]={...saved,loading:false,error:null};state.scriptDrafts[unit]=saved.body;
+      state.scripts[unit]={...saved,loading:false,error:null};state.scriptDrafts[unit]=saved.body;state.scriptEditing[unit]=false;
       toast('Script guardado en '+(unit==='habita'?'HABITA':'TURNIA')+'.');
     }catch(err){toast(err.message||'No se pudo guardar el script.',true);}
     finally{state.scriptSaving=false;if(state.unit===unit&&state.view==='script')render();}
