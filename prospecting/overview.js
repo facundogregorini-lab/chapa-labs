@@ -265,11 +265,11 @@
       const a=cur>=0?vals[cur]:null,b=prev>=0?vals[prev]:null;
       let delta='',cls='';
       if(a!=null&&b!=null){
-        if(!a&&!b)delta='sin movimiento';
+        if(!a&&!b)delta='=';
         else if(!b){delta='nuevo';cls='is-up';}
-        else{const d=Math.round((a-b)/b*100);delta=`${d>0?'+':''}${d}% vs sem. ant.`;cls=d>0?'is-up':d<0?'is-down':'';}
+        else{const d=Math.round((a-b)/b*100);delta=`${d>0?'+':''}${d}%`;cls=d>0?'is-up':d<0?'is-down':'';}
       }
-      return `<button type="button" class="ov-evo-chip ${on?'is-on':''}" style="--sc:var(--ov-e${k})" data-fu="ov-evo-step" data-fu-unit-id="${esc(u.id)}" data-fu-evo-step="${esc(s.key)}" aria-pressed="${on}">
+      return `<button type="button" class="ov-evo-chip ${on?'is-on':''}" style="--sc:var(--ov-e${k})" data-fu="ov-evo-step" data-fu-unit-id="${esc(u.id)}" data-fu-evo-step="${esc(s.key)}" aria-pressed="${on}" title="${delta&&delta!=='='?`${esc(delta)} vs semana anterior`:''}">
         <span class="ov-evo-name"><i aria-hidden="true"></i>${esc(s.label)}</span>
         <span class="ov-evo-num"><b>${num(total)}</b>${delta?`<small class="${cls}">${delta}</small>`:''}</span></button>`;
     }).join('');
@@ -337,7 +337,7 @@
         </div></section>
       ${ctx.notice?`<p class="ov-note">${esc(ctx.notice)}</p>`:''}
       <section class="ov-card ov-wide" data-testid="overview-evolution"><div class="ov-head"><div><h2>Evolución semanal</h2>
-        <p class="ov-muted">Cada paso del embudo de cada producto, semana a semana (de lunes a domingo, con la misma cuenta del embudo contra la meta). Tocá un paso para sumarlo o sacarlo; la variación compara las dos últimas semanas completas. * Semana en curso.</p></div>
+        <p class="ov-muted">Cada paso del embudo de cada producto, semana a semana (de lunes a domingo, con la misma cuenta del embudo contra la meta). Tocá un paso para sumarlo o sacarlo; el % compara las dos últimas semanas completas. * Semana en curso.</p></div>
         <nav class="ov-seg" aria-label="Semanas">${EVO_WEEKS.map(w=>`<button type="button" class="${(view.evoWeeks||4)===w?'is-on':''}" aria-pressed="${(view.evoWeeks||4)===w}" data-fu="ov-evo-weeks" data-fu-weeks="${w}" data-testid="overview-evo-weeks-${w}">${w} semanas</button>`).join('')}</nav></div>
         <div class="ov-units">${units.map(u=>evolutionCard(u,view)).join('')}</div></section>
       <div class="ov-units" data-testid="overview-funnels">${units.map(u=>`<div class="ov-unit" data-testid="overview-unit-${esc(u.id)}">${funnelCard(u,view)}</div>`).join('')}</div>
