@@ -29,11 +29,11 @@ test('the page loads overview.js after results-view.js and before app.js; app wi
   assert.match(app,/window\.ProspectingOverview\.render\(/);
 });
 
-test('periods and buckets use Buenos Aires days and Sat–Fri weeks',()=>{
+test('periods and buckets use Buenos Aires days and Mon–Sun weeks',()=>{
   assert.deepEqual(O.periodDays('7','2026-11-11'),['2026-11-05','2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
   assert.equal(O.periodDays('mes','2026-11-11').length,11);
   const weeks=O.buckets(O.periodDays('14','2026-11-11'),'semana');
-  assert.deepEqual(weeks.map(w=>w.key),['2026-10-30','2026-11-06','2026-11-13']);
+  assert.deepEqual(weeks.map(w=>w.key),['2026-11-01','2026-11-08','2026-11-15']);
   assert.equal(weeks.reduce((n,w)=>n+w.days.length,0),14);
 });
 
@@ -80,9 +80,11 @@ test('pearson needs 14 days',()=>{
   assert.ok(Math.abs(O.pearson(a,b)-1)<1e-9);
 });
 
-test('«Esta semana» runs from Saturday to today',()=>{
-  assert.deepEqual(O.periodDays('semana','2026-11-11'),['2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
-  assert.deepEqual(O.periodDays('semana','2026-11-07'),['2026-11-07']);
+test('«Esta semana» runs from Monday to today',()=>{
+  assert.deepEqual(O.periodDays('semana','2026-11-11'),['2026-11-09','2026-11-10','2026-11-11']);
+  assert.deepEqual(O.periodDays('semana','2026-11-09'),['2026-11-09']);
+  // Sunday closes the week that began on Monday.
+  assert.equal(O.periodDays('semana','2026-11-15').length,7);
   assert.equal(O.PERIODS[0][0],'semana');
 });
 

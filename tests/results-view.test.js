@@ -101,7 +101,7 @@ test('Turnia: its cohorts come from its accounts with the Odontólogos stages; v
     {stage:'prospect',step:0,createdAt:'2000-01-01T00:00:00.000Z'},
   ];
   const cf=R.turniaCohorts(rows,stages,1,new Date('2026-11-11T15:00:00Z'));
-  assert.deepEqual(cf.contacto,[{cohort:'2026-11-13',size:3,reached:[3,3,2,1,0,0]}]);
+  assert.deepEqual(cf.contacto,[{cohort:'2026-11-15',size:3,reached:[3,3,2,1,0,0]}]);
   assert.equal(cf.respuesta[0].size,1);
   const turnia={stages:[{key:'sin-saludo',title:'Sin saludar',versions:[{id:'v',version:1,status:'active',stats:{executions:40,conversions:8}}]}],
     results:{actionLabels:{'sin-saludo':'Paso 1: el saludo'},execution:{available:true,days:[day('2026-11-11',[t('Paso 1: el saludo',{stages:['sin-saludo'],pending:5,human:5,successHuman:2})])]},weeklyByType:{}}};
@@ -134,10 +134,10 @@ test('cohorts come before the actions',()=>{
   assert.ok(html.indexOf('data-testid="results-cohorts"')<html.indexOf('data-testid="results-actions"'));
 });
 
-test('«Esta semana» is the default and starts on Saturday, like the Follow-up weeks',()=>{
+test('«Esta semana» is the default and starts on Monday (weeks run Monday to Sunday)',()=>{
   const days=['2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11'].map(d=>day(d,[t('Saludo',{pending:1,human:1})]));
   assert.equal(R.defaults({}).period,'semana');
-  assert.deepEqual(R.selectedDays(days,{period:'semana'}).map(d=>d.day),['2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
+  assert.deepEqual(R.selectedDays(days,{period:'semana'}).map(d=>d.day),['2026-11-09','2026-11-10','2026-11-11']);
   assert.match(R.render('habita',habita,{}),/aria-pressed="true" data-fu="results-period" data-fu-period="semana"/);
 });
 

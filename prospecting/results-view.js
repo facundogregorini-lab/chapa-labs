@@ -15,8 +15,8 @@
   const WINDOWS={'7':'7 días','14':'14 días',todo:'Sin límite'};
   const COHORTS={contacto:'Semana de contacto',respuesta:'Semana de primera respuesta',version:'Versión del saludo'};
   const PERIODS={semana:'Esta semana',hoy:'Hoy',ayer:'Ayer','7':'Últimos 7 días',custom:'Elegir fechas'};
-  /** El sábado que abre la semana de un día (las semanas de Follow-up van de sábado a viernes). */
-  const weekStart=d=>{const t=new Date(String(d)+'T12:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+1)%7));return t.toISOString().slice(0,10);};
+  /** El lunes que abre la semana de un día (las semanas van de lunes a domingo). */
+  const weekStart=d=>{const t=new Date(String(d)+'T12:00:00Z');t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7));return t.toISOString().slice(0,10);};
   const BARS={pending:'Pendientes',executed:'Ejecutadas',success:'Exitosas'};
   const SMALL=30;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -252,7 +252,7 @@
         ${rows.map(c=>`<tr><td class="rs-heat-lbl">${esc(by==='version'?c.cohort:weekLabel(c.cohort))}<small>${num(c.size)} ${who}</small></td>${stages.map((s,i)=>{const n=Number(c.reached?.[i])||0;const r=c.size?n/c.size:0;
           return `<td class="rs-heat-cell" style="--rs-a:${(0.06+r*0.94).toFixed(2)}" data-dark="${r>0.45}" title="${esc(s.title)}: ${num(n)} de ${num(c.size)}"><b>${c.size?pc(r):'—'}</b><small>${num(n)}</small></td>`;}).join('')}</tr>`).join('')||`<tr><td colspan="${stages.length+1}">Sin cohortes en este período.</td></tr>`}
       </tbody></table></div>
-      <div class="rs-scale"><span>0%</span><i></i><span>100%</span>${by!=='version'?'<span class="rs-muted">Las semanas cierran el viernes; la última todavía está madurando.</span>':''}</div>`
+      <div class="rs-scale"><span>0%</span><i></i><span>100%</span>${by!=='version'?'<span class="rs-muted">Las semanas van de lunes a domingo; la última todavía está madurando.</span>':''}</div>`
       :'<p class="rs-muted">No se pudieron consultar las cohortes.</p>'}
     </section>`;
   }
@@ -264,7 +264,7 @@
       if(r.stage!=='closed')return Math.max(0,order.indexOf(r.stage));
       const step=Number(r.step)||0;return step>=6?5:step>=5?4:step>=3?3:step>=2?2:1;
     };
-    const weekOf=iso=>{const t=new Date(Date.parse(iso)-3*3600000);t.setUTCDate(t.getUTCDate()+((5-t.getUTCDay()+7)%7));return t.toISOString().slice(0,10);};
+    const weekOf=iso=>{const t=new Date(Date.parse(iso)-3*3600000);t.setUTCDate(t.getUTCDate()+((7-t.getUTCDay())%7));return t.toISOString().slice(0,10);};
     const last=Date.parse(weekOf(now.toISOString())+'T00:00:00Z');
     const list=Array.from({length:weeks},(_,i)=>new Date(last-(weeks-1-i)*7*86400000).toISOString().slice(0,10));
     const contacted=(rows||[]).filter(r=>r.stage!=='prospect'&&r.createdAt&&!String(r.createdAt).startsWith('2000-'));

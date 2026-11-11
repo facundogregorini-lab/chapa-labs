@@ -26,17 +26,17 @@
   /** The days of a period ending today (YYYY-MM-DD, Buenos Aires), oldest first. */
   function periodDays(key,today){
     const t=new Date(today+'T12:00:00Z');
-    // «Esta semana»: desde el sábado, como las semanas de Follow-up (sábado a viernes).
-    const n=key==='mes'?t.getUTCDate():key==='semana'?((t.getUTCDay()+1)%7)+1:Number(key)||7;
+    // «Esta semana»: desde el lunes (las semanas van de lunes a domingo).
+    const n=key==='mes'?t.getUTCDate():key==='semana'?((t.getUTCDay()+6)%7)+1:Number(key)||7;
     return Array.from({length:n},(_,i)=>new Date(t.getTime()-(n-1-i)*86400000).toISOString().slice(0,10));
   }
 
-  /** Days grouped by Sat–Fri reporting week (the same weeks as Follow-up), each with its own days. */
+  /** Days grouped by Mon–Sun week (the same weeks as Follow-up), each keyed by its closing Sunday. */
   function buckets(days,grain){
     if(grain!=='semana')return days.map(d=>({key:d,label:dayLabel(d),days:[d]}));
     const out=[];
     for(const d of days){
-      const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+((5-t.getUTCDay()+7)%7));
+      const t=new Date(d+'T12:00:00Z');t.setUTCDate(t.getUTCDate()+((7-t.getUTCDay())%7));
       const key=t.toISOString().slice(0,10);
       let b=out.find(x=>x.key===key);
       if(!b){b={key,label:'Sem. al '+shortDay(key),days:[]};out.push(b);}

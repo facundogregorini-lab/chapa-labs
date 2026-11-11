@@ -35,6 +35,11 @@ Chapa Labs adopta un único workspace con selector **General / habita. / Turnia*
 
 Traspaso para quien siga este trabajo (persona o IA), sin necesidad de leer conversaciones anteriores. Estado al **08/11/2026**.
 
+## Modo extensión y semanas de lunes a domingo (11/11/2026)
+
+- **Quién ejecutó (persona o bot).** La extensión del navegador usa el mismo Chrome y la misma sesión que una persona, así que no hay forma técnica de distinguirlas. Por eso la extensión se identifica: abrí su pestaña con **`https://chapa-labs.vercel.app/prospecting?agente=1`**. Esa pestaña muestra la franja «Modo extensión» y todo lo que se confirme desde ahí llega a habita y a Turnia con `ejecutor: "bot"` y se guarda como `executed_by = 'bot'`. `?agente=0` lo apaga; las otras pestañas siguen siendo de personas. En las instrucciones de la extensión, que siempre abra ese enlace.
+- **Semanas:** lunes a domingo en todo (Resumen, Resultados, cohortes y semanas de habita y Turnia). Cada semana se nombra por su domingo de cierre.
+
 ## En una frase
 
 Chapa Labs (`/prospecting`) es la **única pantalla comercial** de los dos productos. **No guarda prospectos ni corre su propio motor de seguimiento.** Cada producto es dueño de sus datos y de su Follow-up, y los expone por la misma API. Chapa los lee, los muestra juntos y manda cada acción al producto que corresponde, a nombre de quien opera.
