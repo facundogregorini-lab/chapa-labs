@@ -18,7 +18,7 @@ test('SCRIPT is a real section in both product navigation and in HABITA top tabs
   assert.match(app,/data-testid="commercial-script"/);
 });
 test('HABITA script reads original source and TURNIA script is separately persistent',()=>{
-  assert.match(api,/const SCRIPT_TAB = 'Script'/);
+  assert.match(api,/const SCRIPT_TAB = 'Script Chapa Labs'/);
   assert.match(api,/async function doScript\(req,res,user\)/);
   assert.match(api,/query:\{vista:'script'\}/);
   assert.match(api,/followup:\{op:'script-save',body\}/);
