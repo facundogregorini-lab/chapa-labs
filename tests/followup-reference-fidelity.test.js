@@ -7,10 +7,10 @@ const css=fs.readFileSync(path.join(__dirname,'../prospecting/commercial-os.css'
 const app=fs.readFileSync(path.join(__dirname,'../prospecting/app.js'),'utf8');
 
 test('Habita uses the original Follow-up workspace dimensions without changing the Turnia shell',()=>{
-  assert.match(css,/body\[data-unit="habita"\] \.os-shell\s*\{\s*grid-template-columns:190px minmax\(0,1fr\)/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-workspace > main\s*\{[^}]*padding:30px clamp\(14px,1\.6vw,28px\) 40px/);
-  assert.match(css,/body\[data-unit="habita"\] \.fu-ref-workspace\s*\{\s*grid-template-columns:minmax\(300px,\.85fr\) minmax\(680px,2fr\)/);
-  assert.match(css,/body\[data-unit="habita"\] \.fu-catalog-layout\s*\{\s*grid-template-columns:minmax\(200px,245px\) minmax\(0,1fr\)/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-shell\s*\{\s*grid-template-columns:190px minmax\(0,1fr\)/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-workspace > main\s*\{[^}]*padding:30px clamp\(14px,1\.6vw,28px\) 40px/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-ref-workspace\s*\{\s*grid-template-columns:minmax\(300px,\.85fr\) minmax\(680px,2fr\)/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-catalog-layout\s*\{\s*grid-template-columns:minmax\(200px,245px\) minmax\(0,1fr\)/);
 });
 
 test('Mobile displays the same 2x4 stage tile grid and two-column KPI arrangement as Habita',()=>{

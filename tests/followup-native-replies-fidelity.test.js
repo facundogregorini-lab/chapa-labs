@@ -38,9 +38,9 @@ test('Native reply controls act exactly as original and cannot classify inadvert
 });
 
 test('Habita inbox is legible on mobile; Turnia engine remains untouched',()=>{
-  assert.match(css,/body\[data-unit="habita"\] \[data-testid="followup-inbox"\]/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-fu-conv-tags/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-fu-actions \[data-testid="followup-reply-save"\]/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \[data-testid="followup-inbox"\]/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-conv-tags/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-actions \[data-testid="followup-reply-save"\]/);
   assert.match(js,/if\(r\.unit==='habita'\)/);
   assert.match(js,/op:'situation',inmobiliaria:r\.id/);
 });

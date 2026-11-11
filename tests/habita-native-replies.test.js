@@ -13,7 +13,7 @@ test('Habita inbox preserves its native four KPIs and does not show a redundant 
     '¿LLEGÓ UNA RESPUESTA?','la extensión no estaba segura o no las clasificó',
     'audios, preguntas no cubiertas, confianza baja','de confianza en la clasificación'])
     assert.ok(js.includes(label),label);
-  assert.match(js,/scope==='habita'\?'':/);
+  assert.match(js,/scope!=='todas'\?'':/);
   assert.match(js,/data-testid="followup-inbox"/);
   assert.match(js,/data-testid="followup-reply-form"/);
 });
@@ -29,6 +29,6 @@ test('Native classification detail shows confidence, correct CTA, referral/date 
   assert.match(js,/data-fu="reply-select"/);
   assert.match(js,/data-fu="reply-manual"/);
   assert.match(js,/case 'reply-select':/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-fu-conv-tags/);
-  assert.match(css,/body\[data-unit="habita"\] \[data-testid="followup-inbox"\]/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-conv-tags/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \[data-testid="followup-inbox"\]/);
 });

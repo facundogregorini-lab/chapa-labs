@@ -365,24 +365,29 @@
   // The original Habita tabs, title, utility destinations and hierarchy are
   // shared across queue, responses, funnel, rules, catalog and results.
   function habitaFuChrome(content) {
+    // Turnia uses the same workspace chrome (tabs, mobile layout), adapted to
+    // its own copy and destinations.
+    const turnia=state.unit==='turnia';
     const tabs=[
       ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
       ['pipeline','EMBUDO'],['secuencias','REGLAS'],
       ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
-    const links=[
+    const links=turnia?[
+      ['PANEL DE TURNIA','https://turniasalud.app/panel/prospeccion'],
+    ]:[
       ['MI INMOBILIARIA','/panel'],['GALERÍA','/galeria'],
       ['PRECIOS','/precios'],['MI CUENTA','/cuenta'],
       ['IR A MI INMOBILIARIA','/inicio'],
-    ];
+    ].map(([label,path])=>[label,'https://www.habitaia.app'+path]);
     return `<header class="habita-fu-workspace-head" data-testid="habita-workspace-header">
       <div class="habita-fu-head-copy">
         <span class="habita-fu-eyebrow">FOLLOW-UP</span>
         <h1>EJECUCIÓN COMERCIAL</h1>
-        <p>Gestioná el outreach y el seguimiento de todas tus inmobiliarias.</p>
+        <p>${turnia?'Gestioná el outreach y el seguimiento de todos tus consultorios.':'Gestioná el outreach y el seguimiento de todas tus inmobiliarias.'}</p>
       </div>
-      <nav class="habita-fu-utilities" aria-label="Accesos de Habita">
-        ${links.map(([label,path])=>`<a href="https://www.habitaia.app${path}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('')}
+      <nav class="habita-fu-utilities" aria-label="Accesos de ${turnia?'Turnia':'Habita'}">
+        ${links.map(([label,href])=>`<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('')}
       </nav>
     </header>
     <nav class="habita-fu-tabs" role="tablist" aria-label="Ejecución comercial">
@@ -408,7 +413,7 @@
       else if (d.error) main.innerHTML = unitError(state.unit, d);
       else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
-    if(state.unit==='habita'&&(isFu()||state.view==='script')&&!state.demo)
+    if((state.unit==='habita'||state.unit==='turnia')&&(isFu()||state.view==='script')&&!state.demo)
       main.innerHTML=habitaFuChrome(main.innerHTML);
     after();
   }
@@ -2640,6 +2645,16 @@
   });
 }
 
+  // Quién ejecuta cada acción: la extensión del producto (lo que no tiene
+  // responsable o está asignado a «Extensión»), Facu o Axel a mano.
+  function fuExecutor(x) {
+  const o=String(x?.owner||'').trim().toLowerCase();
+  if(o.startsWith('facu'))return 'facu';
+  if(o==='axel'||o.startsWith('axel '))return 'axel';
+  return 'extension';
+}
+  const FU_EXECUTOR_LABEL={extension:'Extensión',facu:'Facu',axel:'Axel'};
+
   function fuQueueSelection(scope) {
   const n=state.fu.n,q=fuQueueState();
   const snap=scope==='todas'?null:n.units[scope];
@@ -2663,7 +2678,10 @@
     antiguo:(a,b)=>String(a.since||'').localeCompare(String(b.since||'')),
     reciente:(a,b)=>String(b.since||'').localeCompare(String(a.since||''))};
   filtered.sort(sort[q.order]||sort.comercial);
-  return {q,snap,stages,current,all:base,rows:filtered};
+  const executors={extension:0,facu:0,axel:0};
+  for(const x of filtered)executors[fuExecutor(x)]++;
+  const byExecutor=q.executor?filtered.filter(x=>fuExecutor(x)===q.executor):filtered;
+  return {q,snap,stages,current,all:base,rows:byExecutor,executors};
 }
 
   function fuQueueTableRow(x,{closed=false,selected=false}={}) {
@@ -2702,6 +2720,7 @@
         <div class="os-fu-mobile-item-control">
           ${executable?`<button type="button" class="btn primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-execute">EJECUTAR →</button>`:
           `<span class="os-fu-mobile-item-status">${esc(stateText)}</span>`}
+          ${closed?'':`<span class="os-fu-executor-chip" data-executor="${fuExecutor(x)}" data-testid="fu-mobile-executor">${fuExecutor(x)==='extension'?'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'}${esc(FU_EXECUTOR_LABEL[fuExecutor(x)])}</span>`}
         </div>
       </div>
       <details class="os-fu-mobile-item-more" data-testid="fu-mobile-expand">
@@ -2762,7 +2781,7 @@
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
-  const {q,snap,stages,current,rows}=fuQueueSelection(scope);
+  const {q,snap,stages,current,rows,executors}=fuQueueSelection(scope);
   const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
   const customStages=stages.filter(x=>customStageKeys.has(x.key));
@@ -2813,6 +2832,8 @@
         ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''}
         data-testid="fu-take-next">EJECUTAR SIGUIENTE →</button>
     </div>
+    <button type="button" class="os-fu-filters-toggle" data-fu="queue-filters" aria-expanded="${Boolean(q.filtersOpen)}" data-testid="fu-queue-filters-toggle"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Filtros${q.search||q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed||q.order!=='comercial'?' · activos':''}</span><span class="os-fu-filters-chev" aria-hidden="true">⌄</span></button>
+    <div class="os-fu-filters-body" data-open="${Boolean(q.filtersOpen)}" data-testid="fu-queue-filters-body">
     <div class="os-fu-queue-compact-search"><input class="input os-fu-search" type="search" data-fu-queue-search value="${esc(q.search||'')}" placeholder="Buscar contacto…" aria-label="Buscar contacto"></div>
     <details class="os-fu-queue-advanced" data-testid="fu-queue-advanced" ${q.advancedOpen?'open':''}><summary>Filtros y métricas ${q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed?'· activos':''}</summary><div class="os-fu-advanced-body"><div class="os-fu-kpis">${cards.map(([key,label,value,note])=>`<button type="button" class="os-fu-kpi ${q.kpi===key?'is-on':''}" data-fu="queue-kpi" data-fu-kpi="${key}" aria-pressed="${q.kpi===key}" data-testid="followup-kpi-${key}">
       <span>${label}</span><strong>${int(value)}</strong><small>${esc(note)}</small></button>`).join('')}</div>
@@ -2830,6 +2851,12 @@
       ${rules.length?`<label>REGLA<select class="input" data-fu-queue-select="rule"><option value="">Todas</option>${rules.map(r=>`<option value="${esc(r.key)}" ${q.rule===r.key?'selected':''}>${esc(r.action||r.key)}</option>`).join('')}</select></label>`:''}
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
     </div></details>
+    </div>
+    ${q.closed?'':`<div class="os-fu-executor-bar" role="group" aria-label="Quién ejecuta" data-testid="fu-queue-executor">
+      ${[['','Todos'],['extension','Extensión'],['facu','Facu'],['axel','Axel']]
+        .filter(([k])=>!k||k==='extension'||executors[k]>0||q.executor===k)
+        .map(([k,l])=>`<button type="button" data-fu="queue-executor" data-fu-executor="${k}" data-executor="${k||'todos'}" aria-pressed="${(q.executor||'')===k}" class="${(q.executor||'')===k?'is-on':''}">${k==='extension'?'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':''}${l}</button>`).join('')}
+    </div>`}
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
     <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
@@ -2899,7 +2926,7 @@
       <button type="button" class="btn" data-fu="reply-to-queue" data-fu-id="${esc(selected.id)}">VER EN COLA →</button></div>
       <p class="os-fu-caption">Las bajas y solicitudes de no contactar quedan protegidas por el motor de cada producto. La clasificación no envía WhatsApp por sí sola.</p>
     </form>`:'<p class="empty">No hay respuestas pendientes.</p>';
-  return `${scope==='habita'?'':`<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
+  return `${scope!=='todas'?'':`<section class="hero"><div><span class="eyebrow">${scope==='todas'?'GENERAL':esc(fuName(scope).toUpperCase())} / RESPUESTAS</span>
     <h1>Conversaciones que importan.</h1><p>El mensaje original, la clasificación, el contexto y la siguiente acción pertenecen al motor del producto.</p></div>
     ${any?`<button class="btn" type="button" data-view="responder-legado">BANDEJA DE WHATSAPP ↗</button>`:''}</section>`}
     <section class="os-fu-kpis" data-testid="followup-inbox">
@@ -3912,6 +3939,8 @@
         const q=fuQueueState();q.closed=ds.fuClosed==='1';q.rule=null;q.group=null;q.situation=null;q.limit=25;render();break;
       }
       case 'queue-more': fuQueueState().limit+=25;render();break;
+      case 'queue-filters': {const q=fuQueueState();q.filtersOpen=!q.filtersOpen;render();break;}
+      case 'queue-executor': {const q=fuQueueState();q.executor=ds.fuExecutor||null;q.limit=25;render();break;}
       case 'funnel-period': {
         const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
         state.fu.chartFocus=null;await loadFollowup({quiet:true});render();break;

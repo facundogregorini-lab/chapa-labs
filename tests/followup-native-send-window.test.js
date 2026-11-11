@@ -28,5 +28,5 @@ test('Preset controls still submit exact engine values through named hidden fiel
   assert.match(js,/if\(e\.target\.matches\('\[data-fu-rule-hours-presets\]'\)\)/);
 });
 test('Mobile retains the source two-selector layout',()=>{
-  assert.match(css,/body\[data-unit="habita"\] \.fu-ref-send-window-selects\s*\{\s*display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-ref-send-window-selects\s*\{\s*display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
 });

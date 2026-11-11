@@ -26,6 +26,8 @@ Chapa Labs adopta un único workspace con selector **General / habita. / Turnia*
 - **No cambia**: el contrato existente de tomar 10 minutos, abrir WhatsApp sin contar envío, confirmar idempotente, bloqueos, baja permanente, cadencias propias y auditoría en cada producto.
 - **QA antes de retirar paneles duplicados**: validar login por persona, 10 ejecuciones reales con Facu y Axel simultáneamente, versiones y catálogo en habita., clasificación de no interesados, límites de WhatsApp, persistencia desde Chapa y conciliación de métricas por dos semanas.
 
+- **Cola en mobile y «Quién ejecuta» (11/11/2026)**: Turnia usa el mismo espacio de trabajo y el mismo diseño mobile que habita. (encabezado, pestañas y estilos de `commercial-os.css` aplican a las dos unidades). En mobile, el header queda en Chapa Labs + General · Turnia · Habita y pasa directo a las pestañas de la cola; se ocultan la fila repetida de vistas, las herramientas anteriores y el encabezado «Ejecución comercial». Buscar, Filtros y métricas y Orden quedan dentro de un solo botón **Filtros**; no hay «Ejecutar siguiente». Debajo, el filtro **Quién ejecuta** (Todos · Extensión · Facu · Axel; Facu y Axel solo aparecen si tienen acciones) y cada tarjeta muestra quién la ejecuta debajo de EJECUTAR. Se calcula con el responsable de la tarea: sin responsable o «Extensión» = la extensión del producto (Facu en habita., Axel en Turnia).
+
 **Estado técnico:** la UI y los endpoints quedaron implementados en ramas; las pruebas con bases y credenciales reales, deploy y paridad funcional total de Turnia deben verificarse por separado.
 
 
