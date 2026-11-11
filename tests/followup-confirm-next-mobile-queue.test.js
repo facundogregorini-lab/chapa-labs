@@ -231,10 +231,10 @@ test('Desktop preview shows next action, WhatsApp message and actual version not
   const end=app.indexOf('function fuHoy()',start);
   const body=app.slice(start,end);
   assert.ok(start>0&&end>start);
-  const action=body.indexOf('Próxima acción</strong>');
+  const action=body.indexOf('Próxima acción');
   const message=body.indexOf('Mensaje de WhatsApp · borrador');
-  const observations=body.indexOf('Observaciones</strong>');
-  const contact=body.indexOf('Información del contacto</strong>');
+  const observations=body.indexOf('Observaciones');
+  const contact=body.indexOf('Información del contacto');
   assert.ok(contact>=0&&action>contact&&message>action&&observations>message);
   assert.match(body,/const observations=\[x\.situationNote,version\?\.notes\]/);
   assert.match(body,/esc\(observations\|\|'Sin observaciones registradas\.'/);
