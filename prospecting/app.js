@@ -26,6 +26,7 @@
     more: {},        // bloques de Hoy desplegados completos
     editing: null,   // mensaje en edición: { unit, key, text, subject }
     agent: { replied: null, fails: 0, override: false }, // modo Enviar
+    scripts: {}, scriptDrafts: {}, scriptSaving: false,
     editingTargets: null, // unidad cuyas metas del embudo se están editando
     busy: false,     // una acción en curso: un doble clic no la repite
   };
@@ -61,6 +62,7 @@
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke="currentColor" stroke-width="2" d="M6 6l12 12M18 6 6 18"/></svg>',
     chev: '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" d="m6 9 6 6 6-6"/></svg>',
     ext: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
+    building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.4"/><path d="M9 21v-4h6v4M9 7h1m4 0h1M9 11h1m4 0h1"/></svg>',
   };
 
   function store(key, value) {
@@ -163,7 +165,7 @@
     render();
     if (unit !== previousUnit && isFu() && !state.demo)
       setTimeout(() => loadFollowup({ quiet: true }), 0);
-    if (!isFu() && !state.demo) {
+    if (!isFu() && !state.demo && state.view!=='script') {
       ensureLoaded().then(render);
       loadMetrics().then(render);
     }
@@ -176,6 +178,94 @@
     readRoute(); render();
     if (isFu() && !state.demo) loadFollowup({ quiet: true });
     else if (!state.demo) ensureLoaded().then(render);
+  });
+
+
+  // One source of truth per product: HABITA = /admin/script, TURNIA = its own
+  // Script tab. Never substitute a hardcoded copy when the source is unavailable.
+  async function loadScript(unit,{quiet=false}={}){
+    if(!['habita','turnia'].includes(unit)||state.demo)return;
+    if(!quiet){state.scripts[unit]={...(state.scripts[unit]||{}),loading:true,error:null};render();}
+    try{
+      const result=await api('script',{query:{unit}});
+      const old=state.scripts[unit]||{};
+      if(state.scriptDrafts[unit]===undefined||state.scriptDrafts[unit]===old.body)
+        state.scriptDrafts[unit]=result.body||'';
+      state.scripts[unit]={...result,loading:false,error:null};
+    }catch(error){
+      state.scripts[unit]={...(state.scripts[unit]||{}),loading:false,error:error.message};
+    }
+    if(state.unit===unit&&state.view==='script')render();
+  }
+  function renderScript(unit){
+    if(!['habita','turnia'].includes(unit))return '<section class="card glass">Elegí HABITA o TURNIA.</section>';
+    if(state.demo)return '<section class="card glass"><h2>Script comercial</h2><p>El script operativo se consulta con una sesión real, no en el ejemplo.</p></section>';
+    if(!state.scripts[unit]){
+      state.scripts[unit]={loading:true};
+      if(!state.demo)setTimeout(()=>loadScript(unit,{quiet:true}),0);
+    }
+    const d=state.scripts[unit],body=state.scriptDrafts[unit]??d.body??'';
+    const habita=unit==='habita',dirty=body!==(d.body||'');
+    const date=d.updated_at&&!Number.isNaN(Date.parse(d.updated_at))
+      ?new Date(d.updated_at).toLocaleString('es-AR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'America/Argentina/Buenos_Aires'})
+      :null;
+    const title=habita?'HABITA':'TURNIA';
+    return '<section class="os-script-workspace" data-testid="commercial-script" data-script-unit="'+unit+'">'
+      +'<header class="os-script-heading"><div><span class="os-kicker">'+title+' · GUÍA DE EJECUCIÓN</span><h2>SCRIPT COMERCIAL</h2>'
+      +'<p>'+(habita?'El mismo documento operativo del panel original de HABITA y su extensión. Los cambios se sincronizan en ambas vistas.':'Documento de TURNIA, separado de HABITA. Registrá acá las instrucciones reales de su equipo.')+'</p></div>'
+      +'<span class="os-script-source"><span class="os-script-source-dot"></span> '+(habita?'SINCRONIZADO CON HABITA':'SCRIPT DE TURNIA')+'</span></header>'
+      +(d.loading?'<p class="os-script-loading" role="status">Cargando script…</p>'
+        :d.error?'<div class="os-script-error" role="alert">No se pudo leer el script: '+esc(d.error)+' <button class="btn small" type="button" data-script-refresh>Reintentar</button></div>'
+        :'<form class="os-script-editor" data-script-form>'
+          +'<div class="os-script-editor-top"><div><h3>GUÍA DE TRABAJO</h3><p>'+(habita?'Fuente oficial: HABITA · /admin/script':'El texto queda guardado en la planilla operativa de TURNIA')+'</p></div>'
+          +'<button class="btn os-script-reload" type="button" data-script-refresh '+(dirty?'disabled':'')+'>↻ Actualizar</button></div>'
+          +'<textarea name="body" data-script-body maxlength="20000" rows="21" aria-label="Script comercial de '+title+'"'
+          +(!d.editable||state.demo?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
+          +'<footer class="os-script-bottom"><div class="os-script-meta"><span data-script-dirty>'+(dirty?'Cambios sin guardar':date?'Guardado el '+esc(date):'Todavía sin guardar')+'</span>'
+          +'<span data-script-count>'+int(body.length)+' / 20.000 caracteres</span></div><div class="os-script-actions">'
+          +'<button class="btn" type="button" data-script-discard '+(dirty?'':'disabled')+'>Descartar</button>'
+          +(d.editable&&!state.demo?'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar script')+'</button>'
+            :'<span class="os-script-readonly">Solo lectura · configurá una sesión protegida para editar.</span>')
+          +'</div></footer></form>')
+      +(habita?'<p class="os-script-original-link">Fuente: <a href="https://www.habitaia.app/admin/script" target="_blank" rel="noopener noreferrer">Abrir script original en HABITA ↗</a></p>':'')
+      +'</section>';
+  }
+  document.addEventListener('input',(e)=>{
+    if(!e.target?.matches?.('[data-script-body]'))return;
+    const unit=state.unit,src=state.scripts[unit];
+    if(!src)return;
+    const body=e.target.value,dirty=body!==(src.body||'');
+    state.scriptDrafts[unit]=body;
+    const form=e.target.closest('[data-script-form]');
+    const note=form?.querySelector('[data-script-dirty]');
+    const count=form?.querySelector('[data-script-count]');
+    const save=form?.querySelector('button[type="submit"]');
+    const discard=form?.querySelector('[data-script-discard]');
+    if(discard)discard.disabled=!dirty;
+    if(note)note.textContent=dirty?'Cambios sin guardar':'Sin cambios';
+    if(count)count.textContent=int(body.length)+' / 20.000 caracteres';
+    if(save)save.disabled=!dirty||state.scriptSaving;
+  });
+  document.addEventListener('click',(e)=>{
+    const button=e.target.closest?.('[data-script-refresh],[data-script-discard]');
+    if(!button||!main.contains(button))return;
+    const unit=state.unit,src=state.scripts[unit];if(!src)return;
+    if(button.hasAttribute('data-script-discard')){state.scriptDrafts[unit]=src.body||'';render();}
+    else if(src.error||state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
+  });
+  document.addEventListener('submit',async(e)=>{
+    if(!e.target?.matches?.('[data-script-form]'))return;
+    e.preventDefault();e.stopImmediatePropagation();
+    const unit=state.unit,src=state.scripts[unit],body=state.scriptDrafts[unit]??'';
+    if(!src?.editable||state.demo||state.scriptSaving||body===(src.body||''))return;
+    state.scriptSaving=true;render();
+    try{
+      const saved=await api('script',{method:'POST',body:{unit,body}});
+      if(saved.body!==body)throw Error('El servidor no confirmó el contenido del script.');
+      state.scripts[unit]={...saved,loading:false,error:null};state.scriptDrafts[unit]=saved.body;
+      toast('Script guardado en '+(unit==='habita'?'HABITA':'TURNIA')+'.');
+    }catch(err){toast(err.message||'No se pudo guardar el script.',true);}
+    finally{state.scriptSaving=false;if(state.unit===unit&&state.view==='script')render();}
   });
 
   // ─── Período ────────────────────────────────────────────────
@@ -218,7 +308,7 @@
   $('#units').innerHTML = segs.map(([id, name, color]) =>
     `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
   ).join('');
-  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙']];
+  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
   const tabs = state.unit === 'todas'
     ? [['resumen','RESUMEN','▦'],['hoy','COLA DE EJECUCIÓN','☷',fuCount('todas')],['pipeline','EMBUDOS','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥']]
     : common;
@@ -272,7 +362,7 @@
     const tabs=[
       ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
       ['pipeline','EMBUDO'],['secuencias','REGLAS'],
-      ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],
+      ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
     const links=[
       ['MI INMOBILIARIA','/panel'],['GALERÍA','/galeria'],
@@ -304,6 +394,7 @@
         (!state.fu.n || (fuScope() !== 'todas' && !state.fu.n.units[fuScope()])))
       setTimeout(() => loadFollowup(), 0);
     if (state.unit === 'todas') main.innerHTML = state.view === 'resumen' ? renderCommercialOverview() : renderFu();
+    else if (state.view === 'script') main.innerHTML = renderScript(state.unit);
     else if (UNIT_FU_VIEWS.includes(state.view) || state.view === 'followup' || state.view === 'responder') main.innerHTML = renderFu();
     else {
       const d = state.data[state.unit];
@@ -311,7 +402,7 @@
       else if (d.error) main.innerHTML = unitError(state.unit, d);
       else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
-    if(state.unit==='habita'&&isFu()&&!state.demo)
+    if(state.unit==='habita'&&(isFu()||state.view==='script')&&!state.demo)
       main.innerHTML=habitaFuChrome(main.innerHTML);
     after();
   }
@@ -2203,7 +2294,7 @@
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
   const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
-  const UNIT_VIEWS = ['hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_VIEWS = ['script', 'hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0,
     loadedAt: {}, periodSignature: null, revision: 0, requestedRevision: 0,
@@ -2521,7 +2612,7 @@
     const owner=x.owner||'Todos';
     const opts=(field,choices,value)=>'<select class="os-fu-inline-select" data-fu-row-field="'+field+'" data-fu-key="'+esc(x.key)+'" aria-label="'+esc(field+' de '+x.name)+'">'+choices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===value?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
     return `<tr class="os-fu-table-row ${selected?'is-selected':''}" data-fu-open="${esc(x.key)}" aria-selected="${selected}" tabindex="0" data-testid="fu-item">
-      <td class="os-fu-name"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></td>
+      <td class="os-fu-name"><span class="os-fu-agency-name"><span class="os-fu-agency-icon" aria-hidden="true">${icon.building}</span><span class="os-fu-agency-copy"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}</small></span></span></td>
       <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
       <td>${opts('situation',situations,x.situation)}</td>
       <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
@@ -2583,28 +2674,60 @@
     const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
     const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
     return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
-      <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
-      <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
-      <div class="os-fu-preview-actions">
-        <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
-        <button type="button" class="btn" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
-        <button type="button" class="btn" disabled title="Primero tomá y enviá la tarea">✓ Confirmar envío</button>
-        <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
-        <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
+      <button type="button" class="os-fu-preview-back" data-fu="focus-queue">← Volver a la cola</button>
+      <header class="os-fu-preview-head">
+        <span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span>
+        <h2>${esc(x.name)}</h2>
+        <div class="os-fu-preview-tags">
+          <span class="os-fu-preview-tag-stage"><b>ETAPA:</b> ${esc(stage?.title||x.stageTitle||'—')}</span>
+          <span class="os-fu-preview-tag-situation"><b>SITUACIÓN:</b> ${esc(x.situationLabel||'—')}</span>
+          <span class="os-fu-preview-tag-owner"><b>QUIÉN LO TOMA:</b> ${esc(x.owner||'Todos')}</span>
+        </div>
+      </header>
+      <div class="os-fu-preview-actions" aria-label="Acciones del contacto">
+        <button type="button" class="btn primary os-fu-preview-wa" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} WhatsApp</button>
+        <button type="button" class="btn os-fu-preview-edit" data-fu="queue-focus-stage" data-fu-key="${esc(x.key)}">✎ Cambiar etapa ${icon.chev}</button>
+        <button type="button" class="btn os-fu-preview-edit" data-fu="queue-focus-situation" data-fu-key="${esc(x.key)}">⇄ Cambiar situación ${icon.chev}</button>
       </div>
-      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
-      <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
-      <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
-      <div class="os-fu-preview-card"><strong>Información del contacto</strong><dl>
-        <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd><dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
-        <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[x.priority]||'—')}</dd>
-        <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
-      <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
-      <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
-      <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
+      <section class="os-fu-preview-card os-fu-preview-contact">
+        <h3>ⓘ &nbsp; Información del contacto</h3>
+        <dl>
+          <dt>WhatsApp</dt><dd>${esc(x.phone||'Sin número')}</dd>
+          <dt>Actividad</dt><dd>${esc(x.stageTitle||'—')}</dd>
+          <dt>Último contacto</dt><dd>${esc(ago(x.since)||'—')}</dd>
+          <dt>Prioridad</dt><dd><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></dd>
+          <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd>
+        </dl>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-context">
+        <h3>▤ &nbsp; Resumen / Contexto</h3>
+        <p>Etapa: ${esc(stage?.title||x.stageTitle||'—')} · Situación: ${esc(x.situationLabel||'—')}</p>
+        <p>Actividad: ${esc(x.stageTitle||'—')}.${x.lastText?' Última acción: '+esc(x.lastText)+'.':''}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-said">
+        <h3>☏ &nbsp; Qué dijo</h3>
+        <p>${esc(x.situationNote||'Sin texto original registrado.')}</p>
+      </section>
+      <section class="os-fu-preview-card is-action">
+        <h3>◎ &nbsp; Próxima acción</h3>
+        <p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-message-card" data-testid="followup-script-message">
+        <h3>◉ &nbsp; Mensaje de WhatsApp · borrador</h3>
+        <p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p>
+        <button type="button" class="btn small os-fu-copy-preview" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-notes-card" data-testid="followup-script-notes">
+        <h3>✎ &nbsp; Observaciones</h3>
+        <p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p>
+      </section>
+      <section class="os-fu-preview-card os-fu-preview-rule" data-testid="followup-applied-rule">
+        <h3>◇ &nbsp; Regla aplicada</h3>
+        <p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p>
+      </section>
+      <p class="os-fu-caption">La vista previa no confirma ningún envío. Para enviar, tomá la tarea y validá los datos.</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
-      '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
+        '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
     </aside>`;
   }
 
@@ -3674,6 +3797,16 @@
         if(item){
           state.fu.selectedQueueKey=item.key;render();
         }
+        break;
+      }
+      case 'focus-queue': { const list=main.querySelector('.os-fu-tablecard');list?.scrollIntoView({behavior:'smooth',block:'start'});break; }
+      case 'queue-focus-stage':
+      case 'queue-focus-situation': {
+        const field=ds.fu==='queue-focus-stage'?'stage':'situation';
+        const selector='[data-fu-row-field="'+field+'"][data-fu-key="'+CSS.escape(ds.fuKey)+'"]';
+        const input=main.querySelector(selector);
+        if(input){input.scrollIntoView({block:'nearest',behavior:'smooth'});input.focus();}
+        else toast('Seleccioná la etapa o situación desde la fila.',true);
         break;
       }
       case 'queue-edit-situation': {
@@ -4844,7 +4977,7 @@
   }
 
   async function ensureLoaded(force) {
-    if (state.demo || !state.session || !state.session.user || isFu()) return;
+    if (state.demo || !state.session || !state.session.user || isFu() || state.view==='script') return;
     // Legacy planillas are loaded on demand. Follow-up reads its own product
     // snapshot and must not trigger a second concurrent scan of both databases.
     const id = state.unit;
@@ -4865,7 +4998,7 @@
     if (new URLSearchParams(location.search).get('ejemplo') === '1') { await startDemo(); return; }
     render();
     await ensureLoaded();
-    if (!isFu()) await loadMetrics();
+    if (!isFu() && state.view!=='script') await loadMetrics();
     render();
   }
 
@@ -4877,6 +5010,9 @@
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
       if (isFu()) {
         if (!state.fu.task) loadFollowup({ quiet: true });
+      } else if (state.view==='script') {
+        const x=state.scripts[state.unit];
+        if(x && state.scriptDrafts[state.unit]===(x.body||''))loadScript(state.unit,{quiet:true});
       } else if (state.unit !== 'todas') {
         loadUnit(state.unit, { quiet: true }).then(render);
       }

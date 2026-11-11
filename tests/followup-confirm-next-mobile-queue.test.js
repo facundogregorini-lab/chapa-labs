@@ -127,7 +127,7 @@ test('Eight commercial funnel stage icons remain above execution shortcuts',()=>
 
 test('Reclassify forms are intercepted and persist via backend instead of reloading the page',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
-  const start=app.indexOf("document.addEventListener('submit'");
+  const start=app.indexOf("document.addEventListener('submit'",app.indexOf('function fuQueueTableRow'));
   assert.ok(start>0);
   const handler=app.slice(start,app.indexOf("  //",start+1000)>start?app.indexOf("  //",start+1000):start+12000);
   const routing=app.slice(start,start+9300);
@@ -185,7 +185,7 @@ test('Funnel review lists agencies under chart, editable commercial stage and in
   assert.match(css,/\.os-fu-funnel-review-item>form/);
 });
 test('Funnel review changes submit, wait for verified server receipt, release stale claim',()=>{
-  const start=app.indexOf("document.addEventListener('submit'");
+  const start=app.indexOf("document.addEventListener('submit'",app.indexOf('function fuQueueTableRow'));
   const end=app.indexOf("const fd = Object.fromEntries(new FormData(form))",start);
   const handler=app.slice(start,end);
   assert.match(handler,/\[data-fu-funnel-review\]/);
@@ -231,11 +231,11 @@ test('Desktop preview shows next action, WhatsApp message and actual version not
   const end=app.indexOf('function fuHoy()',start);
   const body=app.slice(start,end);
   assert.ok(start>0&&end>start);
-  const action=body.indexOf('Próxima acción</strong>');
+  const action=body.indexOf('Próxima acción');
   const message=body.indexOf('Mensaje de WhatsApp · borrador');
-  const observations=body.indexOf('Observaciones</strong>');
-  const contact=body.indexOf('Información del contacto</strong>');
-  assert.ok(action>=0&&message>action&&observations>message&&contact>observations);
+  const observations=body.indexOf('Observaciones');
+  const contact=body.indexOf('Información del contacto');
+  assert.ok(contact>=0&&action>contact&&message>action&&observations>message);
   assert.match(body,/const observations=\[x\.situationNote,version\?\.notes\]/);
   assert.match(body,/esc\(observations\|\|'Sin observaciones registradas\.'/);
 });
