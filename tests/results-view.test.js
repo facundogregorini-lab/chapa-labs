@@ -126,3 +126,9 @@ test('cohorts start at the first week with contacts and say which funnel they us
   assert.match(html,/embudo de Follow-up, desde Contactado/);
   assert.match(R.render('turnia',{results:{execution:{days:[]}}},{},{cohorts:cf}),/desde Saludado/);
 });
+
+test('cohorts come before the actions',()=>{
+  const html=R.render('habita',habita,{});
+  assert.ok(html.indexOf('data-testid="results-queue"')<html.indexOf('data-testid="results-cohorts"'));
+  assert.ok(html.indexOf('data-testid="results-cohorts"')<html.indexOf('data-testid="results-actions"'));
+});
