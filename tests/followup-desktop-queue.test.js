@@ -22,11 +22,10 @@ test('Desktop execution queue exposes inline stage, situation, owner and WhatsAp
 });
 test('Selected lead sidebar contains visible message, action, notes and mobile-inspired CTAs',()=>{
   const side=app.slice(app.indexOf('function fuRecommended('),app.indexOf('function fuHoy()'));
-  for(const label of ['Volver a la cola','WhatsApp','Cambiar etapa','Cambiar situación','Información del contacto','Qué dijo','Próxima acción','Mensaje de WhatsApp','Observaciones'])assert.ok(side.includes(label),label);
-  assert.match(side,/data-fu="queue-focus-stage"/);
-  assert.match(side,/data-fu="queue-focus-situation"/);
-  assert.match(side,/data-testid="followup-script-message"/);
-  assert.match(side,/data-testid="followup-script-notes"/);
+  for(const label of ['Abrir WhatsApp','Copiar borrador','Confirmar envío','Siguiente tarea','Reclasificar','Próxima acción','Mensaje de WhatsApp','Observaciones','Regla aplicada','Información del contacto','Resumen / Contexto','Qué dijo'])assert.ok(side.includes(label),label);
+  assert.match(side,/data-fu="next-preview"/);
+  assert.match(side,/data-fu="queue-edit-situation"/);
+  assert.match(side,/data-copy-text/);
   assert.match(side,/rows\.find\(r=>r\.key===state\.fu\.selectedQueueKey\)\|\|rows\[0\]/);
   assert.match(side,/renderFuTask\(task\)/);
   assert.match(css,/\.os-fu-side-working \.os-fu-mobile-send\{display:grid/);

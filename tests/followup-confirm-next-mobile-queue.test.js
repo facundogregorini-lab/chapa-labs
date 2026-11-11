@@ -235,7 +235,7 @@ test('Desktop preview shows next action, WhatsApp message and actual version not
   const message=body.indexOf('Mensaje de WhatsApp · borrador');
   const observations=body.indexOf('Observaciones');
   const contact=body.indexOf('Información del contacto');
-  assert.ok(contact>=0&&action>contact&&message>action&&observations>message);
+  assert.ok(action>=0&&message>action&&observations>message&&contact>observations);
   assert.match(body,/const observations=\[x\.situationNote,version\?\.notes\]/);
   assert.match(body,/esc\(observations\|\|'Sin observaciones registradas\.'/);
 });
