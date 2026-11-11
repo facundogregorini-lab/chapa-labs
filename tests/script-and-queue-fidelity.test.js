@@ -24,7 +24,11 @@ test('HABITA script reads original source and TURNIA script is separately persis
   assert.match(api,/followup:\{op:'script-save',body\}/);
   assert.match(api,/google\.readTabs\(sheet\.id,\[SCRIPT_TAB\]\)/);
   assert.match(api,/google\.writeRange\(sheet\.id,SCRIPT_TAB,1/);
-  assert.match(api,/if\(session\.open\(\)\)return fail\(res,403/);
+  assert.match(api,/editable:true,max_length:20000/);
+  const scriptHandler=api.slice(api.indexOf('async function doScript('),api.indexOf('// ─── Follow-up: la cola',api.indexOf('async function doScript(')));
+  assert.doesNotMatch(scriptHandler,/if\(session\.open\(\)\).*403/);
+  assert.match(api,/const user = session\.read\(req\);/);
+  assert.match(api,/if \(!user\) return fail\(res, 401, 'Iniciá sesión\.'/);
   assert.match(api,/if \(op === 'script'\) return await doScript\(req, res, user\)/);
   assert.match(app,/data-script-form/);
   assert.match(app,/data-script-body/);
