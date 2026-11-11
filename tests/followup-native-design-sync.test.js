@@ -9,11 +9,11 @@ const app=read('prospecting/app.js');
 const css=read('prospecting/commercial-os.css');
 const html=read('prospecting/index.html');
 
-test('Habita native workspace has all six original upper tabs and title',()=>{
+test('Habita native workspace preserves tabs, title and new SCRIPT tab',()=>{
   assert.doesNotThrow(()=>new vm.Script(app));
   assert.match(app,/function habitaFuChrome\(content\)/);
   for(const label of ['EJECUCIÓN COMERCIAL','Gestioná el outreach y el seguimiento',
-    'COLA DE EJECUCIÓN','RESPUESTAS','EMBUDO','REGLAS','ETAPAS Y SITUACIONES','RESULTADOS'])
+    'COLA DE EJECUCIÓN','RESPUESTAS','EMBUDO','REGLAS','ETAPAS Y SITUACIONES','RESULTADOS','SCRIPT'])
     assert.ok(app.includes(label),label);
   for(const target of ['/panel','/galeria','/precios','/cuenta','/inicio'])
     assert.ok(app.includes("'"+target+"'"),target);
@@ -21,7 +21,8 @@ test('Habita native workspace has all six original upper tabs and title',()=>{
 });
 
 test('Manrope is actually fetched and auth/logout remains accessible in native shell',()=>{
-  assert.match(html,/fonts\.googleapis\.com\/css2\?family=Manrope/);
+  assert.match(html,/fonts\.googleapis\.com\/css2\?family=Inter/);
+  assert.match(html,/family=Manrope/);
   assert.match(css,/\.habita-fu-head-copy h1/);
   assert.match(css,/\.habita-fu-tabs button\.is-on/);
   assert.match(css,/body\[data-unit="habita"\]:has\(\.habita-fu-workspace-head\) \.os-top \.os-user/);
