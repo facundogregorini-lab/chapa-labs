@@ -107,3 +107,29 @@ test('mobile order: both funnels first, then the queue of each product; no false
   assert.doesNotMatch(empty,/Todos los pasos convierten en meta/);
   assert.match(empty,/Todavía no hay conversiones en este período/);
 });
+
+test('weekly evolution: Mon–Sun weeks, separate cards per product, before the funnels, default steps marked',()=>{
+  const days=O.evoDays('2026-11-11',4);
+  assert.equal(days[0],'2026-10-19');assert.equal(days.at(-1),'2026-11-11');
+  assert.deepEqual(O.buckets(days,'semana').map(w=>w.key),['2026-10-25','2026-11-01','2026-11-08','2026-11-15']);
+  assert.deepEqual(O.evoDefault(['saludos','respondieron','demos','visitadas','interaccion','llamadas','fundadores']),['saludos','respondieron','interaccion']);
+  assert.deepEqual(O.evoDefault(['saludos','demos','visitadas','interaccion','cuentas','activas','pagos']),['saludos','interaccion','demos']);
+  const evoSteps=[{key:'saludos',label:'Saludos enviados'},{key:'demos',label:'Demos enviadas'},{key:'interaccion',label:'Con interacción'}];
+  const weekly=[{key:'2026-10-26',label:'Sem. al 26 oct',short:'26 oct',partial:false,steps:[100,10,4]},{key:'2026-11-02',label:'Sem. al 2 nov',short:'2 nov',partial:false,steps:[120,null,5]},
+    {key:'2026-11-09',label:'Sem. al 9 nov',short:'9 nov',partial:false,steps:[150,12,6]},{key:'2026-11-16',label:'Sem. al 16 nov',short:'16 nov',partial:true,steps:[40,2,1]}];
+  const t={...unit,id:'turnia',name:'Turnia',evoSteps,weekly},h={...unit,evoSteps,weekly};
+  const html=O.render({units:[t,h],view:{period:'semana',grain:'dia',step:{},evoWeeks:4,evoSel:{}},today:'2026-11-11'});
+  assert.ok(html.indexOf('overview-evolution')<html.indexOf('overview-funnels'));
+  assert.match(html,/data-testid="overview-evo-turnia"/);assert.match(html,/data-testid="overview-evo-habita"/);
+  assert.match(html,/data-testid="overview-evo-weeks-4"[^>]*|class="is-on" aria-pressed="true" data-fu="ov-evo-weeks" data-fu-weeks="4"/);
+  const card=O.evolutionCard(h,{evoSel:{}});
+  assert.equal((card.match(/aria-pressed="true"/g)||[]).length,3);
+  assert.match(card,/\+25% vs sem\. ant\./); // 150 vs 120, la semana en curso no cuenta
+  assert.match(card,/class="is-open"/);       // el tramo de la semana en curso, punteado
+  assert.match(card,/<path d="M[^"]* C/);       // curvas, no rectas
+  assert.match(O.evolutionCard(h,{evoSel:{habita:[]}}),/Elegí al menos un paso/);
+  const segs=O.curveSegments([{i:0,x:0,y:10},{i:1,x:500,y:null},{i:2,x:1000,y:20},{i:3,x:1500,y:30}]);
+  assert.equal(segs.length,1);assert.equal(segs[0].to,3);
+  const app=read('prospecting/app.js');
+  for(const op of ['ov-evo-weeks','ov-evo-step'])assert.match(app,new RegExp(`case '${op}'`));
+});
