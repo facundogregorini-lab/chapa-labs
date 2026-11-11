@@ -25,8 +25,8 @@ test('Manrope is actually fetched and auth/logout remains accessible in native s
   assert.match(html,/family=Manrope/);
   assert.match(css,/\.habita-fu-head-copy h1/);
   assert.match(css,/\.habita-fu-tabs button\.is-on/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\):has\(\.habita-fu-workspace-head\) \.os-top \.os-user/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-sidebar::after/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\):has\(\.habita-fu-workspace-head\) \.os-top \.os-user/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-sidebar::after/);
 });
 
 test('Native queue preserves compact scoring, situation edit action, recommended CTA and mobile layout',()=>{
@@ -55,12 +55,12 @@ test('Native Habita rules editor is one aligned header + when + what + message +
 test('Habita funnel shows exactly original nine-step historical chart, not second invented flowboard',()=>{
   assert.match(app,/if\(scope==='habita'\)return fuNativeChart\(snap\)/);
   assert.match(app,/data-testid="followup-native-funnel"/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-native-segment\.is-stayed/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-native-segment\.is-stayed/);
 });
 
 test('Catalog remains bound to origin and preserves native labels and uppercase heading',()=>{
   assert.match(app,/HABITA_SITUATION_NOTES/);
   assert.match(app,/data-testid="followup-state-catalog"/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-catalog-head h2\s*\{[^}]*text-transform:uppercase/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.fu-catalog-head h2\s*\{[^}]*text-transform:uppercase/);
   assert.match(app,/PROSPECTING_PASSWORD/);
 });

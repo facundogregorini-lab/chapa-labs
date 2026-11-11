@@ -135,7 +135,7 @@ tr:hover td { background:#f8fcf9; }
 .os-action-banner strong { font-size:18px; letter-spacing:-.02em; }
 .os-action-banner p { margin:3px 0 0; color:#c5e4d1; font-size:12px; }
 .os-action-banner .btn { background:#e2f6e7; color:#12553a; border:0; }
-body:is([data-unit="habita"],[data-unit="turnia"]) { --accent:#12764c; }
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) { --accent:#12764c; }
 body[data-unit="turnia"] { --accent:#138378; }
 :root[data-theme="dark"] { --page:#111e17; --ink:#eaf6ed; --ink-2:#bad0c1; --muted:#9eb9a6; --grid:#315344; --glass:#1a3326; --glass-strong:#1a3326; --glass-soft:#254331; --glass-line:#385845; --glass-edge:#385845; --field:#203d2d; }
 :root[data-theme="dark"] .os-top { background:#172f23e8; border-color:#355743; }
@@ -645,117 +645,117 @@ body[data-unit="turnia"] { --accent:#138378; }
  * Scoped to Habita. The three workspace switches and all actions stay intact.
  * Native reference: desktop sidebar 190px, compact work area, 2-column mobile
  * stage grid, 245px catalog tree, 300/680 rules workspace. */
-body:is([data-unit="habita"],[data-unit="turnia"]){
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]){
   --page:#f8faf8;
   --glass-edge:#e1e8e0;
   --glass-shadow:0 8px 30px #18392a0b;
 }
 @media (min-width:901px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-shell{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-shell{
     grid-template-columns:190px minmax(0,1fr);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-sidebar{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-sidebar{
     padding:30px 13px 18px;
   }
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-workspace > main{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-workspace > main{
   width:100%;
   max-width:none;
   padding:30px clamp(14px,1.6vw,28px) 40px;
   gap:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-center{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-center{
   display:flex;
   flex-direction:column;
   gap:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"]{
   order:-10;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-queue-custom-stages"],
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-queue-situations"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-queue-custom-stages"],
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-queue-situations"]{
   order:-9;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-center > .os-fu-kpis{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-center > .os-fu-kpis{
   order:12;
   padding-top:14px;
   margin-top:10px;
   border-top:1px dashed #cadccd;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
   padding:0 0 4px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-kpi{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-kpi{
   min-height:76px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-kpi strong{font-size:21px}
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-kpi small{font-size:10px}
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-kpi strong{font-size:21px}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-kpi small{font-size:10px}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{
   grid-template-columns:minmax(0,2.2fr) minmax(275px,.95fr);
   gap:13px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablecard,
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-side{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-side{
   border-radius:15px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-side-head{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-side-head{
   min-height:43px;
   padding:11px 12px;
   background:#e8f8ee;
   color:#125037;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-workspace{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-workspace{
   grid-template-columns:minmax(300px,.85fr) minmax(680px,2fr);
   gap:14px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-layout{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-layout{
   grid-template-columns:minmax(200px,245px) minmax(0,1fr);
   gap:20px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-nav,
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-content{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-nav,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-content{
   border-radius:16px;
   border-color:#d8e6dc;
   box-shadow:0 5px 20px rgb(22 61 42 / 4%);
 }
 @media(max-width:1450px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"]{
     grid-template-columns:repeat(8,minmax(116px,1fr));
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{
     grid-template-columns:minmax(0,1.8fr) minmax(270px,.9fr);
   }
 }
 @media(max-width:1250px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
     display:flex;
     overflow-x:auto;
     gap:9px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
     flex:0 0 146px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{
     grid-template-columns:minmax(0,1fr);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-side{position:static}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-workspace{grid-template-columns:minmax(0,1fr)}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-side{position:static}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-workspace{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:900px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-shell{grid-template-columns:minmax(0,1fr)}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-shell{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-workspace > main{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-workspace > main{
     padding:16px 11px 144px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-stage-grid[data-testid="followup-reference-stage-cards"]{
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     overflow:visible;
     gap:9px;
     padding:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
     flex:auto;
     min-width:0;
     min-height:66px;
@@ -763,69 +763,69 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-content{
     grid-template-columns:34px minmax(0,1fr);
     grid-template-rows:18px 24px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage-label{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage-label{
     font-size:9.5px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage strong{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage strong{
     font-size:24px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-center > .os-fu-kpis{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-center > .os-fu-kpis{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{
     display:flex;
     flex-direction:column;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid > .os-fu-side{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid > .os-fu-side{
     width:100%;
     order:-1;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-layout{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-layout{
     grid-template-columns:minmax(0,1fr);
     gap:12px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-workspace{grid-template-columns:minmax(0,1fr)}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-workspace{grid-template-columns:minmax(0,1fr)}
 }
 
 
 /* Native Habita: a condition is a removable selected chip plus '+ AGREGAR',
    not a permanent wall of checked/unchecked classifiers. */
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-situation-editor{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-situation-editor{
   display:flex;flex-wrap:wrap;align-items:center;gap:7px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-situation-selected{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-situation-selected{
   display:flex;align-items:center;gap:6px;flex-wrap:wrap;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-chipbtn{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipbtn{
   display:inline-flex;align-items:center;justify-content:center;
   min-height:30px;padding:6px 9px;border-radius:9px;
   font-family:inherit;font-size:10px;font-weight:750;
   line-height:1.25;text-transform:uppercase;white-space:normal;
   border:1px solid #b9e2ca;background:#eaf7ed;color:#146041;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) button.fu-ref-chipbtn{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) button.fu-ref-chipbtn{
   cursor:pointer;transition:background .15s,border-color .15s;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) button.fu-ref-chipbtn:hover{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) button.fu-ref-chipbtn:hover{
   background:#d7f0de;border-color:#73ba8e;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-chipbtn.is-static{cursor:default}
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-chipadd{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipbtn.is-static{cursor:default}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipadd{
   flex:0 0 auto;max-width:min(240px,100%);min-height:32px;
   padding:5px 8px;border-radius:9px;color:#196340;
   border-color:#c2dfca;background:#fff;font-size:10px;
   font-weight:800;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-situation-hidden{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-situation-hidden{
   position:absolute!important;width:1px!important;height:1px!important;
   opacity:0!important;pointer-events:none!important;
   clip-path:inset(50%)!important;overflow:hidden!important;
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-situation-editor{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-situation-editor{
     align-items:flex-start;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-chipbtn{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipbtn{
     min-height:34px;
   }
 }
@@ -833,80 +833,80 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-situation-hidden{
 
 /* Habita's native historical funnel: bar palette, hatched "stayed" segments,
    dense labels, and original chart proportions. Scoped to Habita only. */
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-funnel{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-funnel{
   border:1px solid #d9e5dc;background:#fff;box-shadow:none;
   border-radius:16px;padding:25px;margin-bottom:16px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-head h2{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-head h2{
   font-size:19px;color:#153c2b;font-weight:800;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-head p{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-head p{
   color:#60766a;font-size:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-head .os-native-period{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-head .os-native-period{
   min-width:min(100%,475px);
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-legend{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-legend{
   margin:20px 0 11px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-legend .is-went{background:#206d4b}
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-legend .is-stayed{background:#e5a045}
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-legend .is-lost{background:#b8b9b3}
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-chart{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-legend .is-went{background:#206d4b}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-legend .is-stayed{background:#e5a045}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-legend .is-lost{background:#b8b9b3}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-chart{
   grid-template-columns:repeat(9,minmax(108px,1fr));
   gap:7px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step{
   grid-template-rows:70px 310px minmax(90px,auto);
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-top strong{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-top strong{
   font-size:25px;color:#123b29;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-label{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-label{
   text-align:center;gap:5px;padding:7px 3px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-label b{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-label b{
   color:#113d28;font-weight:800;font-size:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-label small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-label small{
   font-size:11px;line-height:1.4;color:#ba6b26;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-label small.is-lost{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-label small.is-lost{
   color:#84776a;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-label small.is-went{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-label small.is-went{
   color:#116943;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step-plot{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step-plot{
   border-color:#e0e8e0;
   background:repeating-linear-gradient(to top,#e4ebe5 0px,#e4ebe5 1px,transparent 1px,transparent 62px);
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-bar{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-bar{
   border-radius:7px 7px 0 0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-segment{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-segment{
   border-radius:0;min-height:21px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-segment.is-advanced{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-segment.is-advanced{
   background:#206d4b;color:#fff;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-segment.is-stayed{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-segment.is-stayed{
   background:repeating-linear-gradient(135deg,#e8a348 0px,#e8a348 8px,#f3b36b 8px,#f3b36b 15px);
   color:#55380e;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-segment.is-lost{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-segment.is-lost{
   background:#b8b9b3;color:#4b493f;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-segment.is-advanced.is-last{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-segment.is-advanced.is-last{
   background:#206d4b;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-note{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-note{
   font-size:11px;color:#63776a;line-height:1.6;
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-funnel{padding:14px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-head .os-native-period{min-width:100%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-step{grid-template-rows:65px 250px minmax(88px,auto)}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-funnel{padding:14px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-head .os-native-period{min-width:100%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-native-step{grid-template-rows:65px 250px minmax(88px,auto)}
 }
 
 
@@ -916,65 +916,65 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-native-note{
    Chapa's unit-switcher remains accessible at left, but the
    workspace and every step use Habita's native header/tabs.
    ============================================================ */
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .top.os-top {
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .top.os-top {
   display:none;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-workspace-head{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-workspace-head{
   display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
   gap:18px;margin:0 0 9px;min-height:73px;padding:0;
   font-family:"Manrope","Inter",Arial,sans-serif;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-head-copy{min-width:0;flex:1 1 400px}
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-eyebrow{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-head-copy{min-width:0;flex:1 1 400px}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-eyebrow{
   display:block;font-size:10px;line-height:1.2;letter-spacing:.09em;
   color:#6e8c77;font-weight:800;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-head-copy h1{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-head-copy h1{
   margin:4px 0 0;font-size:clamp(24px,2.15vw,31px);
   font-weight:800;line-height:1.12;letter-spacing:-.039em;
   color:#162c20;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-head-copy p{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-head-copy p{
   margin:5px 0 0;max-width:620px;font-size:12px;
   line-height:1.45;color:#65796b;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities{
   display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;
   gap:17px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities a{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities a{
   font-size:10.5px;font-weight:700;text-transform:uppercase;
   color:#204e38;text-decoration:none;
   padding:8px 0;white-space:nowrap;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities a:hover,
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities a:focus-visible{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities a:hover,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities a:focus-visible{
   color:#087c50;text-decoration:underline;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities a:last-child{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities a:last-child{
   background:#e5f2e8;border-radius:11px;padding:13px 14px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs{
   display:flex;flex-wrap:nowrap;align-items:center;gap:2px;
   width:max-content;max-width:100%;overflow-x:auto;
   margin:0 0 10px;background:#ffffffd9;
   border:1px solid #e3ebe3;border-radius:13px;
   padding:3px;scrollbar-width:thin;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs button{
   flex:0 0 auto;min-height:35px;padding:7px 12px;
   border:0;border-radius:10px;background:transparent;
   color:#214330;cursor:pointer;
   font-family:inherit;font-size:10px;font-weight:750;
   white-space:nowrap;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button:hover{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs button:hover{
   background:#edf6ef;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button.is-on{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs button.is-on{
   background:#0a6b46;color:#fff;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button:focus-visible{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs button:focus-visible{
   outline:2px solid #178753;outline-offset:2px;
 }
 
@@ -982,7 +982,7 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button:focus-
    while CSS forms a single two-column editor and WhatsApp preview on
    the right. Unlike separate cards, its header spans both sections. */
 @media(min-width:1281px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail{
     display:grid;
     grid-template-columns:minmax(270px,1.16fr) minmax(220px,.91fr) minmax(200px,.83fr);
     grid-template-rows:auto auto auto auto;
@@ -990,165 +990,165 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button:focus-
     background:#fff;border:1px solid #dce8df;
     border-radius:15px;padding:15px;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-rule-form{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-rule-form{
     display:contents;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule-form>.fu-ref-edit-head{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule-form>.fu-ref-edit-head{
     grid-column:1/3;grid-row:1;
     padding:4px 2px 12px;margin:0;
     align-self:center;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule-form>.fu-ref-when{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule-form>.fu-ref-when{
     grid-column:1;grid-row:2;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule-form>.fu-ref-what{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule-form>.fu-ref-what{
     grid-column:2;grid-row:2;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule-form>.fu-ref-buttons{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule-form>.fu-ref-buttons{
     grid-column:1/3;grid-row:3;
     align-self:end;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-message{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-message{
     grid-column:1/3;grid-row:4;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-wa-preview{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-wa-preview{
     grid-column:3;grid-row:1/5;
     align-self:start;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-buttons{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-buttons{
     grid-column:1/3;grid-row:5;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-when,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-when,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what{
     border:1px solid #dfe9e0;background:#f9fbf9;
     border-radius:12px;padding:14px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule-form>.fu-ref-edit-head .fu-ref-titleline{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule-form>.fu-ref-edit-head .fu-ref-titleline{
     gap:10px;flex-wrap:nowrap;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-titleline .fu-ref-rule-name{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-titleline .fu-ref-rule-name{
     font-size:17px;
   }
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-flowrow{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-flowrow{
   padding:12px;border-radius:16px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-flowstep{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-flowstep{
   min-height:57px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-stage-head{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-stage-head{
   background:#f4f9f5;
   border-color:#dfe9df;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule{
   border-radius:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-rule.is-on{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-rule.is-on{
   background:#edf8ef;border-color:#5ab781;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-list{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-list{
   padding:18px;border-radius:16px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-wa-header{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-wa-header{
   background:#1b3f30;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-wa-bubble{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-wa-bubble{
   background:#d6f7db;
 }
 @media(max-width:1280px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail{
     grid-template-columns:minmax(0,1fr);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-rule-form,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-message,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-wa-preview,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-detail>.fu-ref-buttons{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-rule-form,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-message,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-wa-preview,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-detail>.fu-ref-buttons{
     grid-column:1;
   }
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-workspace-head{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-workspace-head{
     align-items:flex-start;gap:12px;min-height:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-head-copy h1{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-head-copy h1{
     font-size:23px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-head-copy p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-head-copy p{
     font-size:10.5px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities{
     gap:9px;justify-content:flex-start;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities a{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities a{
     font-size:9px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs{
     width:100%;margin-bottom:9px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-tabs button{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-tabs button{
     min-height:40px;font-size:10px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-list{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-list{
     padding:13px;
   }
 }
 
 
 /* Native Habita queue: round scores, hierarchy, and discreet row CTA. */
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-score-bubble{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-score-bubble{
   width:31px;height:31px;display:inline-grid;place-items:center;
   border-radius:50%;background:#e2f5e9;color:#127c4b;
   font-size:10px;font-weight:850;line-height:1;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-edit-stage{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-edit-stage{
   display:block;width:max-content;max-width:100%;margin:4px 0 0;
   padding:0;background:transparent;border:0;
   color:#248451;text-decoration:underline;font-family:inherit;
   font-size:9px;font-weight:600;cursor:pointer;text-align:left;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-edit-stage:hover{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-edit-stage:hover{
   color:#0e6843;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablecard [data-testid="fu-execute"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard [data-testid="fu-execute"]{
   background:#fff;border:1px solid #dce9dd;
   color:#0c643e;box-shadow:none;
   font-size:10px;font-weight:750;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablecard [data-testid="fu-execute"]:hover{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard [data-testid="fu-execute"]:hover{
   background:#eaf7ef;border-color:#61ba83;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-head h2{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-head h2{
   font-weight:850;letter-spacing:-.045em;
   text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-head>.btn{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-head>.btn{
   font-size:10.5px;font-weight:800;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-state-main strong{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-state-main strong{
   font-size:13px;color:#153d2a;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-catalog-state-main small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-catalog-state-main small{
   line-height:1.4;color:#597362;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what-actions{
   display:grid;gap:6px;align-items:stretch;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions .btn{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what-actions .btn{
   width:100%;min-height:34px;
   background:#fff;color:#1c6945;border:1px solid #cfded3;
   border-radius:9px;font-size:10px;font-weight:750;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions .btn:hover{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what-actions .btn:hover{
   border-color:#409d6e;background:#f2faf5;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions .btn:focus-visible{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what-actions .btn:focus-visible{
   outline:2px solid #2b9961;outline-offset:2px;
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-score-bubble{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-score-bubble{
     width:30px;height:30px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-what-actions{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 }
@@ -1157,7 +1157,7 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-what-actions .btn:foc
 /* Keep the existing authenticated session/logout control available.
    Habita has a compact logout utility in the native upper-right corner.
    Hide only the duplicate breadcrumb/search/theme—not the account action. */
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .top.os-top{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .top.os-top{
   display:flex;
   position:fixed;top:22px;right:15px;left:auto;
   width:43px;height:43px;min-height:0;
@@ -1165,23 +1165,23 @@ body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head
   border:0;background:transparent;box-shadow:none;
   backdrop-filter:none;z-index:100;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .os-top .os-breadcrumb,
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .os-top .gsearch,
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .os-top #theme{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .os-top .os-breadcrumb,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .os-top .gsearch,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .os-top #theme{
   display:none!important;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .os-top .os-user{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .os-top .os-user{
   min-width:40px;width:40px;height:40px;
   background:#fff;border:1px solid #d9e8dd;border-radius:12px;
   color:#19593c;font-size:11px;box-shadow:0 2px 7px #21452c09;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities{
   padding-right:52px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-sidebar{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-sidebar{
   isolation:isolate;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-sidebar::after{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-sidebar::after{
   content:"";display:block;position:absolute;z-index:-1;
   left:0;right:0;bottom:58px;height:350px;
   opacity:.88;pointer-events:none;
@@ -1190,40 +1190,40 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-sidebar::after{
       center bottom / cover no-repeat;
 }
 @media(max-width:900px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-sidebar::after{display:none}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-sidebar::after{display:none}
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-utilities{padding-right:0}
-  body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .top.os-top{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-utilities{padding-right:0}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .top.os-top{
     position:fixed;top:10px;right:10px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-workspace-head{padding-right:47px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-workspace-head{padding-right:47px}
 }
 
 
 /* Exact Habita schedule interaction: two side-by-side preset selectors
    (days and time-window), not seven checkboxes + hourly number inputs. */
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window{
   display:grid;gap:6px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window>span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window>span{
   font-size:10.5px;font-weight:800;color:#526d57;
   text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window-selects{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window-selects{
   display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
   gap:8px;align-items:center;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window-selects select{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window-selects select{
   min-width:0;max-width:100%;width:100%;min-height:38px;
   border:1px solid #dce7df;background:#fff;border-radius:9px;
   padding:8px 9px;font-size:11px;font-weight:650;color:#214a31;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window-selects select:focus-visible{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window-selects select:focus-visible{
   outline:2px solid #188854;outline-offset:2px;
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window-selects{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-send-window-selects{
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:6px;
   }
@@ -1232,229 +1232,229 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .fu-ref-send-window-selects s
 
 /* Native Habita ResultsView — identical information hierarchy as original
    follow-up: conversion window, 4 KPIs, weekly and blockers, versions, cohorts. */
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results{
   display:grid;gap:15px;min-width:0;color:#18372a;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-filters{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-filters{
   display:flex;align-items:center;flex-wrap:wrap;gap:7px;
   padding:4px 0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-filters>span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-filters>span{
   font-size:10px;font-weight:850;letter-spacing:.055em;
   color:#607a68;margin-right:8px;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-filters button,
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-cohort-header nav button{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-filters button,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-cohort-header nav button{
   border:1px solid #dce8dd;border-radius:9px;
   padding:8px 12px;min-height:34px;background:#fff;
   color:#326246;font-size:10.5px;font-weight:750;
   font-family:inherit;cursor:pointer;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-filters button.is-on,
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-cohort-header nav button.is-on{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-filters button.is-on,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-cohort-header nav button.is-on{
   background:#126b47;color:#fff;border-color:#126b47;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpis{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpis{
   display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpi{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpi{
   border:1px solid #dce8de;background:#fff;
   border-radius:15px;padding:16px;min-width:0;
   display:grid;gap:8px;align-content:start;
   box-shadow:0 5px 18px #153a2708;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpi span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpi span{
   color:#587360;font-size:10px;letter-spacing:.025em;
   text-transform:uppercase;font-weight:750;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpi strong{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpi strong{
   font-size:26px;font-weight:850;color:#163f2b;line-height:1;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpi small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpi small{
   color:#748879;font-size:10px;line-height:1.4;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-columns{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-columns{
   display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:13px;
   align-items:stretch;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-card{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-card{
   background:#fff;border:1px solid #dce8de;border-radius:15px;
   padding:18px;min-width:0;box-shadow:0 5px 18px #153a2708;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-card h2{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-card h2{
   margin:0 0 12px;font-size:13px;line-height:1.35;
   color:#1d4931;font-weight:800;text-transform:uppercase;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-legend{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-legend{
   display:flex;gap:15px;align-items:center;flex-wrap:wrap;
   color:#687c6d;font-size:10px;margin-bottom:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-legend span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-legend span{
   display:inline-flex;align-items:center;gap:6px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-legend i{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-legend i{
   display:inline-block;width:11px;height:11px;border-radius:3px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results .is-ex{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results .is-ex{
   background:#d88c48;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results .is-cv{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results .is-cv{
   background:#1d8a59;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-weekly{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-weekly{
   display:flex;justify-content:space-around;align-items:flex-end;
   gap:10px;overflow-x:auto;padding:10px 2px 4px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-week{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-week{
   display:grid;justify-items:center;align-content:end;
   gap:7px;flex:1 0 49px;min-width:49px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-week small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-week small{
   font-size:10px;color:#6b806e;white-space:nowrap;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-bar-pair{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-bar-pair{
   display:flex;justify-content:center;align-items:flex-end;
   gap:4px;height:145px;width:100%;
   border-bottom:1px solid #dce9dd;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-bar-pair>span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-bar-pair>span{
   display:block;max-width:22px;width:38%;min-height:0;
   border-radius:5px 5px 0 0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-blocks{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-blocks{
   list-style:none;display:grid;gap:12px;margin:0;padding:0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-blocks li{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-blocks li{
   display:grid;gap:5px;min-width:0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-blocks li>span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-blocks li>span{
   display:flex;gap:9px;justify-content:space-between;
   font-size:11px;color:#49664f;line-height:1.4;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-blocks li i{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-blocks li i{
   display:block;max-width:100%;height:7px;
   border-radius:99px;background:#d6a16b;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-table-scroll{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-table-scroll{
   overflow:auto;max-width:100%;scrollbar-width:thin;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-table-scroll table{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-table-scroll table{
   border-collapse:collapse;min-width:800px;width:100%;font-size:11px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-table-scroll th{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-table-scroll th{
   background:#f7faf7;text-align:left;font-size:9.5px;
   font-weight:800;color:#5d7462;letter-spacing:.025em;
   padding:11px 9px;border-bottom:1px solid #dce8df;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-table-scroll td{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-table-scroll td{
   color:#2b4733;padding:12px 9px;
   border-bottom:1px solid #e6eee7;vertical-align:top;
   font-variant-numeric:tabular-nums;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-table-scroll td small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-table-scroll td small{
   display:block;margin-top:3px;font-size:9.5px;
   color:#7a907f;line-height:1.4;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-version-status{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-version-status{
   display:inline-block;margin-left:5px;padding:3px 6px;
   background:#eef2ef;border-radius:5px;color:#536b59;
   font-size:9px;font-weight:750;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-version-status.is-active{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-version-status.is-active{
   color:#11693c;background:#e3f4e8;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-best{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-best{
   background:#e2f6e8;color:#0d7045;padding:5px 7px;
   border-radius:6px;font-size:9px;font-weight:850;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-muted{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-muted{
   color:#677c6e;font-size:10.5px;line-height:1.65;margin:11px 0 0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-cohort-header{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-cohort-header{
   display:flex;align-items:center;justify-content:space-between;
   gap:11px;flex-wrap:wrap;margin-bottom:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-cohort-header h2{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-cohort-header h2{
   margin:0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-cohort-header nav{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-cohort-header nav{
   display:flex;flex-wrap:wrap;gap:6px;
 }
 @media(max-width:1150px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-columns{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-columns{
     grid-template-columns:minmax(0,1fr);
   }
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-kpis{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-kpis{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-card{
     padding:13px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .fu-native-results-filters button{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-native-results-filters button{
     flex:0 0 auto;min-height:38px;
   }
 }
 
 
 /* Habita native Inbox: compact 4 KPIs above conversation / detail split. */
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"]{
   margin:0 0 13px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"] .os-fu-kpi{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi{
   min-height:112px;border:1px solid #dce9df;border-radius:14px;
   box-shadow:0 5px 16px #1b463008;
   background:#fff;align-items:start;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"] .os-fu-kpi span{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi span{
   font-size:10.5px;font-weight:750;text-transform:uppercase;
   color:#506b5b;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"] .os-fu-kpi strong{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi strong{
   font-size:26px;color:#164330;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"] .os-fu-kpi small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"] .os-fu-kpi small{
   color:#738777;font-size:10px;line-height:1.4;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-inbox-grid{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-inbox-grid{
   background:#fff;border:1px solid #dce8dd;
   border-radius:15px;box-shadow:0 7px 22px #173d2908;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-conversation{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-conversation{
   padding:13px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-conv-tags{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-conv-tags{
   display:flex;align-items:center;flex-wrap:wrap;gap:9px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-conv-tags>small{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-conv-tags>small{
   font-size:9.5px;color:#778c7c;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-conv-status{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-conv-status{
   border-radius:7px;font-size:9.5px;padding:5px 8px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-reply-detail{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-reply-detail{
   padding:20px;min-width:0;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-reply-bubble{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-reply-bubble{
   background:#f5faf6;border-left-color:#429568;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-reply-classes legend{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-reply-classes legend{
   font-weight:800;font-size:11px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="followup-reply-save"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-actions [data-testid="followup-reply-save"]{
   background:#0f744a;color:#fff;border-color:#0f744a;
   font-weight:800;min-height:40px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="followup-reply-facu"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-actions [data-testid="followup-reply-facu"]{
   background:#fff;border:1px solid #cee0d0;color:#205d3d;
   font-weight:750;min-height:40px;
 }
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-inbox"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-inbox"]{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-reply-detail{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-reply-detail{
     padding:13px;
   }
 }
@@ -1467,118 +1467,118 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="
 .os-fu-wa-desktop{display:inline-flex;align-items:center;gap:7px}
 .os-fu-wa-desktop svg,.os-fu-wa-native svg,.os-fu-mobile-copy svg{width:18px;height:18px;flex:none}
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="fu-mobile-actions"]) .habita-fu-workspace-head,
-  body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="fu-mobile-actions"]) .habita-fu-tabs{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="fu-mobile-actions"]) .habita-fu-workspace-head,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="fu-mobile-actions"]) .habita-fu-tabs{
     display:none!important;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="fu-mobile-actions"]) .os-workspace > main{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="fu-mobile-actions"]) .os-workspace > main{
     padding: max(68px,calc(env(safe-area-inset-top) + 22px)) 12px
       calc(36px + env(safe-area-inset-bottom));
     width:100%;min-width:0;overflow-x:hidden;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="fu-detail"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="fu-detail"]{
     display:flex;flex-direction:column;gap:12px;
     grid-template-columns:minmax(0,1fr);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards>.os-fu-message-card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards>.os-fu-message-card{
     order:1;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards>.os-fu-execution-card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards>.os-fu-execution-card{
     order:2;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards>.os-fu-context-card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards>.os-fu-context-card{
     order:3;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards>.card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards>.card{
     width:100%;min-width:0;margin:0;padding:15px;
     border-radius:16px;
     box-shadow:0 4px 14px #143d2710;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-title{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-title{
     display:block;margin:10px 0 12px;padding:0;
     border:0;box-shadow:none;background:transparent;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-title h1{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-title h1{
     font-size:clamp(23px,6.1vw,34px);line-height:1.14;
     letter-spacing:-.035em;overflow-wrap:anywhere;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-title p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-title p{
     font-size:12px;line-height:1.5;margin-top:6px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="followup-task-context"] .os-fu-task-sidebar{display:none}
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="fu-mobile-actions"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="followup-task-context"] .os-fu-task-sidebar{display:none}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="fu-mobile-actions"]{
     display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.8fr);
     gap:9px;
     margin:0 0 13px;padding:13px;
     border:1px solid #d3e6d7;background:#f0f9f1;
     border-radius:17px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-wa-native{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-wa-native{
     display:inline-flex!important;align-items:center;justify-content:center;
     gap:7px;min-height:52px;padding:11px 9px;
     background:#087b49;color:#fff;border:1px solid #087b49;
     border-radius:12px;font-weight:850;font-size:13px;
     text-align:center;text-decoration:none;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-wa-desktop{display:none!important}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-copy{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-wa-desktop{display:none!important}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-copy{
     display:flex;align-items:center;justify-content:center;
     min-height:52px;border:1px solid #c7decd;
     background:#fff;color:#175536;border-radius:12px;
     font-weight:750;font-size:12px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-send p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-send p{
     grid-column:1/-1;margin:0;
     font-size:11px;color:#647c6c;line-height:1.45;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-confirm{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-confirm{
     grid-column:1/-1;min-height:48px;
     background:#fff;border:1px solid #c8ddcf;border-radius:12px;
     color:#135f3c;font-size:13px;font-weight:800;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-execution-primary{display:none!important}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .section{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-execution-primary{display:none!important}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .section{
     min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .facts{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .facts{
     grid-template-columns:minmax(90px,.7fr) minmax(0,1fr);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .input,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards textarea,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards select{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .input,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards textarea,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards select{
     width:100%;min-width:0;max-width:100%;
     min-height:42px;font-size:16px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards button,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-send button{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards button,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-send button{
     touch-action:manipulation;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .section h3{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .section h3{
     font-size:12px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .btns{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .btns{
     display:flex;flex-wrap:wrap;gap:8px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards .btns>.btn{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards .btns>.btn{
     min-height:42px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards [data-fu-situation],
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-task-cards [data-fu-reply]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards [data-fu-situation],
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-task-cards [data-fu-reply]{
     border:1px solid #dce9df;background:#f7fbf8;
     padding:13px;border-radius:13px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) [data-testid="fu-mobile-actions"] .btn:focus-visible{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) [data-testid="fu-mobile-actions"] .btn:focus-visible{
     outline:3px solid #126944;outline-offset:3px;
   }
 }
 
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-app-fallback{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-app-fallback{
     display:inline-block;margin-top:5px;color:#0d6c43;
     text-decoration:underline;text-underline-offset:2px;
     font-size:11px;font-weight:700;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-app-fallback:focus-visible{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-app-fallback:focus-visible{
     outline:2px solid #166f46;outline-offset:3px;
   }
 }
@@ -1586,7 +1586,7 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="
 /* Next-task shortcut stays directly under the primary send confirmation on
  * mobile, without changing the send status or resetting the queue filters. */
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-send .os-fu-mobile-next{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-send .os-fu-mobile-next{
     grid-column:1/-1;
     display:flex;align-items:center;justify-content:center;
     min-height:50px;padding:12px;
@@ -1596,10 +1596,10 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="
     font-size:14px;font-weight:850;
     cursor:pointer;touch-action:manipulation;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-send .os-fu-mobile-next:focus-visible{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-send .os-fu-mobile-next:focus-visible{
     outline:3px solid #18814f;outline-offset:3px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-send .os-fu-mobile-next-note{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-send .os-fu-mobile-next-note{
     grid-column:1/-1;
     margin:0;
     font-size:10.5px;line-height:1.4;
@@ -1612,121 +1612,121 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-actions [data-testid="
    action and expandable context. Desktop keeps its full commercial table. */
 .os-fu-mobile-list{display:none}
 @media(max-width:760px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablecard{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard{
     overflow:visible;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablecard>.table-wrap{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablecard>.table-wrap{
     display:none!important;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-list{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-list{
     display:grid;gap:9px;padding:10px;
     min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item{
     display:grid;gap:0;min-width:0;
     padding:12px;border:1px solid #d9e9de;
     border-radius:14px;background:#fff;
     box-shadow:0 3px 12px #1a41280a;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-main{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-main{
     display:grid;grid-template-columns:minmax(0,1fr) auto;
     align-items:center;gap:10px;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-body{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-body{
     display:flex;flex-direction:column;gap:5px;
     min-width:0;overflow-wrap:anywhere;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-name{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-name{
     color:#193e2b;font-size:14px;font-weight:850;
     line-height:1.25;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-stage{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-stage{
     color:#738879;font-size:10px;line-height:1.35;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-action{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-action{
     color:#215c3d;font-size:11px;line-height:1.35;font-weight:750;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-control{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-control{
     display:flex;justify-content:flex-end;align-items:center;
     max-width:130px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-control .btn{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-control .btn{
     min-height:44px;min-width:110px;padding:10px;
     border-radius:10px;background:#0d754a;
     border:1px solid #0d754a;color:#fff;
     font-size:11px;font-weight:850;line-height:1.25;
     white-space:nowrap;touch-action:manipulation;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-status{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-status{
     max-width:114px;color:#8b7864;
     font-size:10px;text-align:right;font-weight:800;
     overflow-wrap:anywhere;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more{
     margin-top:9px;padding-top:9px;
     border-top:1px solid #e6eee8;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more summary{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more summary{
     display:flex;align-items:center;justify-content:space-between;
     gap:8px;min-height:32px;cursor:pointer;
     color:#32694a;font-size:11px;font-weight:700;
     list-style:none;touch-action:manipulation;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more summary::-webkit-details-marker{display:none}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more summary>span{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more summary::-webkit-details-marker{display:none}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more summary>span{
     font-size:21px;line-height:1;transition:transform .14s;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more[open] summary>span{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more[open] summary>span{
     transform:rotate(180deg);
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more dl{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more dl{
     display:grid;grid-template-columns:minmax(92px,.75fr) minmax(0,1.25fr);
     gap:9px 8px;margin:10px 0;
     font-size:11px;line-height:1.45;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more dt{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more dt{
     color:#7b8e80;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-more dd{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-more dd{
     margin:0;color:#284d36;overflow-wrap:anywhere;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-view{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-view{
     width:100%;min-height:42px;
     background:#eff7f0;border:1px solid #c7dfcc;
     border-radius:10px;color:#206d45;
     font-weight:750;font-size:11px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-empty{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-empty{
     margin:12px 0;color:#6b806f;font-size:12px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid>.os-fu-side{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid>.os-fu-side{
     display:none;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablehead{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablehead{
     gap:10px;padding:13px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tablehead h2{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tablehead h2{
     font-size:14px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tools{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tools{
     display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
     width:100%;gap:8px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tools label{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tools label{
     min-width:0;flex:auto;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tools .input{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tools .input{
     width:100%;max-width:none;min-width:0;
     min-height:40px;font-size:13px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tools .os-fu-search{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tools .os-fu-search{
     grid-column:1/-1;width:100%!important;max-width:none!important;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-tools>[data-testid="fu-take-next"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-tools>[data-testid="fu-take-next"]{
     grid-column:1/-1;min-height:46px;
     font-size:12px;white-space:normal;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-confirmed-receipt{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-confirmed-receipt{
     padding:21px 15px;margin:8px 0 24px;
   }
 }
@@ -1915,254 +1915,254 @@ body[data-executing="true"] .os-fu-lock-note{font-size:11px;opacity:.7}
    Source: approved 1672×941 desktop screenshot.
    These declarations only affect the commercial queue; state/ops remain native.
    ================================================================ */
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]){
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]){
   --page:#f8faf8; --ink:#153b2b; --accent:#076c43;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-workspace>main{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-workspace>main{
   padding-top:24px;gap:10px;
   font-family:"Inter","Manrope",sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-workspace-head{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-workspace-head{
   min-height:64px;margin-bottom:3px;gap:12px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-head-copy h1{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-head-copy h1{
   font-family:"Inter",sans-serif;font-size:clamp(25px,1.85vw,30px);
   font-weight:800;letter-spacing:-.04em;line-height:1.09;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-head-copy p{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-head-copy p{
   font-size:12px;line-height:1.5;color:#718077;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs{
   margin-bottom:9px;border-radius:14px;border-color:#e4eee7;
   box-shadow:0 2px 8px #143f2510;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs button{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs button{
   font-family:"Inter",sans-serif;font-size:10px;font-weight:750;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs button.is-on{background:#006d43}
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) [data-testid="followup-reference-stage-cards"]{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .habita-fu-tabs button.is-on{background:#006d43}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) [data-testid="followup-reference-stage-cards"]{
   gap:9px;margin:0 0 7px;padding-bottom:1px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) [data-testid="followup-reference-stage-cards"] .os-fu-stage{
   min-height:65px;padding:9px 9px;border-radius:12px;
   box-shadow:0 4px 13px #224c3110;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-heading h2{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-heading h2{
   font-family:"Inter",sans-serif;font-size:15px;font-weight:800;letter-spacing:-.035em;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-ready-count{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-ready-count{
   font-size:12px;color:#086d42;font-weight:800;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-tablecard{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-tablecard{
   background:#fff;border:1px solid #e0eae2;border-radius:15px;min-height:640px;
   box-shadow:0 10px 24px #173a2710;overflow:hidden;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-tablehead-fast{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-tablehead-fast{
   padding:14px 15px 9px;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-next{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-next{
   min-height:45px!important;background:#026b43!important;
   border-color:#026b43!important;border-radius:9px!important;
   box-shadow:0 4px 10px #026b4321;font-family:"Inter",sans-serif;font-weight:800!important;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search{position:relative;padding:0 15px 10px}
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search::before{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search{position:relative;padding:0 15px 10px}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search::before{
   content:"⌕";position:absolute;left:28px;top:8px;color:#586e60;font-size:25px;pointer-events:none;line-height:1;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search .os-fu-search{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-compact-search .os-fu-search{
   font-family:"Inter",sans-serif;background:white;border:1px solid #dbe7de;
   border-radius:10px;min-height:40px;font-size:12px;padding-left:42px;
   box-shadow:0 1px 4px #14392705;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced,
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters{
   margin:0 15px 9px;border:1px solid #e6ece6;border-radius:10px;padding:0;background:#fff;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary,
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary{
   display:flex;align-items:center;min-height:39px;gap:9px;
   padding:9px 12px;color:#255c3c;font-family:"Inter",sans-serif;
   font-size:11px;font-weight:750;line-height:1.4;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary::before{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary::before{
   content:"⚲";font-size:16px;line-height:1;margin:0;color:#188557;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary::before{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary::before{
   content:"⇅";font-size:17px;line-height:1;margin:0;color:#188557;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary::after,
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary::after{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced>summary::after,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters>summary::after{
   content:"⌄";margin-left:auto;color:#4d6753;font-size:20px;line-height:1;
 }
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced[open]>summary::after,
-body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters[open]>summary::after{
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-queue-advanced[open]>summary::after,
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has([data-testid="followup-queue-grid"]) .os-fu-table-filters[open]>summary::after{
   transform:rotate(180deg);
 }
 @media(min-width:1231px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{
     grid-template-columns:minmax(0,1.76fr) minmax(478px,1fr)!important;
     gap:12px!important;align-items:start;
   }
 }
 @media(min-width:761px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table{
     width:100%;min-width:805px;table-layout:fixed;border-collapse:separate;border-spacing:0 6px;
     font-family:"Inter","Manrope",sans-serif;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th{
     font-size:9px;font-weight:800;letter-spacing:.035em;line-height:1.3;
     text-align:left;padding:10px 6px!important;color:#647368;
     background:transparent;border:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(1){width:18%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(2){width:15%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(3){width:15%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(4){width:14%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(5){width:11%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(6){width:9%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(7){width:11%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table th:nth-child(8){width:7%}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table td{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(1){width:18%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(2){width:15%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(3){width:15%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(4){width:14%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(5){width:11%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(6){width:9%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(7){width:11%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table th:nth-child(8){width:7%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table td{
     border-top:1px solid transparent;border-bottom:1px solid #e5ece6;
     background:#fff;padding:11px 6px!important;vertical-align:middle;
     line-height:1.35;color:#1c3528;font-size:10.5px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table tr.is-selected td{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table tr.is-selected td{
     background:#eaf7ed;border-color:#47ae70;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table tr.is-selected td:first-child{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table tr.is-selected td:first-child{
     border-left:1px solid #258f51;border-radius:11px 0 0 11px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table tr.is-selected td:last-child{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table tr.is-selected td:last-child{
     border-right:1px solid #258f51;border-radius:0 11px 11px 0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table tbody tr:hover td{background:#f1faf3}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-name strong{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table tbody tr:hover td{background:#f1faf3}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-name strong{
     font-size:12px;font-weight:750;line-height:1.24;color:#183a29;letter-spacing:-.015em;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-name small{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-name small{
     font-size:10px;color:#7d8c80;line-height:1.35;margin-top:3px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-agency-name{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-agency-name{
     display:flex;align-items:center;gap:9px;min-width:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-agency-icon{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-agency-icon{
     display:inline-flex;flex:0 0 33px;align-items:center;justify-content:center;
     width:33px;height:33px;background:#e6f6ea;color:#14764b;border-radius:10px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-agency-icon svg{width:19px;height:19px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-agency-copy{min-width:0;overflow-wrap:anywhere}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-inline-select{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-agency-icon svg{width:19px;height:19px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-agency-copy{min-width:0;overflow-wrap:anywhere}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-inline-select{
     background:#fff;border:1px solid #e0eae2;border-radius:10px;
     font-family:"Inter",sans-serif;font-size:10.5px;line-height:1.3;font-weight:600;
     color:#253f30;min-height:38px;width:100%;min-width:0;max-width:100%;
     padding:7px 17px 7px 8px;text-overflow:ellipsis;box-shadow:0 1px 4px #24452d0a;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table select[data-fu-row-field="situation"]{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table select[data-fu-row-field="situation"]{
     background:#e8f9ec;border-color:#c6ebd0;color:#1e5634;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-inline-wa{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-inline-wa{
     width:37px;height:37px;border-radius:10px;color:#0daa52;
     background:#fff;border:1px solid #d3e7d8;box-shadow:0 2px 5px #143d2512;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-inline-wa svg{width:21px;height:21px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-next-cell b{font-size:11px;font-weight:750}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-table .os-fu-priority{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-inline-wa svg{width:21px;height:21px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-next-cell b{font-size:11px;font-weight:750}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-table .os-fu-priority{
     font-size:10px!important;padding:6px 9px!important;border-radius:99px;
   }
 }
 /* Approved detail pane: 3 action buttons, chips, contextual cards. */
 @media(min-width:761px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-side{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-side{
     position:sticky;top:10px;max-height:calc(100vh - 20px);overflow:auto;
     border:1px solid #e0eae2;border-radius:16px;padding:15px;gap:11px;
     background:#fff;box-shadow:0 10px 27px #183e2a14;
     font-family:"Inter","Manrope",sans-serif;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-back{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-back{
     border:1px solid #dce9df;background:#fff;border-radius:9px;padding:8px 11px;
     width:max-content;color:#244b35;font-size:11px;font-weight:700;cursor:pointer;
     min-height:35px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-back:hover{background:#edf7ef}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-head{display:grid;gap:9px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-product{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-back:hover{background:#edf7ef}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-head{display:grid;gap:9px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-product{
     color:#c7764c;font-size:11px;font-weight:800;letter-spacing:.01em;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-head h2{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-head h2{
     font-size:clamp(23px,2vw,29px);line-height:1.15;color:#133b29;
     letter-spacing:-.045em;font-weight:800;margin:0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-tags{display:flex;flex-wrap:wrap;gap:7px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-tags span{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-tags{display:flex;flex-wrap:wrap;gap:7px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-tags span{
     display:inline-flex;align-items:center;gap:5px;
     padding:7px 11px;border-radius:99px;font-size:10px;font-weight:600;
     color:#205b38;background:#e6f6e9;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-tags b{font-size:9px;font-weight:800;letter-spacing:.01em}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-tags .os-fu-preview-tag-stage{background:#e5f6f8;color:#236c73}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-tags .os-fu-preview-tag-situation{background:#e8f7e9}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-tags b{font-size:9px;font-weight:800;letter-spacing:.01em}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-tags .os-fu-preview-tag-stage{background:#e5f6f8;color:#236c73}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-tags .os-fu-preview-tag-situation{background:#e8f7e9}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions{
     display:grid;grid-template-columns:1.08fr 1fr 1.16fr;gap:8px;margin:2px 0 0;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions>.btn{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions>.btn{
     grid-column:auto;display:flex;align-items:center;justify-content:center;gap:7px;
     border-radius:10px!important;font-size:11px;font-weight:700;line-height:1.25;
     min-height:43px;padding:9px 8px;background:#fbfdfb;border:1px solid #d9e8dd;
     color:#234f34;white-space:nowrap;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions .os-fu-preview-wa{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions .os-fu-preview-wa{
     color:#fff!important;background:#057746!important;border-color:#057746!important;
     box-shadow:0 4px 12px #08784824;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions .os-fu-preview-wa svg{width:18px;height:18px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions .os-fu-preview-edit svg{width:13px;height:13px}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions .os-fu-preview-wa svg{width:18px;height:18px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions .os-fu-preview-edit svg{width:13px;height:13px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card{
     background:#fbfdfb;border:1px solid #dce8de;border-radius:12px;
     padding:12px 14px;gap:6px;box-shadow:0 1px 4px #23452e07;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card h3{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card h3{
     margin:0;color:#1c3929;font-size:11.8px;font-weight:800;line-height:1.35;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card p{
     font-size:11.5px;line-height:1.55;color:#526759;margin:0;font-weight:450;
     overflow-wrap:anywhere;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-contact dl{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-contact dl{
     display:grid;grid-template-columns:minmax(70px,.77fr) minmax(95px,1.1fr) minmax(72px,.73fr) minmax(93px,1fr);
     gap:9px 8px;margin:6px 0 0;font-size:10.5px;align-items:center;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-contact dt{font-size:10px;color:#77877a}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-contact dd{font-size:10.5px;font-weight:650;color:#2f4e39;margin:0;overflow-wrap:anywhere}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-context{background:#f4f8f5}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-said p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-contact dt{font-size:10px;color:#77877a}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-contact dd{font-size:10.5px;font-weight:650;color:#2f4e39;margin:0;overflow-wrap:anywhere}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-context{background:#f4f8f5}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-said p{
     background:#fff;border:1px solid #e2ebe4;border-radius:9px;padding:9px 10px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card.is-action{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card.is-action{
     background:#e8f8eb;border:1px solid #c6e8cb;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card.is-action p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card.is-action p{
     font-size:14px;font-weight:800;color:#16452b;line-height:1.3;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-message-card p,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-notes-card p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-message-card p,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-notes-card p{
     white-space:pre-wrap;background:#fff;border:1px solid #e0ebe2;
     padding:12px;border-radius:10px;font-size:12px;line-height:1.7;
     color:#244733;max-height:none;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-message-card .os-fu-copy-preview{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-message-card .os-fu-copy-preview{
     justify-self:end;padding:7px 10px;font-size:10px;min-height:32px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-rule{background:#f6f9f6}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-side-execute{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-rule{background:#f6f9f6}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-side-execute{
     min-height:46px;padding:12px;border-radius:10px;
     background:#057246;border-color:#057246;font-weight:800;font-size:12px;
   }
 }
 @media(max-width:1230px) and (min-width:761px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-side{position:static;max-height:none}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-queue-grid{grid-template-columns:minmax(0,1fr)!important}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-side{position:static;max-height:none}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-queue-grid{grid-template-columns:minmax(0,1fr)!important}
 }
 /* SCRIPT — common Chapa visual language, no loss of source metadata. */
 .os-script-workspace{
@@ -2223,27 +2223,27 @@ body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-qu
 /* Interaction restoration: preserve the approved Inter/green visual language,
    but let the pre-redesign FINAL five CTA layout work unchanged. */
 @media(min-width:761px){
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions{
     display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions>.btn{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions>.btn{
     grid-column:auto;min-height:43px;padding:9px 12px;
     border:1px solid #d9e8dd;background:#fbfdfb;color:#234f34;
     font:700 11px/1.3 "Inter","Manrope",sans-serif;
     border-radius:10px;display:inline-flex;gap:7px;
     align-items:center;justify-content:center;white-space:normal;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions>.btn:first-child{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions>.btn:first-child{
     grid-column:1/-1;background:#057746!important;border-color:#057746!important;
     color:#fff!important;box-shadow:0 4px 12px #08784824;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-actions>.btn:disabled{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-actions>.btn:disabled{
     opacity:.52;cursor:not-allowed;box-shadow:none;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card>strong{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card>strong{
     display:block;color:#1c3929;font:800 11.8px/1.35 "Inter","Manrope",sans-serif;
   }
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-preview-card.is-action p{
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-preview-card.is-action p{
     font-size:14px;font-weight:800;color:#16452b;
   }
 }
@@ -2268,7 +2268,7 @@ body:is([data-unit="habita"],[data-unit="turnia"]):has([data-testid="followup-qu
 /* ── Resultados en tres lecturas (results-view.js) ─────────────────────────── */
 .rs{--rs-accent:var(--s3);--rs-human:#2a78d6;--rs-bot:#8a5cd6;--rs-ok:var(--s3);--rs-base:var(--grid);--rs-heat:27,175,122;
   display:grid;gap:16px;min-width:0;color:var(--ink)}
-body:is([data-unit="habita"],[data-unit="turnia"]) .rs{--rs-accent:#126b47;--rs-ok:#1baf7a;--rs-heat:18,107,71}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-accent:#126b47;--rs-ok:#1baf7a;--rs-heat:18,107,71}
 .rs-card{background:var(--glass-strong);border:1px solid var(--glass-edge);border-radius:16px;padding:20px;box-shadow:var(--glass-shadow);min-width:0;display:grid;gap:14px}
 .rs-head{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start}
 .rs-head h2{margin:0;font-size:18px;font-weight:800;text-wrap:balance}
@@ -2507,16 +2507,99 @@ body:is([data-unit="habita"],[data-unit="turnia"]) .rs{--rs-accent:#126b47;--rs-
   .os-fu-filters-body[data-open="false"]{display:none}
   .os-fu-executor-bar{margin:2px 12px 10px}
   .os-fu-mobile-item-control{flex-direction:column;align-items:stretch}
-  body:is([data-unit="habita"],[data-unit="turnia"]) .os-fu-mobile-item-control{flex-direction:column;align-items:stretch}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .os-fu-mobile-item-control{flex-direction:column;align-items:stretch}
   .os-fu-executor-chip{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:6px;min-height:22px;padding:0 8px;border-radius:7px;font-size:11px;font-weight:800;background:#e3f2e9;color:#0a5b3b;white-space:nowrap}
   .os-fu-executor-chip[data-executor="facu"]{background:#fbeae0;color:#8a3b1c}
   .os-fu-executor-chip[data-executor="axel"]{background:#dfeff5;color:#12536a}
   /* Header: Chapa Labs + General · Turnia · Habita, y directo a las pestañas
      de la cola (sin la fila repetida ni las herramientas anteriores). */
-  body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-tabs) #tabs,
-  body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-tabs) #legacy-tabs,
-  body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-tabs) .os-sidebar .os-section-label,
-  body:is([data-unit="habita"],[data-unit="turnia"]) .habita-fu-workspace-head{display:none!important}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-tabs) #tabs,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-tabs) #legacy-tabs,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-tabs) .os-sidebar .os-section-label,
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .habita-fu-workspace-head{display:none!important}
   /* La cuenta queda arriba, en el header, y no flota sobre la cola al bajar. */
-  body:is([data-unit="habita"],[data-unit="turnia"]):has(.habita-fu-workspace-head) .top.os-top{position:absolute}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]):has(.habita-fu-workspace-head) .top.os-top{position:absolute}
+}
+
+/* Resultados más visuales y mobile (11/11/2026): mismo contenido e interacción,
+   menos ruido. Las barras ya no cortan texto (el reparto persona / bot y el éxito
+   se leen en el score), el score va primero en el celular y el detalle por día
+   entra en una sola fila. */
+.rs-card{padding:22px;gap:16px;border-radius:18px}
+.rs-head p{font-size:12.5px;line-height:1.5;max-width:64ch}
+.rs-note{background:#fff8e8;border-left-color:#e0a526;color:#6b5420;font-size:12px;border-radius:0 12px 12px 0}
+.rs-funnel{gap:6px}
+.rs-frow{padding:8px 10px}
+.rs-ftrack{height:36px;border-radius:999px;background:#eef3ef}
+.rs-fbar{border-radius:999px}
+.rs-fbar .is-bot,.rs-fbar .is-ok{font-size:0;padding:0}
+.rs-fbar .is-pending{background:#7d8f84}
+.rs-fval strong{font-size:22px;color:var(--ink)}
+.rs-leak{gap:5px;font-size:11px}
+.rs-leak span{padding:2px 9px;background:#fff}
+.rs-days{background:#f6f9f7;border:1px solid #e3ece6;border-radius:14px;padding:10px 6px 6px;margin-top:4px}
+.rs-cols{height:70px}
+.rs-cols i{width:11px;border-radius:4px 4px 1px 1px}
+.rs-score{background:#fff;border-radius:16px;box-shadow:0 2px 10px #21452c0d}
+.rs-score .rs-band{font-weight:800}
+.rs-act{border-radius:14px}
+.rs-heat-cell{border-radius:10px}
+@media(max-width:760px){
+  .rs{gap:12px}
+  .rs-card{padding:16px 14px;gap:12px;border-radius:18px}
+  .rs-head{gap:10px}
+  .rs-head h2{font-size:16px}
+  .rs-head p{font-size:12px}
+  .rs-controls{width:100%;justify-items:stretch}
+  .rs-seg{display:flex;width:100%;box-sizing:border-box}
+  .rs-seg button{flex:1 1 auto;padding:7px 8px}
+  .rs-exec{display:flex;flex-direction:column;gap:12px}
+  .rs-score{order:-1;width:100%;box-sizing:border-box;display:grid;grid-template-columns:92px minmax(0,1fr);column-gap:14px;row-gap:6px;justify-items:start;align-items:center;text-align:left;padding:14px}
+  .rs-score .rs-kicker{grid-column:1/-1}
+  .rs-score svg{grid-row:span 2;width:92px;height:92px}
+  .rs-score dl{grid-column:2;font-size:11.5px;gap:2px 8px}
+  .rs-score .rs-weights{grid-column:1/-1}
+  .rs-frow{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"l v" "t t";gap:6px 10px;padding:8px}
+  .rs-frow>.rs-flabel{grid-area:l;grid-column:auto}
+  .rs-frow>.rs-fval{grid-area:v}
+  .rs-frow>.rs-ftrack{grid-area:t;height:26px}
+  .rs-fval strong{font-size:20px}
+  .rs-fbar span{font-size:11px}
+  .rs-leak{margin:0 8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .rs-leak::-webkit-scrollbar{display:none}
+  .rs-leak span{flex:none}
+  .rs-days{grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;padding:8px 2px 4px}
+  .rs-day{padding:4px 0;font-size:10px}
+  .rs-cols{height:52px;gap:2px}
+  .rs-cols i{width:7px}
+  .rs-day small{font-size:9.5px;white-space:nowrap}
+  .rs-heat{min-width:500px;border-spacing:3px}
+  .rs-heat th:first-child,.rs-heat-lbl{position:sticky;left:0;z-index:1;background:var(--glass-strong,#fff)}
+  .rs-heat td{padding:6px 3px}
+  .rs-heat-cell b{font-size:12px}
+  .rs-act{padding:10px 12px}
+  .rs-inst-grid{grid-template-columns:1fr}
+  /* Resumen general */
+  .ov{gap:14px}
+  .ov-top h1{font-size:22px}
+  .ov-top p{font-size:13px}
+  .ov-card{padding:14px;border-radius:18px}
+  .ov-cols{grid-template-columns:repeat(7,minmax(58px,1fr));overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .ov-cols::-webkit-scrollbar{display:none}
+  .ov-name{overflow-wrap:normal;hyphens:auto;min-height:38px}
+  .ov-bars{height:120px}
+  .ov-kpis{grid-template-columns:1fr}
+  /* Embudo y prospectos de cada producto: las etiquetas arriba de los chips
+     y las tablas anchas se desplazan en vez de aplastarse. */
+  .os-fu-chipbar{gap:8px}
+  .os-fu-chipbar>strong{flex:1 1 100%;padding-top:0}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .hero h1{font-size:26px}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .table-wrap{overflow-x:auto}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .table-wrap>.os-fu-table:not(.os-fu-queue-table){min-width:620px}
+}
+/* Reglas: «Etapas comerciales» en columna no reserva 115 px de alto vacíos. */
+@media(max-width:1520px){.fu-ref-flowrow>.fu-ref-flow-label{flex:0 0 auto}}
+@media(max-width:760px){
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .toolbar{box-sizing:border-box;max-width:100%}
+  body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .toolbar>select.input{flex:1 1 140px;min-width:0;max-width:100%}
 }

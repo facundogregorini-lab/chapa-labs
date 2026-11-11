@@ -29,6 +29,6 @@ test('Native classification detail shows confidence, correct CTA, referral/date 
   assert.match(js,/data-fu="reply-select"/);
   assert.match(js,/data-fu="reply-manual"/);
   assert.match(js,/case 'reply-select':/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-conv-tags/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \[data-testid="followup-inbox"\]/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-fu-conv-tags/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \[data-testid="followup-inbox"\]/);
 });

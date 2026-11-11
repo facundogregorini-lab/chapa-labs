@@ -22,7 +22,7 @@ test('Native Habita 9-step funnel, broken-scale computation and original caption
   assert.match(app,/Math\.log\(n\/limit\)/);
 });
 test('Habita funnel draws hatched orange + dark green, no Turnia bleed',()=>{
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-native-segment\.is-stayed\s*\{\s*background:repeating-linear-gradient/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-native-segment\.is-advanced\s*\{\s*background:#206d4b/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-native-step-label\s*\{\s*text-align:center/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-native-segment\.is-stayed\s*\{\s*background:repeating-linear-gradient/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-native-segment\.is-advanced\s*\{\s*background:#206d4b/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-native-step-label\s*\{\s*text-align:center/);
 });

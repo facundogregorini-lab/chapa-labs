@@ -367,13 +367,16 @@
   function habitaFuChrome(content) {
     // Turnia uses the same workspace chrome (tabs, mobile layout), adapted to
     // its own copy and destinations.
-    const turnia=state.unit==='turnia';
-    const tabs=[
+    const turnia=state.unit==='turnia',general=state.unit==='todas';
+    const tabs=general?[
+      ['resumen','RESUMEN'],['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDOS'],
+      ['prospectos','PROSPECTOS'],['secuencias','REGLAS Y MENSAJES'],['rendimiento','RESULTADOS'],
+    ]:[
       ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
       ['pipeline','EMBUDO'],['secuencias','REGLAS'],
       ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
-    const links=turnia?[
+    const links=general?[]:turnia?[
       ['PANEL DE TURNIA','https://turniasalud.app/panel/prospeccion'],
     ]:[
       ['MI INMOBILIARIA','/panel'],['GALERÍA','/galeria'],
@@ -382,11 +385,11 @@
     ].map(([label,path])=>[label,'https://www.habitaia.app'+path]);
     return `<header class="habita-fu-workspace-head" data-testid="habita-workspace-header">
       <div class="habita-fu-head-copy">
-        <span class="habita-fu-eyebrow">FOLLOW-UP</span>
-        <h1>EJECUCIÓN COMERCIAL</h1>
-        <p>${turnia?'Gestioná el outreach y el seguimiento de todos tus consultorios.':'Gestioná el outreach y el seguimiento de todas tus inmobiliarias.'}</p>
+        <span class="habita-fu-eyebrow">${general?'GENERAL':'FOLLOW-UP'}</span>
+        <h1>${general?'CENTRO COMERCIAL':'EJECUCIÓN COMERCIAL'}</h1>
+        <p>${general?'Turnia y habita. en un solo lugar: la cola, los embudos y los resultados de cada uno.':turnia?'Gestioná el outreach y el seguimiento de todos tus consultorios.':'Gestioná el outreach y el seguimiento de todas tus inmobiliarias.'}</p>
       </div>
-      <nav class="habita-fu-utilities" aria-label="Accesos de ${turnia?'Turnia':'Habita'}">
+      <nav class="habita-fu-utilities" aria-label="Accesos de ${general?'Chapa Labs':turnia?'Turnia':'Habita'}">
         ${links.map(([label,href])=>`<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`).join('')}
       </nav>
     </header>
@@ -413,7 +416,7 @@
       else if (d.error) main.innerHTML = unitError(state.unit, d);
       else main.innerHTML = demoBanner() + readOnlyBanner(state.unit) + ({ hoy: renderToday, adquisicion: renderToday, responder: renderResponder, 'responder-legado': renderResponder, enviar: renderSend, onboarding: renderOnboarding, embudo: renderFunnelView, cuentas: renderAccounts, inmobiliarias: renderAgencies, mensajes: renderMessages, playbook: renderPlaybook }[state.view] || renderToday)(state.unit);
     }
-    if((state.unit==='habita'||state.unit==='turnia')&&(isFu()||state.view==='script')&&!state.demo)
+    if((state.unit==='todas'||(state.unit==='habita'||state.unit==='turnia')&&(isFu()||state.view==='script'))&&!state.demo)
       main.innerHTML=habitaFuChrome(main.innerHTML);
     after();
   }
