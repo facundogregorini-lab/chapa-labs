@@ -51,8 +51,8 @@ test('Mobile cards replace wide queue table without changing filtered data',()=>
   assert.match(app,/data-fu="queue-view"/);
   assert.match(app,/case 'queue-view':/);
   assert.match(css,/@media\(max-width:760px\)/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-fu-tablecard>\.table-wrap\s*\{\s*display:none!important/);
-  assert.match(css,/body\[data-unit="habita"\] \.os-fu-mobile-list\s*\{\s*display:grid/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-tablecard>\.table-wrap\s*\{\s*display:none!important/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.os-fu-mobile-list\s*\{\s*display:grid/);
   assert.match(css,/\.os-fu-mobile-item-control \.btn\s*\{[\s\S]*?min-height:44px/);
 });
 
