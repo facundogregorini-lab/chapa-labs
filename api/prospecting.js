@@ -444,7 +444,7 @@ async function doSetup(req, res, user) {
 // No se duplican instrucciones: el mismo script que lee la extensión de HABITA
 // se lee/escribe en su propio panel. TURNIA no tiene script equivalente aún,
 // por eso se crea uno independiente sin contenido inventado.
-const SCRIPT_TAB = 'Script';
+const SCRIPT_TAB = 'Script Chapa Labs';
 const SCRIPT_HEAD = ['Script', 'Actualizado', 'Por'];
 async function doScript(req,res,user){
   const unit=UNITS[req.method==='GET'?req.query.unit:req.body?.unit];
