@@ -23,6 +23,6 @@ test('Selected chip edits still write normal named checkbox values to FormData',
 test('The native add selector is keyboard-accessible and checked values are visible',()=>{
   assert.match(src,/aria-label="Agregar situación"/);
   assert.match(src,/aria-label="Quitar \$\{esc\(/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-ref-situation-editor/);
-  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\) \.fu-ref-situation-hidden/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.fu-ref-situation-editor/);
+  assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.fu-ref-situation-hidden/);
 });

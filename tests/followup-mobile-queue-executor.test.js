@@ -48,8 +48,16 @@ test('en mobile: un solo «Filtros» que despliega buscar, métricas y orden; si
 });
 
 test('Turnia usa el mismo espacio de trabajo y diseño mobile que habita.', () => {
-  assert.match(app, /if\(\(state\.unit==='habita'\|\|state\.unit==='turnia'\)&&\(isFu\(\)\|\|state\.view==='script'\)&&!state\.demo\)/);
+  assert.match(app, /if\(\(state\.unit==='todas'\|\|\(state\.unit==='habita'\|\|state\.unit==='turnia'\)&&\(isFu\(\)\|\|state\.view==='script'\)\)&&!state\.demo\)/);
   assert.match(app, /Gestioná el outreach y el seguimiento de todos tus consultorios\./);
   assert.doesNotMatch(css, /body\[data-unit="habita"\] /);
-  assert.match(css, /body:is\(\[data-unit="habita"\],\[data-unit="turnia"\]\):has\(\.habita-fu-tabs\) #legacy-tabs/);
+  assert.match(css, /body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\):has\(\.habita-fu-tabs\) #legacy-tabs/);
+});
+
+test('General usa el mismo espacio de trabajo y Resultados se ve primero con el score en mobile', () => {
+  assert.match(app, /\['resumen','RESUMEN'\],\['hoy','COLA DE EJECUCIÓN'\],\['pipeline','EMBUDOS'\]/);
+  assert.match(css, /body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.rs\{/);
+  assert.match(css, /\.rs-score\{order:-1;/);
+  assert.match(css, /\.rs-days\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(css, /\.fu-ref-flowrow>\.fu-ref-flow-label\{flex:0 0 auto\}/);
 });
