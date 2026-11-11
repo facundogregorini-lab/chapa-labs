@@ -79,3 +79,9 @@ test('pearson needs 14 days',()=>{
   const a=Array.from({length:14},(_,i)=>i),b=a.map(x=>x*2+1);
   assert.ok(Math.abs(O.pearson(a,b)-1)<1e-9);
 });
+
+test('«Esta semana» runs from Saturday to today',()=>{
+  assert.deepEqual(O.periodDays('semana','2026-11-11'),['2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
+  assert.deepEqual(O.periodDays('semana','2026-11-07'),['2026-11-07']);
+  assert.equal(O.PERIODS[0][0],'semana');
+});

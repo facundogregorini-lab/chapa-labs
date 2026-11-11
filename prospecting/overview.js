@@ -13,7 +13,7 @@
   else root.ProspectingOverview=api;
 })(typeof self!=='undefined'?self:this,function(){
   'use strict';
-  const PERIODS=[['7','Últimos 7 días'],['14','14 días'],['30','30 días'],['mes','Este mes']];
+  const PERIODS=[['semana','Esta semana'],['7','Últimos 7 días'],['14','14 días'],['30','30 días'],['mes','Este mes']];
   const GRAINS=[['dia','Día'],['semana','Semana']];
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const num=n=>n===null||n===undefined||!Number.isFinite(Number(n))?'—':Number(n)<10&&Number(n)%1?Number(n).toLocaleString('es-AR',{maximumFractionDigits:1}):Math.round(Number(n)).toLocaleString('es-AR');
@@ -26,7 +26,8 @@
   /** The days of a period ending today (YYYY-MM-DD, Buenos Aires), oldest first. */
   function periodDays(key,today){
     const t=new Date(today+'T12:00:00Z');
-    const n=key==='mes'?t.getUTCDate():Number(key)||7;
+    // «Esta semana»: desde el sábado, como las semanas de Follow-up (sábado a viernes).
+    const n=key==='mes'?t.getUTCDate():key==='semana'?((t.getUTCDay()+1)%7)+1:Number(key)||7;
     return Array.from({length:n},(_,i)=>new Date(t.getTime()-(n-1-i)*86400000).toISOString().slice(0,10));
   }
 
@@ -214,7 +215,7 @@
   function render(ctx){
     const view=ctx.view||{};
     const units=ctx.units||[];
-    const days=periodDays(view.period||'7',ctx.today);
+    const days=periodDays(view.period||'semana',ctx.today);
     const pts=quadrantData(units,days);
     const order={exe:0,msg:1,opp:2};
     const todo=pts.filter(p=>p.kind!=='ok').sort((a,b)=>order[a.kind]-order[b.kind]||b.today-a.today).slice(0,5);

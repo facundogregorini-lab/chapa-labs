@@ -50,9 +50,10 @@ test('1 · the queue: pending, executed by a person or a bot, successful, the le
   // Score: 60% × 3/6 + 40% × 1/3 = 43.
   assert.match(html,/class="rs-score-num">43</);
   const week=R.aggregate(R.selectedDays(habita.results.execution.days,{period:'7'}));
-  // The day without a photo adds what was executed, never its pending.
+  // Only days with a photo enter the totals; what was executed on a day without one goes apart.
   assert.equal(week.total.pending,16);
-  assert.equal(week.executed,20);
+  assert.equal(week.executed,11);
+  assert.equal(week.outside,9);
   assert.equal(R.score(R.selectedDays(habita.results.execution.days,{period:'7'}),{wCov:60,wOk:40}).value,Math.round(100*(.6*(11/16)+.4*(4/11))));
   assert.match(R.render('habita',habita,{period:'7'}),/1 día no tiene foto de la cola/);
 });
@@ -131,4 +132,11 @@ test('cohorts come before the actions',()=>{
   const html=R.render('habita',habita,{});
   assert.ok(html.indexOf('data-testid="results-queue"')<html.indexOf('data-testid="results-cohorts"'));
   assert.ok(html.indexOf('data-testid="results-cohorts"')<html.indexOf('data-testid="results-actions"'));
+});
+
+test('«Esta semana» is the default and starts on Saturday, like the Follow-up weeks',()=>{
+  const days=['2026-11-06','2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11'].map(d=>day(d,[t('Saludo',{pending:1,human:1})]));
+  assert.equal(R.defaults({}).period,'semana');
+  assert.deepEqual(R.selectedDays(days,{period:'semana'}).map(d=>d.day),['2026-11-07','2026-11-08','2026-11-09','2026-11-10','2026-11-11']);
+  assert.match(R.render('habita',habita,{}),/aria-pressed="true" data-fu="results-period" data-fu-period="semana"/);
 });
