@@ -199,6 +199,7 @@
   }
   function renderScript(unit){
     if(!['habita','turnia'].includes(unit))return '<section class="card glass">Elegí HABITA o TURNIA.</section>';
+    if(state.demo)return '<section class="card glass"><h2>Script comercial</h2><p>El script operativo se consulta con una sesión real, no en el ejemplo.</p></section>';
     if(!state.scripts[unit]){
       state.scripts[unit]={loading:true};
       if(!state.demo)setTimeout(()=>loadScript(unit,{quiet:true}),0);
@@ -222,7 +223,7 @@
           +(!d.editable||state.demo?' readonly':'')+' placeholder="Todavía no hay script para TURNIA. Añadí aquí los criterios y pasos comerciales aprobados.">'+esc(body)+'</textarea>'
           +'<footer class="os-script-bottom"><div class="os-script-meta"><span data-script-dirty>'+(dirty?'Cambios sin guardar':date?'Guardado el '+esc(date):'Todavía sin guardar')+'</span>'
           +'<span data-script-count>'+int(body.length)+' / 20.000 caracteres</span></div><div class="os-script-actions">'
-          +(dirty?'<button class="btn" type="button" data-script-discard>Descartar</button>':'')
+          +'<button class="btn" type="button" data-script-discard '+(dirty?'':'disabled')+'>Descartar</button>'
           +(d.editable&&!state.demo?'<button class="btn primary" type="submit" '+(!dirty||state.scriptSaving?'disabled':'')+'>'+(state.scriptSaving?'Guardando…':'Guardar script')+'</button>'
             :'<span class="os-script-readonly">Solo lectura · configurá una sesión protegida para editar.</span>')
           +'</div></footer></form>')
@@ -239,6 +240,8 @@
     const note=form?.querySelector('[data-script-dirty]');
     const count=form?.querySelector('[data-script-count]');
     const save=form?.querySelector('button[type="submit"]');
+    const discard=form?.querySelector('[data-script-discard]');
+    if(discard)discard.disabled=!dirty;
     if(note)note.textContent=dirty?'Cambios sin guardar':'Sin cambios';
     if(count)count.textContent=int(body.length)+' / 20.000 caracteres';
     if(save)save.disabled=!dirty||state.scriptSaving;
@@ -248,7 +251,7 @@
     if(!button||!main.contains(button))return;
     const unit=state.unit,src=state.scripts[unit];if(!src)return;
     if(button.hasAttribute('data-script-discard')){state.scriptDrafts[unit]=src.body||'';render();}
-    else if(state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
+    else if(src.error||state.scriptDrafts[unit]===(src.body||''))loadScript(unit);
   });
   document.addEventListener('submit',async(e)=>{
     if(!e.target?.matches?.('[data-script-form]'))return;
