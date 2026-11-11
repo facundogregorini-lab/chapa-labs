@@ -453,9 +453,9 @@ async function doScript(req,res,user){
   try{
     let data;
     if(req.method==='POST'){
-      // El script es política operativa de la extensión: no exponer su edición
-      // en instalaciones sin autenticación protegida.
-      if(session.open())return fail(res,403,'Para editar el script configurá PROSPECTING_PASSWORD en Chapa Labs.');
+      // Misma autorización que las demás acciones comerciales de HABITA:
+      // exige la sesión existente de Chapa, sin pedir otra contraseña.
+      // El endpoint de origen sigue protegido con la credencial servidor-a-servidor.
       const body=req.body?.body;
       if(typeof body!=='string'||body.length>20000)return fail(res,400,'El script debe tener hasta 20.000 caracteres.');
       if(unit.id==='habita'){
@@ -483,7 +483,7 @@ async function doScript(req,res,user){
     return res.status(200).json({
       unit:unit.id,body:String(data?.body||''),updated_at:data?.updated_at||null,
       source:unit.id==='habita'?'habita-original':'turnia-sheet',
-      editable:!session.open(),max_length:20000,
+      editable:true,max_length:20000,
     });
   }catch(err){return fail(res,err.status&&err.status<500?err.status:502,err.message||'No se pudo consultar el script.');}
 }
