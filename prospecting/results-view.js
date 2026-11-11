@@ -234,11 +234,14 @@
     const stages=Array.isArray(cf?.stages)?cf.stages:[];
     const options=Object.entries(COHORTS).filter(([k])=>Array.isArray(cf?.[k]));
     const by=Array.isArray(cf?.[view.cohortBy])?view.cohortBy:'contacto';
-    const rows=Array.isArray(cf?.[by])?cf[by]:[];
+    const all=Array.isArray(cf?.[by])?cf[by]:[];
+    // Las semanas vacías del principio no dicen nada: la tabla arranca en la primera con contactos.
+    const first=all.findIndex(c=>Number(c.size)>0);
+    const rows=first<0?[]:all.slice(first);
     const who=unit==='habita'?'inmobiliarias':'odontólogos';
     return `<section class="rs-card" data-testid="results-cohorts">
       <div class="rs-head"><div><h2><span class="rs-step">3</span>Cohortes</h2>
-        <p>Con las etapas del panel de ${unit==='habita'?'Inmobiliarias':'Odontólogos'}. Cada celda es el porcentaje de la cohorte que llegó a esa etapa: cuanto más oscura, mejor.</p></div>
+        <p>Con las etapas del embudo de Follow-up, desde ${unit==='habita'?'Contactado':'Saludado'}. Cada celda es el porcentaje de la cohorte que llegó a esa etapa: cuanto más oscura, mejor.</p></div>
         ${options.length>1?`<nav class="rs-seg" aria-label="Agrupación de cohortes">${options.map(([k,l])=>`<button type="button" class="${by===k?'is-on':''}" aria-pressed="${by===k}" data-fu="results-cohort" data-fu-cohort="${k}" data-testid="followup-cohort-${k}">${l}</button>`).join('')}</nav>`:''}</div>
       ${stages.length?`<div class="rs-table-scroll"><table class="rs-heat" data-testid="followup-results-cohorts"><thead><tr><th>${by==='version'?'Segmento':'Semana'}</th>${stages.map(s=>`<th>${esc(s.title)}</th>`).join('')}</tr></thead><tbody>
         ${rows.map(c=>`<tr><td class="rs-heat-lbl">${esc(by==='version'?c.cohort:weekLabel(c.cohort))}<small>${num(c.size)} ${who}</small></td>${stages.map((s,i)=>{const n=Number(c.reached?.[i])||0;const r=c.size?n/c.size:0;

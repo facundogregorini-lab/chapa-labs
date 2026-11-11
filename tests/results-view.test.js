@@ -115,3 +115,14 @@ test('without results it says so instead of fabricating numbers',()=>{
   assert.match(R.render('habita',{}),/No se pudieron consultar los resultados/);
   assert.match(R.render('habita',{results:{execution:{available:false,days:[]}}}),/Todavía no se guarda la foto diaria/);
 });
+
+test('cohorts start at the first week with contacts and say which funnel they use',()=>{
+  const cf={stages:[{key:'contactado',title:'Contactado'},{key:'interesado',title:'Interesado'}],
+    contacto:[{cohort:'2026-10-02',size:0,reached:[0,0]},{cohort:'2026-10-09',size:4,reached:[4,1]},{cohort:'2026-10-16',size:0,reached:[0,0]}]};
+  const html=R.render('habita',{results:{execution:{days:[]},windows:{}}},{},{cohorts:cf});
+  assert.doesNotMatch(html,/2 oct/);
+  assert.match(html,/9 oct/);
+  assert.match(html,/16 oct/);
+  assert.match(html,/embudo de Follow-up, desde Contactado/);
+  assert.match(R.render('turnia',{results:{execution:{days:[]}}},{},{cohorts:cf}),/desde Saludado/);
+});
