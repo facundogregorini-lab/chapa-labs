@@ -10,6 +10,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  /** Una fecha cargada (no vacía ni «no»). */
+  const isSet = (v) => Boolean(v) && !/^no$/i.test(String(v).trim());
   const lastName = (name) => String(name || '').trim().split(/\s+/).slice(-1)[0] || '';
   /** Turnia: respondió el saludo (Paso 1). Las fechas son «AAAA-MM-DD HH:MM» de Buenos Aires: se comparan como texto. */
   const respondedGreeting = (a) => Boolean(a.permissionSent || a.replied) || ['respondio', 'interesado'].includes(a.stage)
@@ -238,27 +240,24 @@
       return null;
     },
     // Embudo con metas: la base es por semana; cada paso, la conversión esperada del anterior.
-    // Modelo comercial de Turnia (Programa Fundadores): nadie compra sin una llamada de 15 minutos y el
-    // setup se cobra 100% antes de implementar. Por eso el embudo termina en «setup cobrado»; crear la
-    // cuenta y que opere es posventa (vista Onboarding, con las garantías).
-    // «Respondieron el saludo» (09/11): con la secuencia a la recepción, el Paso 1 busca una respuesta y recién
-    // ahí va el Paso 2. Cuenta la respuesta que leyó la lectura de WhatsApp («Última respuesta» después del
-    // saludo), el estado «Respondió» y el Paso 2 enviado. Las metas de fábrica (20 % y 75 %) dejan igual la
-    // de demos enviadas (15 % de los saludos); se cambian en Embudo.
+    // Los pasos son las etapas de su Follow-up (11/11): Saludado (Contactados), Demo enviada, Demo visitada,
+    // Conversó con Sofi, Cuenta creada, Cuenta activa y Cliente. Cada paso incluye a los siguientes.
+    // «demos_enviadas» es una clave nueva (antes «demos» era el % sobre «Respondieron el saludo»): así una
+    // meta guardada con la definición vieja no se aplica a la nueva.
     // Después del saludo, lo que hicieron en el período las inmobiliarias prospectadas, saludadas cuando sea
     // (/api/metricas de habita, prospeccion.periodo): una demo enviada hoy a una saludada la semana pasada cuenta hoy.
     targets: [
-      { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
-      { key: 'respondieron', label: 'Respondieron el saludo', hint: 'Contestaron el Paso 1 (lo leyó la lectura de WhatsApp o se marcó «Respondió»)', rate: 0.2, sheet: respondedGreeting },
-      { key: 'demos', label: 'Demos enviadas', hint: 'El link: Paso 3 o Seguimiento 1', rate: 0.75, sheet: (a) => a.touches >= 1 },
-      { key: 'visitadas', label: 'Visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
-      { key: 'interaccion', label: 'Hablaron con Sofi', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
-      { key: 'llamadas', label: 'Llamadas agendadas', hint: 'Reunión de 15 minutos («Reunión» en Turnia)', rate: 0.45, sheet: (a) => Boolean(a.meeting) || a.stage === 'reunion' },
-      { key: 'fundadores', label: 'Clientes Fundadores', hint: 'Setup y mes 1 cobrados («Cliente» en Turnia)', rate: 0.5, sheet: (a) => Boolean(a.customer) || a.stage === 'cliente' },
+      { key: 'saludos', label: 'Contactados', hint: 'Les llegó el saludo (Paso 1)', perWeek: 250, sheet: (a) => Boolean(a.greetingSent || a.firstContact) },
+      { key: 'demos_enviadas', label: 'Demos enviadas', hint: 'El link: Paso 3 o Seguimiento 1', rate: 0.15, sheet: (a) => a.touches >= 1 },
+      { key: 'visitadas', label: 'Demos visitadas', hint: 'Abrieron su demo (/p/…)', rate: 0.65, sheet: (a) => Boolean(a.demoOpened || a.demoTried || a.demoClinic) },
+      { key: 'interaccion', label: 'Conversaron con Sofi', hint: 'Conversaron con Sofi en su demo', rate: 0.5, sheet: (a) => Boolean(a.demoChat) },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon su cuenta de Turnia', rate: 0.45, sheet: (a) => isSet(a.accountAt) },
+      { key: 'activas', label: 'Cuentas activas', hint: 'La cuenta ya opera (con turnos)', rate: 0.8, sheet: (a) => isSet(a.accountActive) },
+      { key: 'clientes', label: 'Clientes', hint: 'Setup y mes 1 cobrados («Cliente» en Turnia)', rate: 0.6, sheet: (a) => Boolean(a.customer) || isSet(a.clientAt) || a.stage === 'cliente' },
     ],
     // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`):
     // el Resumen cruza cuánto se ejecutó cada etapa con cuánto convirtió su paso.
-    queueSteps: { 'sin-saludo': 0, 'saludo-sin-demo': 2, 'demo-sin-abrir': 3, 'abrio-sin-conversar': 4, 'converso-sin-cuenta': 5, 'cuenta-sin-actividad': 6, 'activa-sin-pago': 6 },
+    queueSteps: { 'sin-saludo': 0, 'saludo-sin-demo': 1, 'demo-sin-abrir': 2, 'abrio-sin-conversar': 3, 'converso-sin-cuenta': 4, 'cuenta-sin-actividad': 5, 'activa-sin-pago': 6 },
     // Las versiones de su demo personal (/p/<código>), para ver cuál convierte mejor. El corte es el de
     // turniasalud src/lib/demo-version.ts (el deploy de #138, en hora de Argentina): si cambia, cambiar los dos.
     demoVersions: [
@@ -379,16 +378,17 @@
       email_3: { title: 'Paso 3 · Email', hint: 'Último paso.', channel: 'email', subject: '¿Lo dejamos acá?', text: 'Hola {saludo},\n\nÚltimo mail, prometido. ¿Te muestro la demo en 10 minutos o lo dejamos acá?\n\nSaludos,\nhabita.' },
     },
     targets: [
-      { key: 'saludos', label: 'Saludos enviados', perWeek: 250, sheet: (a) => Boolean(a.firstContact) || a.stage !== 'por_contactar' && a.stage !== 'invalido' && a.stage !== 'baja' },
-      { key: 'demos', label: 'Demos enviadas', hint: 'Inmobiliarias prospectadas a las que se les envió la demo en el período', rate: 0.15, metrics: 'prospeccion.periodo.demosEnviadas' },
-      { key: 'visitadas', label: 'Visitadas', hint: 'Entraron a su demo en el período', rate: 0.65, metrics: 'prospeccion.periodo.visitadas' },
-      { key: 'interaccion', label: 'Con interacción', hint: 'Interactuaron con su demo en el período', rate: 0.5, metrics: 'prospeccion.periodo.conInteraccion' },
-      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta en el período', rate: 0.5, metrics: 'prospeccion.periodo.cuentas' },
+      { key: 'saludos', label: 'Contactados', hint: 'Les llegó el primer mensaje', perWeek: 250, sheet: (a) => Boolean(a.firstContact) || a.stage !== 'por_contactar' && a.stage !== 'invalido' && a.stage !== 'baja' },
+      { key: 'interesados', label: 'Interesados', hint: 'Mostraron interés o recibieron la demo en el período', rate: 0.2, metrics: 'prospeccion.periodo.interesados' },
+      { key: 'demos_enviadas', label: 'Demos enviadas', hint: 'Inmobiliarias prospectadas a las que se les envió la demo en el período', rate: 0.75, metrics: 'prospeccion.periodo.demosEnviadas' },
+      { key: 'cuentas_creadas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta en el período', rate: 0.15, metrics: 'prospeccion.periodo.cuentas' },
       { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia en el período', rate: 0.5, metrics: 'prospeccion.periodo.activas' },
-      { key: 'pagos', label: 'Clientes pagos', hint: 'Primer pago aprobado en el período', rate: 0.25, metrics: 'prospeccion.periodo.clientes' },
+      { key: 'pagos', label: 'Clientes', hint: 'Primer pago aprobado en el período', rate: 0.25, metrics: 'prospeccion.periodo.clientes' },
     ],
     // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`).
-    queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 1, 'sin-enviar': 1, 'no-abrio': 2, 'sin-interaccion': 3, 'sin-cuenta': 4, 'sin-uso': 5, 'sin-suscripcion': 6 },
+    // Los pasos son las etapas de su Follow-up (11/11): Contactado, Interesado, Demo enviada, Cuenta creada,
+    // Cuenta activa y Cliente. «demos_enviadas» y «cuentas_creadas» son claves nuevas: su % cambió de base.
+    queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 2, 'sin-enviar': 2, 'no-abrio': 3, 'sin-interaccion': 3, 'sin-cuenta': 3, 'sin-uso': 4, 'sin-suscripcion': 5 },
     product: [
       { label: 'Demos publicadas', path: 'demos.publicadas' },
       { label: 'Vinculadas', path: 'prospeccion.vinculados', hint: 'Crearon o reclamaron su cuenta' },

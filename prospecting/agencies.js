@@ -222,17 +222,18 @@
     stageTab: { prospect: 'Por contactar', contacted: 'Saludados', demo_sent: 'Demo enviada', interacted: 'Interactuaron', call: 'Llamada agendada', client: 'Clientes', closed: 'Cerrados' },
     stageParam: { prospect: 'por-contactar', contacted: 'saludados', demo_sent: 'demo-enviada', interacted: 'interactuaron', call: 'llamada', client: 'clientes', closed: 'cerrados' },
     // Los mismos pasos y definiciones que el «Embudo contra la meta» (units.js → targets): empieza en el saludo.
-    steps: ['Saludos enviados', 'Respondieron el saludo', 'Demos enviadas', 'Abrieron la demo', 'Hablaron con Sofi', 'Llamada agendada', 'Clientes Fundadores'],
-    stepLabel: ['Saludado', 'Respondió', 'Enviada', 'La abrió', 'Habló con Sofi', 'Llamada', 'Cliente'],
-    stayed: ['No respondieron el saludo', 'Respondieron, sin la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin llamada', 'Llamada sin cierre'],
-    ofPrevious: ['', 'de los saludados', 'de los que respondieron', 'de las enviadas', 'de las que la abrieron', 'de las que hablaron con Sofi', 'de las llamadas'],
+    steps: ['Contactados', 'Demos enviadas', 'Demos visitadas', 'Conversaron con Sofi', 'Cuentas creadas', 'Cuentas activas', 'Clientes'],
+    stepLabel: ['Saludado', 'Enviada', 'La abrió', 'Habló con Sofi', 'Cuenta creada', 'Cuenta activa', 'Cliente'],
+    stayed: ['Saludados, sin la demo', 'No la abrieron', 'La abrieron, sin hablar con Sofi', 'Hablaron con Sofi, sin cuenta', 'Cuenta creada, sin operar', 'Cuenta activa, sin cobrar'],
+    ofPrevious: ['', 'de los contactados', 'de las enviadas', 'de las que la abrieron', 'de los que hablaron con Sofi', 'de las cuentas creadas', 'de las cuentas activas'],
     lastNote: 'Setup y mes 1 cobrados', periodBy: 'Primer contacto', withDemoTab: 'Contactados', accountLabel: { active: 'Activa', registered: 'Creada', none: 'Sin cuenta' }, accountTitle: 'Cuenta Turnia', accountActive: 'Activa (con turnos)',
-    note: 'Los mismos pasos que el Embudo contra la meta: «Respondieron el saludo» es que contestaron el Paso 1 (lo leyó la lectura de WhatsApp o se marcó «Respondió»). Quien ya recibió la demo también cuenta, y hasta el 09/11 la demo salía sin esperar respuesta: para ver la secuencia nueva, filtrá desde el 09/11; «Abrieron la demo» es que entraron a su /p/… (o la empezaron); «Hablaron con Sofi», que le escribieron o le hablaron (no alcanza con tocar «Probar la demo» o la esfera). Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
+    note: 'Los mismos pasos que el Embudo contra la meta y que las etapas del Follow-up: «Contactados» es que les llegó el saludo; «Demos visitadas», que entraron a su /p/… (o la empezaron); «Conversaron con Sofi», que le escribieron o le hablaron (no alcanza con tocar la esfera); «Cuentas activas», que su cuenta ya opera, y «Clientes», setup y mes 1 cobrados. Cada paso incluye a los siguientes. Los fijos sin respuesta no cuentan, como en el panel de Turnia.',
   };
 
   /** «AAAA-MM-DD HH:mm» (hora de Buenos Aires, como las guarda el panel) a ISO. */
   const iso = (v) => (v && /^\d{4}-\d{2}-\d{2}/.test(v) ? new Date(`${v.slice(0, 10)}T${(v.slice(11, 16) || '12:00')}:00-03:00`).toISOString() : null);
   const isDate = (v) => Boolean(v && v !== 'sí');
+  const isSet = (v) => Boolean(v) && !/^no$/i.test(String(v).trim());
 
   /**
    * Turnia: las filas desde sus cuentas. El paso de su demo (0 armada … 5 cliente) y la etapa sale de los
@@ -242,15 +243,16 @@
     return accounts.filter((a) => !counted || counted(a)).map((a) => {
       // Las mismas definiciones que los pasos del Embudo (units.js → targets de Turnia).
       const greeted = Boolean(a.greetingSent || a.firstContact);
-      const replied = Boolean(a.permissionSent || a.replied || ['respondio', 'interesado'].includes(a.stage) || (a.lastReply && a.lastReply > (a.greetingSent || a.firstContact || '')));
       const sent = (a.touches || 0) >= 1;
       const opened = Boolean(a.demoOpened || a.demoTried || a.demoClinic || a.demoChat);
       const chat = Boolean(a.demoChat);
       const call = Boolean(a.meeting) || a.stage === 'reunion';
-      const client = Boolean(a.customer) || a.stage === 'cliente';
+      const account = isSet(a.accountAt);
+      const active = isSet(a.accountActive);
+      const client = Boolean(a.customer) || isSet(a.clientAt) || a.stage === 'cliente';
       // El paso es el más alto que cumple, con las funciones de los pasos del Embudo contra la meta
       // (units.js → targets): así los dos cuentan exactamente lo mismo. -1: todavía no se le escribió.
-      let step = client ? 6 : call ? 5 : chat ? 4 : opened ? 3 : sent ? 2 : replied ? 1 : greeted ? 0 : -1;
+      let step = client ? 6 : active ? 5 : account ? 4 : chat ? 3 : opened ? 2 : sent ? 1 : greeted ? 0 : -1;
       if (targets && targets.length) { step = -1; targets.forEach((t, i) => { if (t.sheet && t.sheet(a)) step = i; }); }
       const isClosed = closed ? closed(a) : false;
       const stage = client ? 'client' : isClosed ? 'closed' : call ? 'call' : chat || opened || a.replied ? 'interacted' : sent ? 'demo_sent' : a.greetingSent || a.firstContact ? 'contacted' : 'prospect';

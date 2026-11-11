@@ -277,17 +277,17 @@ test('el mismo envío confirmado dos veces seguidas se registra una sola vez', a
 
 test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por su API', async () => {
   process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
-  const rates = { demos: 0.2, visitadas: 0.6, interaccion: 0.4, cuentas: 0.5, activas: 0.5, pagos: 0.3 };
-  const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates: { ...rates, demos: 2 } } });
+  const rates = { interesados: 0.25, demos_enviadas: 0.2, cuentas_creadas: 0.5, activas: 0.5, pagos: 0.3 };
+  const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates: { ...rates, demos_enviadas: 2 } } });
   assert.equal(bad.statusCode, 400);
   const ok = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates } });
   assert.equal(ok.statusCode, 200, JSON.stringify(ok.body));
   assert.equal(book.tabs.Metas[1][0], 'saludos_por_semana');
   assert.equal(book.tabs.Metas[1][1], 300);
-  assert.deepEqual(book.tabs.Metas.find((r) => r[0] === 'demos').slice(0, 2), ['demos', 20]);
+  assert.deepEqual(book.tabs.Metas.find((r) => r[0] === 'demos_enviadas').slice(0, 2), ['demos_enviadas', 20]);
   const data = await call('data', { query: { unit: 'habita' }, cookie });
   assert.equal(data.body.targets.perWeek, 300);
-  assert.equal(data.body.targets.rates.demos, 0.2);
+  assert.equal(data.body.targets.rates.demos_enviadas, 0.2);
 
   process.env.TURNIA_PROSPECTING_SHEET_ID = 'sheet-turnia';
   process.env.TURNIA_METRICS_SECRET = 's'.repeat(40);
@@ -299,10 +299,10 @@ test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por
     return { ok: true, status: 200, json: async () => ({ templates: [], clinics: [], weeklyGoal: 320, funnelRates: { llamadas: 0.6 } }) };
   };
   try {
-    const t = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 320, rates: { respondieron: 0.2, demos: 0.75, visitadas: 0.65, interaccion: 0.5, llamadas: 0.6, fundadores: 0.5 } } });
+    const t = await call('targets', { method: 'POST', cookie, body: { unit: 'turnia', perWeek: 320, rates: { demos_enviadas: 0.15, visitadas: 0.65, interaccion: 0.5, cuentas: 0.6, activas: 0.8, clientes: 0.6 } } });
     assert.equal(t.statusCode, 200, JSON.stringify(t.body));
     assert.equal(sent.funnel.perWeek, 320);
-    assert.equal(sent.funnel.rates.llamadas, 0.6);
+    assert.equal(sent.funnel.rates.cuentas, 0.6);
     const d = await call('data', { query: { unit: 'turnia' }, cookie });
     assert.deepEqual(d.body.targets, { perWeek: 320, rates: { llamadas: 0.6 } });
   } finally {

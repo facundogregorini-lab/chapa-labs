@@ -251,28 +251,32 @@ El id es lo que va entre `/d/` y `/edit` en el link de la planilla. Va en Vercel
 
 En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (se escala al período; en «Histórico», desde el primer contacto). Cada paso tiene la conversión esperada sobre el anterior. Cada unidad tiene el suyo, según cómo vende:
 
-**Turnia** (Programa Fundadores: nadie compra sin una llamada de 15 minutos y el setup se cobra 100% antes de implementar, `src/content/precios.ts`). El embudo termina en el cobro; crear la cuenta y que opere es posventa.
+**Los pasos son las etapas del Follow-up de cada unidad (11/11/2026)**, para que el Resumen, el Embudo y la cola cuenten lo mismo. Cada paso incluye a los siguientes.
 
-| Paso | Meta | De dónde sale |
+**Turnia** (etapas: Saludado, Demo enviada, Demo visitada, Conversó con Sofi, Cuenta creada, Cuenta activa, Cliente).
+
+| Paso | Meta (clave) | De dónde sale |
 | --- | --- | --- |
-| Saludos enviados | 250 por semana | Planilla: saludo o primer contacto |
-| Demos enviadas | 15% | Planilla: al menos un mensaje con la demo |
-| Visitadas | 65% | Planilla: abrieron su demo (`/p/…`) |
-| Hablaron con Sofi | 50% | Planilla: conversaron con Sofi en su demo |
-| Llamadas agendadas | 45% | Planilla: «Reunión» (15 minutos) |
-| Clientes Fundadores | 50% | Planilla: «Cliente» = setup y mes 1 cobrados |
+| Contactados | 250 por semana (`saludos`) | Planilla: saludo o primer contacto |
+| Demos enviadas | 15% (`demos_enviadas`) | Planilla: al menos un mensaje con la demo |
+| Demos visitadas | 65% (`visitadas`) | Planilla: abrieron su demo (`/p/…`) |
+| Conversaron con Sofi | 50% (`interaccion`) | Planilla: conversaron con Sofi en su demo |
+| Cuentas creadas | 45% (`cuentas`) | Planilla: «Cuenta creada» |
+| Cuentas activas | 80% (`activas`) | Planilla: «Cuenta activa» |
+| Clientes | 60% (`clientes`) | Planilla: «Cliente» / «Cliente desde» = setup y mes 1 cobrados |
 
-**habita.** (alta autogestionada con créditos de regalo: crear la cuenta sí es parte del embudo).
+**habita.** (etapas: Contactado, Interesado, Demo enviada, Cuenta creada, Cuenta activa, Cliente).
 
-| Paso | Meta | De dónde sale |
+| Paso | Meta (clave) | De dónde sale |
 | --- | --- | --- |
-| Saludos enviados | 250 por semana | Planilla: «Enviado» |
-| Demos enviadas | 15% | App: demos publicadas de las cuentas prospectadas |
-| Visitadas | 65% | App: entraron a su demo |
-| Con interacción | 50% | App: interactuaron con su demo |
-| Cuentas creadas | 50% | App: crearon o reclamaron su cuenta |
-| Cuentas activas | 50% | App: primera ambientación propia |
-| Clientes pagos | 25% | App: primer pago aprobado |
+| Contactados | 250 por semana (`saludos`) | Planilla: «Enviado» |
+| Interesados | 20% (`interesados`) | App: mostraron interés o recibieron la demo en el período (`prospeccion.periodo.interesados`) |
+| Demos enviadas | 75% (`demos_enviadas`) | App: demos enviadas a las cuentas prospectadas |
+| Cuentas creadas | 15% (`cuentas_creadas`) | App: crearon o reclamaron su cuenta |
+| Cuentas activas | 50% (`activas`) | App: primera ambientación propia |
+| Clientes | 25% (`pagos`) | App: primer pago aprobado |
+
+Las claves cuyo % cambió de base son nuevas (`demos_enviadas`, `cuentas_creadas`): una meta guardada con la definición anterior no se aplica a la nueva. Visitas e interacción con la demo de habita. siguen en Embudos (funnel de demos) y en Inmobiliarias.
 
 **Metas ajustables:** en el Embudo, «Editar metas» cambia los saludos por semana y el % de cada paso. Son del equipo (las ve todo el que abre el panel) y se guardan donde vive cada unidad: **Turnia**, en su configuración por su API (los saludos por semana son la misma meta semanal de su panel, `outreach_weekly_goal`; los % en `outreach_funnel_rates`); **habita.**, en la pestaña «Metas» de su planilla (se puede editar ahí también: el % como «45» o «45%»). «Volver a las de fábrica» vuelve a las de `units.js`.
 
