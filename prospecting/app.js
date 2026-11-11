@@ -530,7 +530,7 @@
 
   // ─── Resumen general (todas las unidades) ───────────────────
   // ── Resumen general (overview.js): cada embudo contra su meta, la ejecución de su cola y el cruce ──
-  const ovState = () => state.ov || (state.ov = { view: { period: '7', grain: 'dia', step: { habita: 1, turnia: 1 } }, metrics: null, metricsKey: null, loading: false });
+  const ovState = () => state.ov || (state.ov = { view: { period: 'semana', grain: 'dia', step: { habita: 1, turnia: 1 } }, metrics: null, metricsKey: null, loading: false });
   function ovRange() {
     const days = window.ProspectingOverview.periodDays(ovState().view.period, C.today());
     return { from: days[0], to: days[days.length - 1] };
@@ -3643,7 +3643,7 @@
 }
 
   function fuResultsView(){
-    return window.ProspectingResults.defaults(state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto',period:'7'}));
+    return window.ProspectingResults.defaults(state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto',period:'semana'}));
   }
   /** Las cohortes con las etapas del panel: habita. las manda calculadas; Turnia, desde sus cuentas (Odontólogos). */
   function fuResultsCohorts(id,snap){
