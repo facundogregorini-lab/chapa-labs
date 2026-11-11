@@ -558,47 +558,44 @@
   // ─── Resumen general (todas las unidades) ───────────────────
   // ── Resumen general (overview.js): cada embudo contra su meta, la ejecución de su cola y el cruce ──
   const ovState = () => state.ov || (state.ov = { view: { period: 'semana', grain: 'dia', step: { habita: 1, turnia: 1 }, evoWeeks: 4, evoSel: {} }, metrics: null, metricsKey: null, loading: false,
-    evo: { metrics: null, key: null, loading: false }, evoCache: {} });
-  /** Las métricas por día de las últimas 12 semanas (Evolución semanal): una sola vez, después de la cola y del período. */
+    evo: { weeks: {}, loading: false }, evoCache: {} });
+  /** Las métricas de cada semana de la Evolución semanal: un pedido por semana (el mismo período que usa
+   *  el embudo contra la meta), de a uno, después de la cola y del período. Las semanas cerradas quedan guardadas. */
+  const evoWeeksOf = (n) => window.ProspectingOverview.buckets(window.ProspectingOverview.evoDays(C.today(), n), 'semana')
+    .map((b) => ({ key: b.key, label: b.label, from: b.days[0], to: b.days[b.days.length - 1] }));
   async function evoLoad() {
     const o = ovState();
     if (o.loading || o.evo.loading || state.demo || !state.session || !state.session.user || state.fu.loading) return;
-    const days = window.ProspectingOverview.evoDays(C.today(), 12);
-    const key = `${days[0]}:${days[days.length - 1]}`;
-    if (o.evo.key === key) return;
+    const missing = evoWeeksOf(o.view.evoWeeks).reverse().filter((w) => !o.evo.weeks[`${w.from}:${w.to}`]);
+    if (!missing.length) return;
     o.evo.loading = true;
     try {
-      try { o.evo.metrics = await (await fetch(`/api/metricas?desde=${days[0]}&hasta=${days[days.length - 1]}`)).json(); }
-      catch { o.evo.metrics = { projects: {}, errors: { all: 'Sin conexión' } }; }
-      o.evo.key = key;
+      for (const w of missing) {
+        let m;
+        try { m = await (await fetch(`/api/metricas?desde=${w.from}&hasta=${w.to}`)).json(); }
+        catch { m = { projects: {}, errors: { all: 'Sin conexión' } }; }
+        o.evo.weeks[`${w.from}:${w.to}`] = m;
+        if (state.unit === 'todas' && state.view === 'resumen') render();
+      }
     } finally { o.evo.loading = false; }
     if (state.unit === 'todas' && state.view === 'resumen') render();
   }
-  /** Cada semana (lunes a domingo) con la misma cuenta del embudo contra la meta, día por día y sumada. */
+  /** Cada semana (lunes a domingo, hasta hoy) con la misma cuenta del embudo contra la meta de ese período. */
   function ovWeekly(u, d) {
     const o = ovState();
-    const OV = window.ProspectingOverview;
-    const project = o.evo.metrics && o.evo.metrics.projects ? o.evo.metrics.projects[u.metricsKey] : null;
-    const sig = `${o.evo.key}|${o.view.evoWeeks}|${C.today()}`;
-    const hit = o.evoCache[u.id];
-    if (hit && hit.sig === sig && hit.accounts === d.accounts && hit.project === project) return hit.weekly;
-    const perDay = new Map(((project && project.prospeccion && project.prospeccion.porDia) || []).map((x) => [x.date, x]));
     const today = C.today();
-    const weekly = OV.buckets(OV.evoDays(today, o.view.evoWeeks), 'semana').map((b) => {
-      const perStep = b.days.map((date) => {
-        const row = perDay.get(date);
-        const tf = C.targetFunnel(d.accounts, u, { range: { from: date, to: date }, metrics: row ? { prospeccion: row } : null });
-        return tf ? tf.steps.map((x) => x.actual) : [];
-      });
-      const steps = (u.targets || []).map((_, k) => {
-        const known = perStep.map((v) => v[k]).filter((v) => v != null);
-        return known.length ? known.reduce((a, x) => a + x, 0) : null;
-      });
-      const end = new Date(b.key + 'T12:00:00Z');
-      return { key: b.key, label: b.label, short: end.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', timeZone: 'UTC' }), partial: b.key > today, steps };
+    return evoWeeksOf(o.view.evoWeeks).map((w) => {
+      const m = o.evo.weeks[`${w.from}:${w.to}`];
+      const project = m && m.projects ? m.projects[u.metricsKey] || null : null;
+      const ck = `${u.id}|${w.from}:${w.to}`;
+      let hit = o.evoCache[ck];
+      if (!hit || hit.accounts !== d.accounts || hit.project !== project) {
+        const tf = C.targetFunnel(d.accounts, u, { range: { from: w.from, to: w.to }, metrics: project });
+        hit = o.evoCache[ck] = { accounts: d.accounts, project, steps: tf ? tf.steps.map((x) => x.actual) : [] };
+      }
+      const end = new Date(w.key + 'T12:00:00Z');
+      return { key: w.key, label: w.label, short: end.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', timeZone: 'UTC' }), partial: w.key > today, steps: (u.targets || []).map((_, k) => hit.steps[k] ?? null) };
     });
-    o.evoCache[u.id] = { sig, accounts: d.accounts, project, weekly };
-    return weekly;
   }
   function ovRange() {
     const days = window.ProspectingOverview.periodDays(ovState().view.period, C.today());
@@ -3978,7 +3975,7 @@
         ovState().view.grain = ds.fuGrain; render(); break;
       }
       case 'ov-evo-weeks': {
-        ovState().view.evoWeeks = Number(ds.fuWeeks) || 4; render(); break;
+        ovState().view.evoWeeks = Number(ds.fuWeeks) || 4; render(); evoLoad(); break;
       }
       case 'ov-evo-step': {
         const v = ovState().view, id = ds.fuUnitId, k = ds.fuEvoStep;

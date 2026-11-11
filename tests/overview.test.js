@@ -132,4 +132,7 @@ test('weekly evolution: Mon–Sun weeks, separate cards per product, before the 
   assert.equal(segs.length,1);assert.equal(segs[0].to,3);
   const app=read('prospecting/app.js');
   for(const op of ['ov-evo-weeks','ov-evo-step'])assert.match(app,new RegExp(`case '${op}'`));
+  // Cada semana con las métricas de esa semana (como el embudo), no con el detalle por día.
+  assert.match(app,/metricas\?desde=\$\{w\.from\}&hasta=\$\{w\.to\}/);
+  assert.match(app,/targetFunnel\(d\.accounts, u, \{ range: \{ from: w\.from, to: w\.to \}, metrics: project \}\)/);
 });
