@@ -128,7 +128,7 @@
     const reasons=Array.isArray(snap?.results?.blocks)?snap.results.blocks:[];
     return `<section class="rs-card" data-testid="results-queue">
       <div class="rs-head"><div><h2><span class="rs-step">1</span>¿Se ejecutó la cola?</h2>
-        <p>Todas las acciones que estuvieron pendientes en el período: cuántas se ejecutaron, quién las hizo y cuántas tuvieron conversión. Tocá una barra para ver los tipos de acción.</p></div>
+        <p>Lo que la cola le asignó a cada día (los saludos, hasta el cupo diario): cuántas se ejecutaron, quién las hizo y cuántas tuvieron conversión. Tocá una barra para ver los tipos de acción.</p></div>
         <div class="rs-controls"><nav class="rs-seg" aria-label="Período">${Object.entries(PERIODS).map(([k,l])=>`<button type="button" class="${view.period===k&&!view.day?'is-on':''}" aria-pressed="${view.period===k&&!view.day}" data-fu="results-period" data-fu-period="${k}" data-testid="results-period-${k}">${l}</button>`).join('')}</nav>
         ${view.period==='custom'?`<div class="rs-dates"><label>Desde <input type="date" class="input" data-fu-results-date="from" value="${esc(view.from||days[0]?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label><label>hasta <input type="date" class="input" data-fu-results-date="to" value="${esc(view.to||days.at(-1)?.day||'')}" min="${esc(days[0]?.day||'')}" max="${esc(days.at(-1)?.day||'')}"></label></div>`:''}
         </div></div>
@@ -140,7 +140,7 @@
             <span class="rs-flabel"><b>${title}</b><small>${sub}</small></span>
             <span class="rs-ftrack"><span class="rs-fbar" style="width:${width}%">${inner}</span></span>
             <span class="rs-fval"><strong>${value}</strong><small>${esc(hint)}</small></span></button>
-            ${key==='executed'&&a.captured?`<div class="rs-leak"><span>Sin ejecutar <b>${num(Math.max(0,t.pending-a.executed))}</b></span><span>bloqueadas ${num(t.blocked)}</span><span>sin tomar ${num(t.unclaimed)}</span><span>no salieron ${num(t.failed)}</span><span class="rs-muted">reprogramadas a propósito ${num(t.scheduled)} (no cuentan)</span></div>`:''}
+            ${key==='executed'&&a.captured?`<div class="rs-leak"><span>Sin ejecutar <b>${num(Math.max(0,t.pending-a.executed))}</b></span><span>bloqueadas ${num(t.blocked)}</span><span>sin tomar ${num(t.unclaimed)}</span><span>no salieron ${num(t.failed)}</span><span class="rs-muted" title="Saludos fuera del cupo diario, programadas para otro día y las que esperan que la persona conteste">para otro día ${num(t.scheduled)} (no cuentan)</span></div>`:''}
             ${view.open===key?`<div class="rs-open" data-testid="results-open-${key}"><h3>${BARS[key]} por tipo de acción</h3>${breakdown(key,a,stageTitle)}</div>`:''}`).join('')}
           ${chart?`<div class="rs-days" aria-label="Detalle por día">${shown.map(d=>{const x=aggregate([d]);const s=score([d],view);const [,c]=band(s?s.value:null);
             return `<button type="button" class="rs-day ${view.day===d.day?'is-on':''}" aria-pressed="${view.day===d.day}" data-fu="results-day" data-fu-day="${esc(d.day)}" title="${esc(dayLabel(d.day))}: ${num(x.total.pending)} pendientes, ${num(x.executed)} ejecutadas">
