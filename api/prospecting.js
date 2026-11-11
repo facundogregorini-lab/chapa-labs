@@ -502,7 +502,7 @@ async function doFollowup(req, res) {
   await Promise.all(want.map(async (unit) => {
     if (!unit.api || !apiOf(unit)) { out[unit.id] = { error: `Falta la clave de la API de ${unit.name} (${(unit.api && unit.api.secretEnvs || []).join(' o ')}).` }; return; }
     try {
-      const chartParams=unit.id==='habita'?{
+      const chartParams=unit.id==='habita'||unit.id==='turnia'?{
         periodo: ['hoy','7','30','mes','todo'].includes(req.query.periodo)?req.query.periodo:'todo',
         ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.desde||'')?{desde:req.query.desde}:{}),
         ...(/^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta||'')?{hasta:req.query.hasta}:{}),

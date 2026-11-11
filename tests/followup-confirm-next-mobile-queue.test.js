@@ -173,14 +173,14 @@ test('Funnel review lists agencies under chart, editable commercial stage and in
   assert.ok(start>0 && end>start);
   const fn=app.slice(start,end);
   assert.match(fn,/snap\.labels\?\.situations/);
-  assert.match(fn,/F\.commercialStages\('habita',snap\)/);
+  assert.match(fn,/F\.commercialStages\(unit,snap\)/);
   assert.match(fn,/chart\[x\.step\]\?\.label/);
   assert.match(fn,/data-fu-funnel-review/);
   assert.match(fn,/data-fu-review-id/);
   assert.match(fn,/Etapa comercial<select name="etapa"/);
   assert.match(fn,/Situación<select name="situacion"/);
   assert.match(fn,/https:\/\/web\.whatsapp\.com\/send\?phone=/);
-  assert.match(app,/fuFunnelReviewList\(snap,rows,focus,chart\)/);
+  assert.match(app,/fuFunnelReviewList\(snap,rows,focus,chart,unit\)/);
   assert.match(app,/data-fu="funnel-review-more"/);
   assert.match(css,/\.os-fu-funnel-review-item>form/);
 });
@@ -238,4 +238,13 @@ test('Desktop preview shows next action, WhatsApp message and actual version not
   assert.ok(action>=0&&message>action&&observations>message&&contact>observations);
   assert.match(body,/const observations=\[x\.situationNote,version\?\.notes\]/);
   assert.match(body,/esc\(observations\|\|'Sin observaciones registradas\.'/);
+});
+
+test('Turnia shows the same «Funnel comercial» as habita. once its API sends the chart, with its own words',()=>{
+  assert.match(app,/if\(scope==='turnia'&&Array\.isArray\(snap\.chart\)&&Array\.isArray\(snap\.lostAt\)&&Array\.isArray\(snap\.chartRows\)\)return fuNativeChart\(snap,'turnia'\)/);
+  assert.match(app,/'Visitaron, sin conversar'/);
+  assert.match(app,/data-fu-review-unit=/);
+  assert.match(app,/form\.dataset\.fuReviewUnit==='turnia'\?'turnia':'habita'/);
+  const api=fs.readFileSync(path.join(__dirname,'../api/prospecting.js'),'utf8');
+  assert.match(api,/unit\.id==='habita'\|\|unit\.id==='turnia'\?\{/);
 });
