@@ -258,3 +258,13 @@ test('Turnia shows the same «Funnel comercial» as habita. once its API sends t
   const api=fs.readFileSync(path.join(__dirname,'../api/prospecting.js'),'utf8');
   assert.match(api,/unit\.id==='habita'\|\|unit\.id==='turnia'\?\{/);
 });
+
+test('A task still being reserved can be left: «Volver» cancels and the late claim is released',()=>{
+  const claim=app.slice(app.indexOf('  async function fuClaim(it'),app.indexOf('  function fuNextCandidate'));
+  assert.match(claim,/const opening = state\.fu\.task;/);
+  assert.match(claim,/if \(state\.fu\.task !== opening\) \{\s*if \(r\) fuBackground\(it\.unit, \{ op: 'release', inmobiliaria: it\.id \}\);/);
+  assert.doesNotMatch(claim,/state\.fu\.busy = true/);
+  assert.match(app,/data-fu="back" data-testid="fu-opening-back"/);
+  assert.match(app,/if\(task\?\.mode==='abriendo'\)\{state\.fu\.task=null;render\(\);break;\}/);
+  assert.match(app,/Está tardando más de lo normal/);
+});

@@ -2761,3 +2761,6 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
 .os-fu-opening-bar:nth-child(2){height:40px}
 @keyframes os-fu-opening{to{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.os-fu-opening-bar{animation:none}}
+.os-fu-opening .os-fu-opening-slow{margin:0;font-size:12px;color:#7a5a17;opacity:0;animation:os-fu-slow .2s ease 4s forwards}
+@keyframes os-fu-slow{to{opacity:1}}
+@media(prefers-reduced-motion:reduce){.os-fu-opening .os-fu-opening-slow{animation-duration:0s}}
