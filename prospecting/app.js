@@ -2615,6 +2615,7 @@
       state.fu.raw = { ...response, units: combined };
       state.fu.n = F.normalize(combined);
       state.fu.at = now;
+      void fuCommentIndexLoad();
       state.fu.error = scope !== 'todas' && !state.fu.n.units[scope]
         ? state.fu.n.errors[scope] || 'No se pudo actualizar este negocio.' : null;
     } catch (err) {
@@ -2633,12 +2634,24 @@
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
 
+  // One request to a product's Follow-up, with no screen lock: for work that
+  // runs beside the main action (release in the background, pre-claim, the
+  // WhatsApp-opened record). Throws on failure.
+  async function fuCall(unit, followup) {
+    const { result } = await api('task', { method: 'POST', body: { unit, followup: agentMode() ? { ...followup, ejecutor: 'bot' } : followup } });
+    if (!['queue', 'replies', 'whatsapp-search'].includes(followup.op)) state.fu.revision++;
+    return result || {};
+  }
+  /** Fire and forget: never blocks the next tap. */
+  function fuBackground(unit, followup, onError) {
+    fuCall(unit, followup).catch((err) => { if (onError) onError(err); else console.warn('Follow-up en segundo plano:', followup.op, err.message); });
+  }
+
   async function fuOp(unit, followup, { label } = {}) {
     if (state.fu.busy) return null;
     state.fu.busy = true;
     try {
-      const { result } = await api('task', { method: 'POST', body: { unit, followup: agentMode() ? { ...followup, ejecutor: 'bot' } : followup } });
-      if (!['queue', 'replies', 'whatsapp-search'].includes(followup.op)) state.fu.revision++;
+      const result = await fuCall(unit, followup);
       if (label) toast(label);
       if (result && result.warning) toast(result.warning, true);
       return result || {};
@@ -2655,28 +2668,69 @@
     return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.noInteresados||[])].find((x) => x.key === key) : null;
   }
 
-  async function fuClaim(it) {
-    const r = await fuOp(it.unit, { op: 'claim', inmobiliaria: it.id });
-    if (!r) return false;
+  // The task opens at once with what the queue already knows (name, stage,
+  // situation) while the product reserves it and builds the message. Nothing
+  // can be sent or confirmed until the reservation comes back.
+  const fuOpening = (it) => ({ unit: it.unit, mode: 'abriendo', item: it, name: it.name, messages: [], warnings: [], checklist: [], history: [], links: {} });
+  function fuShowOpening(it) {
+    state.fu.task = fuOpening(it);
+    state.fu.selectedQueueKey = it.key;
+    render();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+  function fuShowClaimed(it, r) {
     state.fu.task = F.prepared(it.unit, r, it);
     state.fu.task.mode = 'ejecutar';
     state.fu.selectedQueueKey = it.key;
     render();
-    // Do not start an expensive full-board refresh while the operator is
-    // opening the new task. Refresh when returning to the queue instead.
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // `claiming`: a claim already on its way for this item (started beside the
+  // confirmation of the previous one), so the wait is not paid twice.
+  async function fuClaim(it, { claiming, silent } = {}) {
+    if (state.fu.busy) return false;
+    const before = state.fu.task && state.fu.task.mode !== 'abriendo' ? state.fu.task : null;
+    const beforeKey = state.fu.selectedQueueKey;
+    state.fu.busy = true;
+    fuShowOpening(it);
+    let r = null, error = null;
+    try {
+      r = claiming ? await claiming : null;
+      if (!r) r = await fuCall(it.unit, { op: 'claim', inmobiliaria: it.id });
+    } catch (err) { error = err; } finally { state.fu.busy = false; }
+    if (!r) {
+      // Do not start an expensive full-board refresh here. The previous
+      // context comes back as it was; nothing was reserved.
+      state.fu.task = before;
+      state.fu.selectedQueueKey = beforeKey;
+      render();
+      if (error && !silent) toast(error.message, true);
+      return false;
+    }
+    if (r.warning) toast(r.warning, true);
+    fuShowClaimed(it, r);
     return true;
   }
 
+  // Tasks skipped with «Siguiente tarea» in this pass through the queue: a
+  // skipped one goes back to the product's queue in the same place, so without
+  // this the next «Siguiente» would return to it instead of moving on.
+  state.fu.skipped = new Set();
   function fuNextCandidate(currentKey) {
     // Preserve the current queue filters, stage, situation and priority order.
     // Never navigate into a different operator's claim.
-    return state.fu.n ? fuQueueSelection(fuScope()).rows.find(x=>
+    if (!state.fu.n) return null;
+    const free = fuQueueSelection(fuScope()).rows.filter(x=>
       x.key!==currentKey&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action)
-    )||null : null;
+    );
+    const ahead = free.find(x=>!state.fu.skipped.has(x.key));
+    if (ahead || !free.length) return ahead || null;
+    // End of the list: start again from the top.
+    state.fu.skipped.clear();
+    return free[0];
   }
 
-  async function fuNext(clicked) {
+  async function fuNext(clicked, { claiming } = {}) {
     if(state.fu.busy||state.fu.advancing)return;
     state.fu.advancing=true;
     const previous=state.fu.task;
@@ -2687,27 +2741,40 @@
       clicked.setAttribute('aria-busy','true');
     }
     try {
-      let next=fuNextCandidate(cur);
+      // Skipped without confirming: it stays behind for this pass.
+      if(previous?.mode==='ejecutar'&&cur)state.fu.skipped.add(cur);
+      let next=claiming?.item||fuNextCandidate(cur);
       if(!next){
         await loadFollowup({quiet:true});
         next=fuNextCandidate(cur);
       }
+      if(!next&&previous?.mode==='ejecutar'&&cur)state.fu.skipped.delete(cur);
       if(!next){
         toast('No hay otra tarea libre con estos filtros. Podés cambiar los filtros desde la cola.',true);
         return;
       }
-      // Never release a confirmed send, and only release an unconfirmed claim
-      // before taking another. A failed claim keeps the previous context.
+      // Never release a confirmed send. An unconfirmed claim is released
+      // while the next one is taken: two requests at once, not one after the
+      // other. If the release fails the reservation just runs out by itself.
       if(previous?.mode==='ejecutar'){
-        const released=await fuOp(previous.unit,{op:'release',inmobiliaria:previous.item?.id});
-        if(!released)return;
+        fuBackground(previous.unit,{op:'release',inmobiliaria:previous.item?.id},
+          ()=>toast(`${previous.name||previous.item?.name||'La tarea anterior'} queda reservada unos minutos: no se pudo liberar.`,true));
         // The old claim is no longer held. Do not leave a stale 'ejecutar'
         // task visible if claiming the new one fails.
         state.fu.task=null;
       }
       // The server validates the new claim; no speculative "sent" state.
-      const claimed=await fuClaim(next);
-      if(!claimed && !state.fu.task) {
+      // Someone else may have taken it since the last read: try the ones after it.
+      let claimed=await fuClaim(next,{claiming:claiming?.result,silent:true});
+      for(let tries=0;!claimed&&tries<3;tries++){
+        state.fu.skipped.add(next.key);
+        next=fuNextCandidate(cur);
+        if(!next)break;
+        claimed=await fuClaim(next,{silent:true});
+      }
+      if(!claimed){
+        toast('No se pudo tomar la siguiente tarea. Actualizamos la cola.',true);
+        if(previous?.mode==='ejecutar')state.fu.task=null;
         render();
         void loadFollowup({quiet:true});
       }
@@ -2931,7 +2998,7 @@
     return `<article class="os-fu-mobile-item" data-testid="fu-mobile-item">
       <div class="os-fu-mobile-item-main">
         <div class="os-fu-mobile-item-body">
-          <strong class="os-fu-mobile-item-name">${esc(x.name)}</strong>
+          <strong class="os-fu-mobile-item-name">${esc(x.name)}${fuCommentChip(x)}</strong>
           <span class="os-fu-mobile-item-stage">${esc(x.stageTitle||'')} · ${esc(x.situationLabel||'Sin clasificar')}${fuLineBadges(x)}</span>
           <span class="os-fu-mobile-item-action">${esc(x.action||x.actionReason||'Sin acción programada')}</span>
         </div>
@@ -3939,6 +4006,100 @@
       !['recontactar_vacaciones','recontactar_mas_adelante'].includes(key) || stage !== first);
   }
 
+  // ── Comentarios de la ficha ──
+  // Notas entre quien opera y la extensión, por contacto: la extensión deja
+  // qué vio o qué necesita, y la persona le deja indicaciones. Viven en Chapa
+  // (no cambian etapa, situación ni envíos del producto).
+  state.fu.comments = { key: null, list: [], loading: false, error: null, sending: false };
+  state.fu.commentIndex = {};
+  const fuCommentAuthor = (c) => c.bot ? `Extensión${c.by ? ` (${c.by})` : ''}` : c.by || 'Equipo';
+  function fuCommentsInner(t) {
+    const c = state.fu.comments, it = t.item || {};
+    const mine = c.key === `${t.unit}:${it.id}`;
+    const list = mine ? c.list : [];
+    const body = !mine || c.loading ? '<p class="os-fu-comments-empty">Cargando comentarios…</p>'
+      : c.error ? `<p class="os-fu-comments-empty" role="alert">${esc(c.error)} <button type="button" class="btn small" data-fu="comments-reload">Reintentar</button></p>`
+      : list.length ? `<ol class="os-fu-comments-list">${list.map((m) => `<li data-author="${m.bot ? 'extension' : 'persona'}"><span class="os-fu-comment-meta"><b>${esc(fuCommentAuthor(m))}</b><time>${esc(dayTime(m.at))}</time></span><p>${esc(m.text)}</p></li>`).join('')}</ol>`
+      : `<p class="os-fu-comments-empty">Todavía no hay comentarios. ${agentMode() ? 'Dejale una nota al equipo.' : 'Dejale una indicación a la extensión o una nota para vos.'}</p>`;
+    return `<h2>Comentarios${list.length ? ` <span class="os-fu-comments-count">${list.length}</span>` : ''}</h2>
+      ${body}
+      <form data-fu-comment-form>
+        <textarea class="input" aria-label="Nuevo comentario" name="texto" rows="2" maxlength="2000" required placeholder="${agentMode() ? 'Comentario para el equipo' : 'Comentario para la extensión o para el equipo'}"></textarea>
+        <button type="submit" class="btn primary" data-testid="fu-comment-send" ${c.sending ? 'disabled' : ''}>${c.sending ? 'Guardando…' : 'Dejar comentario'}</button>
+      </form>`;
+  }
+  function fuCommentsBox(t) {
+    if (!t || !t.item || !t.item.id || t.mode === 'abriendo' || state.demo) return '';
+    // Read once per contact, after this paint; the box fills in by itself.
+    if (state.fu.comments.key !== `${t.unit}:${t.item.id}`) queueMicrotask(() => { if (state.fu.task === t) fuCommentsOpen(t); });
+    return `<section class="os-fu-comments" data-fu-comments data-testid="fu-comments" aria-live="polite">${fuCommentsInner(t)}</section>`;
+  }
+  /** Repaints only the comments box: a full render would drop what is being typed elsewhere. */
+  function fuCommentsPaint() {
+    const t = state.fu.task, box = main.querySelector('[data-fu-comments]');
+    if (!t || !box) return;
+    const draft = box.querySelector('textarea')?.value || '';
+    box.innerHTML = fuCommentsInner(t);
+    const area = box.querySelector('textarea');
+    if (area && draft && !state.fu.comments.cleared) area.value = draft;
+    state.fu.comments.cleared = false;
+  }
+  async function fuCommentsOpen(t, { force } = {}) {
+    const it = t && t.item;
+    if (!it || !it.id || state.demo) return;
+    const key = `${t.unit}:${it.id}`, c = state.fu.comments;
+    if (c.key === key && !force && (c.loading || !c.error)) { fuCommentsPaint(); return; }
+    state.fu.comments = { key, list: [], loading: true, error: null, sending: false };
+    fuCommentsPaint();
+    try {
+      const r = await api('comments', { query: { unit: t.unit, id: it.id } });
+      if (state.fu.comments.key !== key) return;
+      state.fu.comments = { key, list: r.comments || [], loading: false, error: null, sending: false };
+    } catch (err) {
+      if (state.fu.comments.key !== key) return;
+      state.fu.comments = { key, list: [], loading: false, error: err.message || 'No se pudieron leer los comentarios.', sending: false };
+    }
+    fuCommentsPaint();
+  }
+  async function fuCommentSend(form) {
+    const t = state.fu.task, it = t && t.item, c = state.fu.comments;
+    const text = String(new FormData(form).get('texto') || '').trim();
+    if (!it || !text || c.sending) return;
+    const key = `${t.unit}:${it.id}`;
+    c.sending = true;
+    fuCommentsPaint();
+    try {
+      const r = await api('comments', { method: 'POST', body: { unit: t.unit, id: it.id, name: t.name || it.name, text, ...(agentMode() ? { ejecutor: 'bot' } : {}) } });
+      if (state.fu.comments.key === key) state.fu.comments = { key, list: r.comments || [], loading: false, error: null, sending: false, cleared: true };
+      state.fu.commentIndex[key] = { n: (r.comments || []).length, at: new Date().toISOString() };
+      toast('Comentario guardado.');
+    } catch (err) {
+      c.sending = false;
+      toast(err.message || 'No se pudo guardar el comentario.', true);
+    }
+    fuCommentsPaint();
+  }
+  /** Which contacts have comments, to mark them in the queue. Never blocks the queue. */
+  let fuCommentIndexAt = 0;
+  async function fuCommentIndexLoad() {
+    if (state.demo || Date.now() - fuCommentIndexAt < 60_000) return;
+    fuCommentIndexAt = Date.now();
+    try {
+      const got = await Promise.all(fuUnits().map((u) => api('comments', { query: { unit: u.id } }).then((r) => [u.id, r.index || {}]).catch(() => null)));
+      let changed = false;
+      for (const pair of got) {
+        if (!pair) continue;
+        for (const k of Object.keys(state.fu.commentIndex)) if (k.startsWith(pair[0] + ':')) delete state.fu.commentIndex[k];
+        for (const [id, v] of Object.entries(pair[1])) { state.fu.commentIndex[`${pair[0]}:${id}`] = v; changed = true; }
+      }
+      if (changed && !state.fu.task && isFu() && fuView() === 'hoy') render();
+    } catch { /* la cola no depende de esto */ }
+  }
+  const fuCommentChip = (x) => {
+    const c = state.fu.commentIndex[`${x.unit}:${x.id}`];
+    return c ? `<span class="os-fu-comment-chip" data-testid="fu-comment-chip" title="Tiene comentarios">💬${c.n > 1 ? ` ${c.n}` : ''}</span>` : '';
+  };
+
   function renderFuTask(t) {
     const it = t.item || {};
     // After a confirmed send, show a durable receipt with a separate Next
@@ -3965,11 +4126,18 @@
     const rawWhatsApp=String(t.whatsappUrl||'');
     const nativeWhatsApp=window.ProspectingWhatsApp?.nativeLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
     const appWhatsApp=window.ProspectingWhatsApp?.appLink(rawWhatsApp,t.phone||it.phone,(t.messages||[]).join('\n\n')||t.message||'')||'';
-    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" href="${esc(nativeWhatsApp||rawWhatsApp)}" target="habita-followup-whatsapp"
+    // Phone: the app's own link, followed in this tab, so coming back from
+    // WhatsApp lands on this screen and not on an empty browser tab.
+    const phoneWhatsApp=window.ProspectingWhatsApp?.isMobileClient(window)&&appWhatsApp;
+    const whatsappActions=exec&&rawWhatsApp?`<a class="btn primary os-fu-wa-native" ${phoneWhatsApp?`href="${esc(appWhatsApp)}"`:`href="${esc(nativeWhatsApp||rawWhatsApp)}" target="habita-followup-whatsapp"`}
       data-fu="open-native" data-testid="fu-open-mobile" aria-label="Abrir conversación en la aplicación de WhatsApp">
       ${icon.wa} Abrir WhatsApp</a>
       <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="habita-followup-whatsapp"
       data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
+    if(t.mode==='abriendo')return `${demoBanner()}
+      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" disabled>← Volver a la cola</button><span class="sub os-fu-lock-note" role="status">Reservándola para vos…</span></div>
+      <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${it.action?`<p class="os-fu-technical-context">Próxima acción: ${esc(it.action)}</p>`:''}</div></section>
+      <div class="os-fu-opening" data-testid="fu-opening" aria-busy="true"><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><p>Armando el mensaje…</p></div>`;
     return `${demoBanner()}
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
       <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${commercialStage && it.stageTitle && commercialStage.title !== it.stageTitle ? `<p class="os-fu-technical-context">Actividad: ${esc(it.stageTitle)}</p>` : ''}</div></section>
@@ -3978,7 +4146,7 @@
         <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
         <button type="button" class="btn os-fu-open-blank" data-fu="open-blank" data-testid="fu-open-without-text">Abrir sin texto</button>
         <p>Abrir WhatsApp no confirma el envío. Volvé acá después de enviarlo.
-          ${appWhatsApp?`<a class="os-fu-app-fallback" href="${esc(appWhatsApp)}" data-fu="open-native">Si no se abre, probá abrir la app directamente</a>`:''}
+          ${nativeWhatsApp&&rawWhatsApp?`<a class="os-fu-app-fallback" href="${esc(nativeWhatsApp)}" target="habita-followup-whatsapp" data-fu="open-native" data-testid="fu-open-fallback">Si no se abre, probá con el enlace de WhatsApp</a>`:''}
         </p>
         <button type="button" class="btn os-fu-mobile-confirm" data-fu="confirm" data-testid="fu-confirm-mobile">✓ Confirmar envío</button>
          <button type="button" class="btn primary os-fu-confirm-next" data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop">✓ Confirmar envío y siguiente →</button>
@@ -4006,6 +4174,7 @@
           </div>
         </details>
       </div>`:''}
+      ${fuCommentsBox(t)}
       <div class="grid cols-3 os-fu-task-cards" data-testid="fu-detail">
         <section class="card glass os-fu-context-card"><h2>Contexto</h2>
           <dl class="facts">${it.sub && it.sub !== it.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(it.sub)}</dd>` : ''}${t.phone || it.phone ? `<dt>WhatsApp</dt><dd>${esc(t.phone || it.phone)}</dd>` : ''}${it.zone ? `<dt>Zona</dt><dd>${esc(it.zone)}</dd>` : ''}<dt>Etapa</dt><dd>${esc(it.stageTitle || '')}</dd><dt>Prioridad</dt><dd>${esc(F.PRIORITY_LABEL[it.priority] || '')}${it.priorityManual ? ' (a mano)' : ''}</dd>${it.owner ? `<dt>Responsable</dt><dd>${esc(it.owner)}</dd>` : ''}${it.since ? `<dt>Último contacto</dt><dd>${esc(ago(it.since))}${it.lastText ? ` · ${esc(it.lastText)}` : ''}</dd>` : ''}${it.blocked ? `<dt>Bloqueada</dt><dd style="color:var(--bad-text)">${esc(it.blocked)}</dd>` : ''}${it.dueAt ? `<dt>Programada</dt><dd>${esc(dayTime(it.dueAt))}</dd>` : ''}</dl>
@@ -4239,6 +4408,7 @@
       }
       case 'unit': state.fu.f.unit = ds.fuUnit; store('fu-filters', state.fu.f); render(); break;
       case 'reload': loadFollowup(); break;
+      case 'comments-reload': if(task)fuCommentsOpen(task,{force:true}); break;
       case 'phone-check': {
         if (state.fu.phoneBusy) break;
         state.fu.phoneBusy = true; render();
@@ -4265,22 +4435,35 @@
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
       case 'next': await fuNext(t); break;
       case 'back':
+        // Back to the queue at once: the release travels in the background and
+        // the queue is read again when it lands.
+        if(task?.mode==='abriendo')break;
         if(task?.mode==='ejecutar'){
-          if(!await fuOp(task.unit,{op:'release',inmobiliaria:it.id},{label:'Tarea liberada sin confirmar envío.'}))break;
+          fuCall(task.unit,{op:'release',inmobiliaria:it.id})
+            .catch(()=>toast(`${task.name||it.name} queda reservada unos minutos: no se pudo liberar.`,true))
+            .finally(()=>{if(!state.fu.task)loadFollowup({quiet:true});});
+          state.fu.task=null;render();break;
         }
         state.fu.task=null;render();loadFollowup({quiet:true});break;
       case 'release': if (await fuOp(task.unit, { op: 'release', inmobiliaria: it.id }, { label: 'Quedó libre.' })) { state.fu.task = null; loadFollowup(); } break;
       case 'copy': copy(task.messages[Number(ds.fuIndex)] || task.message); break;
       case 'open-native': {
         // Named browsing context, no noopener: successive actions reuse one tab.
-        e.preventDefault();
-        try {
-          const u=new URL(t.href);
-          if(!['wa.me','web.whatsapp.com','api.whatsapp.com'].includes(u.hostname)||u.protocol!=='https:'){
-            toast('Enlace de WhatsApp inválido.',true);break;
-          }
-          window.open(u.href,'habita-followup-whatsapp');
-        } catch {toast('Enlace de WhatsApp inválido.',true);break;}
+        // On a phone the link is the WhatsApp app itself (whatsapp://): the
+        // tap goes straight to the app and no empty browser tab is left behind
+        // to close on the way back. The browser follows the link by itself.
+        let direct=false;
+        try {direct=new URL(t.href).protocol==='whatsapp:';} catch {direct=false;}
+        if(!direct){
+          e.preventDefault();
+          try {
+            const u=new URL(t.href);
+            if(!['wa.me','web.whatsapp.com','api.whatsapp.com'].includes(u.hostname)||u.protocol!=='https:'){
+              toast('Enlace de WhatsApp inválido.',true);break;
+            }
+            window.open(u.href,'habita-followup-whatsapp');
+          } catch {toast('Enlace de WhatsApp inválido.',true);break;}
+        }
         if(task?.mode==='ejecutar'&&it){
           fetch(API+'?op=task',{
             method:'POST',credentials:'same-origin',keepalive:true,
@@ -4299,8 +4482,12 @@
           const u=new URL(mobile?(native||task.whatsappUrl):task.whatsappUrl);
           if(!['wa.me','web.whatsapp.com','api.whatsapp.com'].includes(u.hostname)||u.protocol!=='https:')throw Error('invalid');
           u.searchParams.delete('text');
-          window.open(u.href,'habita-followup-whatsapp');
-          void fuOp(task.unit,{op:'open',...fields()});
+          // Phone: straight to the app, in this same tab (no empty tab to close).
+          const direct=mobile?window.ProspectingWhatsApp?.appLink(u.href):null;
+          if(direct)window.location.href=direct;
+          else window.open(u.href,'habita-followup-whatsapp');
+          // Recorded in the background: it must not swallow the next tap.
+          fuBackground(task.unit,{op:'open',...fields()});
         } catch {toast('Enlace de WhatsApp inválido.',true);}
         break;
       }
@@ -4309,8 +4496,10 @@
         const mobile=window.ProspectingWhatsApp?.isMobileClient(window);
         const target=mobile?native:task.whatsappUrl;
         if(!target){toast('Número o enlace de WhatsApp inválido.',true);break;}
-        window.open(target,'habita-followup-whatsapp');
-        void fuOp(task.unit,{op:'open',...fields()});
+        const direct=mobile?window.ProspectingWhatsApp?.appLink(target):null;
+        if(direct)window.location.href=direct;
+        else window.open(target,'habita-followup-whatsapp');
+        fuBackground(task.unit,{op:'open',...fields()});
         break;
       }
       case 'handoff-facu':
@@ -4332,6 +4521,11 @@
         t.disabled=true;
         t.textContent='Guardando envío…';
         t.setAttribute('aria-busy','true');
+        // «Confirmar y siguiente»: the next task is reserved while this send
+        // is being saved (two requests at once). It is only shown once the
+        // send is confirmed; if it is not, that reservation is given back.
+        const upcoming=advanceAfterConfirmed?fuNextCandidate(it.key):null;
+        const claiming=upcoming?{item:upcoming,result:fuCall(upcoming.unit,{op:'claim',inmobiliaria:upcoming.id}).catch(()=>null)}:null;
         const r = await fuOp(task.unit, { op: 'confirm', ...fields(), texto: (task.messages||[]).join('\\n\\n') || task.message });
         if(r?.execution?.status==='sent'){
           state.fu.task={...task,mode:'confirmado',confirmedAt:r.execution.at||new Date().toISOString()};
@@ -4344,8 +4538,9 @@
             state.fu.n.queue=state.fu.n.queue.filter(x=>x.key!==task.item?.key);
             state.fu.n.scheduled=state.fu.n.scheduled.filter(x=>x.key!==task.item?.key);
           }
-          if(advanceAfterConfirmed)await fuNext(t);
+          if(advanceAfterConfirmed)await fuNext(t,{claiming});
         }else{
+          if(claiming)claiming.result.then(x=>{if(x)fuBackground(upcoming.unit,{op:'release',inmobiliaria:upcoming.id});});
           // A rejected or ambiguous reply is NOT proof of persistence.
           // Keep the task intact to safely inspect before retrying.
           if(r)toast('El servidor no confirmó el guardado. Verificá el historial antes de reintentar.',true);
@@ -4485,9 +4680,10 @@
   }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form], [data-fu-comment-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if(form.matches('[data-fu-comment-form]')){await fuCommentSend(form);return;}
     if(form.matches('[data-fu-chart-range]')){
       const fd=new FormData(form),p=fuChartPeriod(),from=String(fd.get('desde')||''),to=String(fd.get('hasta')||'');
       if(from&&to&&to<from){toast('La fecha Hasta debe ser igual o posterior a Desde.',true);return;}

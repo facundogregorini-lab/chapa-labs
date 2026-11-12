@@ -47,13 +47,18 @@ test('Dedicated mobile execution screen reuses named WhatsApp tab; opening never
   assert.match(app,/data-testid="fu-mobile-actions"/);
   assert.match(app,/data-testid="fu-open-mobile"/);
   assert.match(app,/href="\$\{esc\(nativeWhatsApp\|\|rawWhatsApp\)\}" target="habita-followup-whatsapp"/);
+  // On a phone the button is the app's own link, followed in the same tab: no empty browser tab is left behind.
+  assert.match(app,/phoneWhatsApp\?`href="\$\{esc\(appWhatsApp\)\}"`/);
+  assert.match(app,/direct=new URL\(t\.href\)\.protocol==='whatsapp:'/);
+  assert.match(app,/if\(direct\)window\.location\.href=direct/);
+  assert.doesNotMatch(app,/void fuOp\(task\.unit,\{op:'open'/);
   assert.match(app,/window\.open\(u\.href,'habita-followup-whatsapp'\)/);
   assert.match(app,/data-fu="open-native"/);
   assert.match(app,/keepalive:true/);
   assert.match(app,/op:'open',\.\.\.fields\(\)/);
   assert.match(app,/case 'confirm':/);
   assert.match(app,/op: 'confirm'/);
-  assert.match(app,/Si no se abre, probá abrir la app directamente/);
+  assert.match(app,/Si no se abre, probá con el enlace de WhatsApp/);
   assert.match(css,/\[data-testid="fu-mobile-actions"\]/);
   assert.match(css,/os-fu-wa-desktop\{display:none!important/);
   assert.match(css,/os-fu-task-cards>\.os-fu-message-card/);
