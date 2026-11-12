@@ -2736,3 +2736,28 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
   .ov-evo-tip{min-width:150px}
   .ov .ov-wide[data-testid="overview-evolution"]>.ov-head>.ov-seg{width:100%}
 }
+
+/* Comentarios de la ficha: notas entre quien opera y la extensión. */
+.os-fu-comments{margin:0 0 13px;padding:14px;border:1px solid #d9e6dc;background:#fff;border-radius:16px;display:grid;gap:10px}
+.os-fu-comments h2{margin:0;font-size:14px;display:flex;align-items:center;gap:7px;color:#143f2b}
+.os-fu-comments-count{font-size:11px;font-weight:800;background:#e3f1e8;color:#14583b;border-radius:999px;padding:2px 8px}
+.os-fu-comments-empty{margin:0;font-size:12.5px;line-height:1.45;color:#62786a}
+.os-fu-comments-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;max-height:320px;overflow:auto}
+.os-fu-comments-list li{padding:9px 11px;border-radius:12px;background:#f3f8f4;border:1px solid #e0ebe3}
+.os-fu-comments-list li[data-author="extension"]{background:#f6f3ec;border-color:#e9e1cf}
+.os-fu-comment-meta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#62786a}
+.os-fu-comment-meta b{color:#1c4a33}
+.os-fu-comments-list p{margin:4px 0 0;font-size:13.5px;line-height:1.45;color:#1d2b23;white-space:pre-wrap;overflow-wrap:anywhere}
+.os-fu-comments form{display:grid;gap:8px}
+.os-fu-comments textarea{width:100%;min-width:0;min-height:64px;font-size:16px;resize:vertical}
+.os-fu-comments form .btn{min-height:44px;justify-self:stretch;touch-action:manipulation}
+@media(min-width:761px){.os-fu-comments form .btn{justify-self:start}}
+.os-fu-comment-chip{display:inline-flex;align-items:center;margin-left:6px;font-size:11px;font-weight:700;color:#14583b;white-space:nowrap}
+
+/* La tarea se abre al instante; el mensaje llega cuando el producto la reserva. */
+.os-fu-opening{display:grid;gap:9px;margin:0 0 13px;padding:14px;border:1px solid #d3e6d7;background:#f0f9f1;border-radius:17px}
+.os-fu-opening p{margin:2px 0 0;font-size:12px;color:#587462}
+.os-fu-opening-bar{display:block;height:46px;border-radius:12px;background:linear-gradient(90deg,#e2efe6 25%,#f4faf6 50%,#e2efe6 75%);background-size:200% 100%;animation:os-fu-opening 1.1s linear infinite}
+.os-fu-opening-bar:nth-child(2){height:40px}
+@keyframes os-fu-opening{to{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){.os-fu-opening-bar{animation:none}}

@@ -9,6 +9,8 @@
 //   POST ?op=setup  {unit}           agrega las columnas y pestañas que falten
 //   GET  ?op=followup&unit=todas     la cola de Follow-up de cada unidad (la calcula su app)
 //   POST ?op=task {unit, followup}   una operación de esa cola (claim, open, confirm…) a nombre de quien opera
+//   GET  ?op=comments&unit=habita[&id=]   comentarios de un contacto (con id) o qué contactos tienen (sin id)
+//   POST ?op=comments {unit,id,text} deja un comentario a nombre de quien opera (o de la extensión)
 //
 // Variables: PROSPECTING_PASSWORD (ver _session.js), la cuenta de servicio (ver
 // _google.js) y, por unidad, <ID>_PROSPECTING_SHEET_ID (ver prospecting/units.js).
@@ -19,6 +21,7 @@ const authFetch = require('./_authfetch');
 const session = require('./_session');
 const { createFollowupCache } = require('./_followup-cache');
 const followupCache = createFollowupCache();
+const { createComments } = require('./_comments');
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
 
@@ -557,12 +560,40 @@ async function doTask(req, res, user) {
   if (sensitiveOps.has(f.op) && session.open() && unit.id !== 'habita')
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones de Turnia configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
+    const startedAt = Date.now();
     const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: ['whatsapp-sync', 'whatsapp-search', 'whatsapp-check'].includes(f.op) ? 280000 : 45000 });
     if (f.op !== 'queue' && f.op !== 'replies' && f.op !== 'whatsapp-search')
       followupCache.invalidate(unit.id + '|');
+    // How long the product took for this operation, visible in the browser's network panel.
+    res.setHeader('Server-Timing', `${unit.id}-${String(f.op).replace(/[^a-z-]/g, '')};dur=${Date.now() - startedAt}`);
     return res.status(200).json({ result: out });
   } catch (err) {
     return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);
+  }
+}
+
+// Comentarios de la ficha: notas entre quien opera y la extensión, por contacto. Viven en Chapa
+// (Vercel Blob privado, ver _comments.js): no son datos del producto ni cambian su cola.
+let commentStore = null;
+function comments() {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) throw Object.assign(new Error('Falta conectar el almacén de Vercel Blob al proyecto para guardar comentarios.'), { status: 503 });
+  if (!commentStore) commentStore = createComments(require('@vercel/blob'));
+  return commentStore;
+}
+async function doComments(req, res, user) {
+  const body = req.method === 'POST' ? req.body || {} : req.query || {};
+  const unit = UNITS[body.unit];
+  if (!unit) return fail(res, 404, 'No existe esa unidad.');
+  try {
+    const store = comments();
+    if (req.method === 'POST') {
+      const list = await store.add(unit.id, body.id, { by: user.name, bot: body.ejecutor === 'bot', text: body.text, name: body.name });
+      return res.status(200).json({ comments: list });
+    }
+    if (body.id) return res.status(200).json({ comments: await store.thread(unit.id, body.id) });
+    return res.status(200).json({ index: await store.index(unit.id) });
+  } catch (err) {
+    return fail(res, err.status && err.status < 500 ? err.status : err.status === 503 ? 503 : 502, err.message || 'No se pudieron leer o guardar los comentarios.');
   }
 }
 
@@ -721,6 +752,7 @@ module.exports = async (req, res) => {
     if (op === 'followup' && req.method === 'GET') return await doFollowup(req, res);
     if (op === 'task' && req.method === 'POST') return await doTask(req, res, user);
     if (op === 'pool' && (req.method === 'GET' || req.method === 'POST')) return await doPool(req, res, user);
+    if (op === 'comments' && (req.method === 'GET' || req.method === 'POST')) return await doComments(req, res, user);
     return fail(res, 404, 'Operación desconocida.');
   } catch (err) {
     console.error('prospecting_error', op, err.message);

@@ -60,7 +60,7 @@ test('Approved visual reference is represented in committed design tokens, not i
 });
 test('Current execution safety and mobile remain intact',()=>{
   assert.match(app,/case 'confirm-and-next':/);
-  assert.match(app,/if\(advanceAfterConfirmed\)await fuNext\(t\)/);
+  assert.match(app,/if\(advanceAfterConfirmed\)await fuNext\(t,\{claiming\}\)/);
   assert.match(app,/data-testid="fu-mobile-queue"/);
   assert.match(app,/data-fu="queue-edit-situation"/);
   assert.match(app,/data-fu="next-preview"/);

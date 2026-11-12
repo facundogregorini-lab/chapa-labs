@@ -23,7 +23,7 @@ test('One-tap confirm checks persisted receipt without blocking on reload',()=>{
 });
 
 test('Next action shows immediate progress and avoids full-board refresh on claim',()=>{
-  const start=app.indexOf('  async function fuNext(clicked) {');
+  const start=app.indexOf('  async function fuNext(clicked');
   const end=app.indexOf('  // ── Las vistas ──',start);
   const fn=app.slice(start,end);
   assert.ok(start>0&&end>start);
@@ -32,10 +32,17 @@ test('Next action shows immediate progress and avoids full-board refresh on clai
   assert.match(fn,/previous\?\.mode==='ejecutar'/);
   assert.match(fn,/op:'release'/);
   assert.doesNotMatch(fn,/op: ?'confirm'/);
-  assert.match(fn,/const claimed=await fuClaim\(next\)/);
+  assert.match(fn,/let claimed=await fuClaim\(next,/);
   assert.match(fn,/state\.fu\.task=null/);
   assert.match(fn,/finally \{/);
-  const claim=app.slice(app.indexOf('  async function fuClaim(it)'),app.indexOf('  function fuNextCandidate'));
+  // The release of the skipped task no longer blocks the next claim.
+  assert.match(fn,/fuBackground\(previous\.unit,\{op:'release'/);
+  assert.doesNotMatch(fn,/await fuOp\(previous\.unit,\{op:'release'/);
+  const claim=app.slice(app.indexOf('  async function fuClaim(it'),app.indexOf('  function fuNextCandidate'));
+  assert.ok(claim.length>0);
+  // The task opens at once; the reservation fills it in.
+  assert.match(claim,/fuShowOpening\(it\)/);
+  assert.match(app,/data-testid="fu-opening"/);
   assert.doesNotMatch(claim,/loadFollowup/);
   assert.match(app,/case 'next-after': await fuNext\(t\)/);
 });
@@ -221,8 +228,11 @@ test('Confirmar y siguiente only advances on confirmed server receipt',()=>{
   assert.match(app,/case 'confirm-and-next':/);
   assert.match(app,/data-fu="confirm-and-next" data-testid="fu-confirm-next-desktop"/);
   assert.match(handler,/r\?\.execution\?\.status==='sent'/);
-  assert.match(handler,/if\(advanceAfterConfirmed\)await fuNext\(t\)/);
-  assert.ok(handler.indexOf("r?.execution?.status==='sent'")<handler.indexOf("if(advanceAfterConfirmed)await fuNext(t)"));
+  assert.match(handler,/if\(advanceAfterConfirmed\)await fuNext\(t,\{claiming\}\)/);
+  assert.ok(handler.indexOf("r?.execution?.status==='sent'")<handler.indexOf("if(advanceAfterConfirmed)await fuNext(t,{claiming})"));
+  // The next task is reserved beside the confirmation and given back if the send was not confirmed.
+  assert.match(handler,/const claiming=upcoming\?\{item:upcoming,result:fuCall\(upcoming\.unit,\{op:'claim'/);
+  assert.match(handler,/fuBackground\(upcoming\.unit,\{op:'release',inmobiliaria:upcoming\.id\}\)/);
   assert.match(css,/\.os-fu-confirm-next\{/);
 });
 
