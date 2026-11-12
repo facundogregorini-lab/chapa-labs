@@ -2691,13 +2691,20 @@
     if (state.fu.busy) return false;
     const before = state.fu.task && state.fu.task.mode !== 'abriendo' ? state.fu.task : null;
     const beforeKey = state.fu.selectedQueueKey;
-    state.fu.busy = true;
     fuShowOpening(it);
+    // The screen this claim belongs to. «Volver a la cola» (or opening another
+    // task) while it is on its way leaves it behind: when it arrives it is
+    // released, never shown.
+    const opening = state.fu.task;
     let r = null, error = null;
     try {
       r = claiming ? await claiming : null;
       if (!r) r = await fuCall(it.unit, { op: 'claim', inmobiliaria: it.id });
-    } catch (err) { error = err; } finally { state.fu.busy = false; }
+    } catch (err) { error = err; }
+    if (state.fu.task !== opening) {
+      if (r) fuBackground(it.unit, { op: 'release', inmobiliaria: it.id });
+      return false;
+    }
     if (!r) {
       // Do not start an expensive full-board refresh here. The previous
       // context comes back as it was; nothing was reserved.
@@ -4135,9 +4142,9 @@
       <a class="btn primary os-fu-wa-desktop" href="${esc(rawWhatsApp)}" target="habita-followup-whatsapp"
       data-fu="open-native" data-testid="fu-open-desktop">${icon.wa} Abrir WhatsApp Web</a>`:'';
     if(t.mode==='abriendo')return `${demoBanner()}
-      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" disabled>← Volver a la cola</button><span class="sub os-fu-lock-note" role="status">Reservándola para vos…</span></div>
+      <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back" data-testid="fu-opening-back">← Volver a la cola</button><span class="sub os-fu-lock-note" role="status">Reservándola para vos…</span></div>
       <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${it.action?`<p class="os-fu-technical-context">Próxima acción: ${esc(it.action)}</p>`:''}</div></section>
-      <div class="os-fu-opening" data-testid="fu-opening" aria-busy="true"><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><p>Armando el mensaje…</p></div>`;
+      <div class="os-fu-opening" data-testid="fu-opening" aria-busy="true"><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><span class="os-fu-opening-bar"></span><p>Armando el mensaje…</p><p class="os-fu-opening-slow">Está tardando más de lo normal. Podés esperar o volver a la cola.</p></div>`;
     return `${demoBanner()}
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
       <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${commercialStage && it.stageTitle && commercialStage.title !== it.stageTitle ? `<p class="os-fu-technical-context">Actividad: ${esc(it.stageTitle)}</p>` : ''}</div></section>
@@ -4436,8 +4443,9 @@
       case 'next': await fuNext(t); break;
       case 'back':
         // Back to the queue at once: the release travels in the background and
-        // the queue is read again when it lands.
-        if(task?.mode==='abriendo')break;
+        // the queue is read again when it lands. While a task is still being
+        // reserved, going back cancels it (fuClaim releases it when it arrives).
+        if(task?.mode==='abriendo'){state.fu.task=null;render();break;}
         if(task?.mode==='ejecutar'){
           fuCall(task.unit,{op:'release',inmobiliaria:it.id})
             .catch(()=>toast(`${task.name||it.name} queda reservada unos minutos: no se pudo liberar.`,true))
