@@ -171,7 +171,7 @@
       },
       whatsapp_seguimiento: {
         title: 'Seguimiento 2 · A las 24 h del link', hint: 'Audio de unos 12 segundos: este es el guion.', channel: 'whatsapp',
-        text: 'Buenas! ¿Cómo va? Che, te consulto rápido: ¿pudiste hacerle alguna pregunta difícil al link que te pasé ayer o mostrárselo a los doctores? Avisame si le pifié en alguna obra social así ya lo corrijo!',
+        text: 'Buenas! ¿Cómo va? Te consulto rápido: ¿pudiste hacerle alguna pregunta difícil al link que te pasé ayer o mostrárselo a los doctores? Avisame si le pifié en alguna obra social así ya lo corrijo!',
       },
       whatsapp_reenviable: {
         title: 'Seguimiento 3 · El mensaje para reenviar', hint: 'A las 48-72 horas. Dos mensajes: el segundo, solo, para reenviar a los doctores. Después no se escribe más.', channel: 'whatsapp',
