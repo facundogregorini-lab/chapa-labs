@@ -2563,7 +2563,20 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 .os-fu-executor-bar button.is-on{background:#046b45;color:#fff}
 .os-fu-executor-bar button:focus-visible{outline:2px solid #188854;outline-offset:2px}
 .os-fu-executor-chip{display:none}
+/* Quién ejecuta y Pendiente · Hoy · Ayer · Esta semana (13/11/2026): arriba de
+   las tarjetas de etapas. Igual en habita. y Turnia. */
+.os-fu-queue-topfilters{display:grid;gap:8px;min-width:0}
+.os-fu-queue-topfilters .os-fu-executor-bar{margin:0;max-width:520px}
+.os-fu-period-bar{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.os-fu-period-bar::-webkit-scrollbar{display:none}
+.os-fu-period-bar button{flex:0 0 auto;min-height:40px;padding:0 13px;border:1px solid #d5e5db;border-radius:999px;background:#fff;color:#1c3328;font:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.os-fu-period-bar button b{font-size:11px;font-weight:800;color:#5a6d63}
+.os-fu-period-bar button.is-on{background:#123b2e;border-color:#123b2e;color:#fff}
+.os-fu-period-bar button.is-on b{color:#cfe3d8}
+.os-fu-period-bar button:focus-visible{outline:2px solid #188854;outline-offset:2px}
 @media(max-width:760px){
+  .os-fu-queue-topfilters .os-fu-executor-bar{margin:0;max-width:none}
+  .os-fu-period-bar button{min-height:44px}
   .os-fu-queue-next{display:none!important}
   .os-fu-filters-toggle{display:flex;align-items:center;gap:10px;width:calc(100% - 24px);margin:0 12px 8px;min-height:44px;padding:0 14px;border:1px solid #e1eae2;border-radius:15px;background:#fff;color:#1e5a41;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
   .os-fu-filters-toggle>span:first-of-type{flex:1;text-align:left}
