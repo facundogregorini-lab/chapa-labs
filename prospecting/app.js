@@ -173,7 +173,26 @@
     if (v === 'odontologos' && state.unit === 'turnia') state.view = 'inmobiliarias';
     if (state.view === 'inmobiliarias' && window.ProspectingAgencies) state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(location.search), state.unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
   }
-  function go(unit, view, { replace } = {}) {
+  // Pasar de un producto a otro desde arriba: la misma pestaña (Cola, Respuestas, Embudo, Reglas…), los
+  // mismos filtros y el mismo lugar de la página, con un fundido corto. El otro producto ya se trajo en
+  // segundo plano (fuPrefetchOther), así que no aparece «Cargando».
+  function switchUnit(unit) {
+    if (unit === state.unit) return;
+    const view = state.view, u = unitOf(unit);
+    const keeps = unit === 'todas' ? TODAS_VIEWS.includes(view)
+      : view !== 'resumen' && UNIT_VIEWS.includes(view) && (view !== 'onboarding' || u?.onboarding) && (view !== 'inmobiliarias' || u?.agencies);
+    state.fu.chartFocus = null;
+    go(unit, keeps ? view : unit === 'todas' ? 'resumen' : 'hoy', { keepScroll: true });
+    ensureLoaded();
+    if (!state.demo && !isFu() && unit !== 'todas') {
+      const other = units().find((x) => x.id !== unit);
+      if (other && !state.data[other.id]?.accounts) loadUnit(other.id, { quiet: true, noSync: true }).catch(() => {});
+    }
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      main.classList.remove('is-switching'); void main.offsetWidth; main.classList.add('is-switching');
+    }
+  }
+  function go(unit, view, { replace, keepScroll } = {}) {
     const previousUnit = state.unit;
     // Al cambiar de producto se mantienen el período, quién ejecuta, la búsqueda y la etapa comercial si
     // existe en los dos (Prospectado, Demo enviada, Cuenta creada…); lo propio de cada uno vuelve a Todas.
@@ -199,7 +218,7 @@
       loadMetrics().then(render);
     }
     main.focus({ preventScroll: true });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!keepScroll) window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   
 
@@ -456,7 +475,8 @@
   $('#units').innerHTML = segs.map(([id, name, color]) =>
     `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' || fuCount(id) === '' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
   ).join('');
-  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['responder','RESPUESTAS','◌',replyCount(state.unit)],['pipeline','EMBUDO','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
+  // Cola de ejecución, Embudo y después el resto (13/11/2026).
+  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['pipeline','EMBUDO','◫'],['responder','RESPUESTAS','◌',replyCount(state.unit)],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
   const tabs = state.unit === 'todas'
     ? [['resumen','RESUMEN','▦'],['hoy','COLA DE EJECUCIÓN','☷',fuCount('todas')],['pipeline','EMBUDOS','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥']]
     : common;
@@ -514,8 +534,8 @@
       ['resumen','RESUMEN'],['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDOS'],
       ['prospectos','PROSPECTOS'],['secuencias','REGLAS Y MENSAJES'],['rendimiento','RESULTADOS'],
     ]:[
-      ['hoy','COLA DE EJECUCIÓN'],['responder','RESPUESTAS'],
-      ['pipeline','EMBUDO'],['secuencias','REGLAS'],
+      ['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDO'],
+      ['responder','RESPUESTAS'],['secuencias','REGLAS'],
       ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
     const links=general?[]:turnia?[
@@ -3426,6 +3446,72 @@
       '</section>';
   }
 
+  // ── Funnel comercial comparado (13/11/2026) ──
+  // Barras horizontales: cuántos llegaron a cada paso en el período (por la fecha en que llegaron, de
+  // `funnelDates` de cada API) y, punteado, cuántos en el mismo tramo del período anterior. Si la API
+  // todavía no manda `funnelDates`, queda el gráfico de columnas de antes (fuNativeChart).
+  const FU_FUNNEL_PERIODS=[['semana','Esta semana'],['pasada','Semana pasada'],['acumulado','Acumulado']];
+  function fuFunnelWindows(period,now=new Date()) {
+  const DAY=86400000,t=now.getTime(),day=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const monday=day-((new Date(day).getDay()+6)%7)*DAY;
+  const at=(ms)=>dayTime(new Date(ms).toISOString());
+  if(period==='pasada')return {cur:[monday-7*DAY,monday],prev:[monday-14*DAY,monday-7*DAY],caption:'vs. la semana anterior completa'};
+  if(period==='acumulado')return {cur:[-Infinity,t],prev:[-Infinity,t-7*DAY],caption:`vs. el acumulado de hace una semana (${at(t-7*DAY)})`,open:true};
+  return {cur:[monday,t],prev:[monday-7*DAY,t-7*DAY],caption:`vs. la semana pasada hasta ${at(t-7*DAY)}`};
+}
+  /** La fecha de llegada a cada paso; sin fecha guardada, la del paso siguiente que la tenga («a más tardar»). */
+  function fuReachDates(row) {
+  const at=Array.isArray(row?.at)?row.at:[],out=[];
+  let later=null;
+  for(let i=Math.max(at.length-1,Number(row?.step)||0);i>=0;i--){
+    const own=Date.parse(at[i]||'');
+    if(Number.isFinite(own))later=later===null?own:Math.min(own,later);
+    out[i]=later;
+  }
+  return out;
+}
+  /** Cuántos llegaron a cada paso en una ventana. `open`: los que llegaron sin fecha conocida cuentan (acumulado). */
+  function fuFunnelCounts(dates,steps,[from,to],open=false) {
+  return Array.from({length:steps},(_,i)=>dates.filter(d=>i<d.length&&(d[i]===null?open:d[i]>=from&&d[i]<to)).length);
+}
+  function fuFunnelChart(snap, unit='habita') {
+  const rows=Array.isArray(snap?.funnelDates)?snap.funnelDates:null,chart=snap?.chart;
+  if(!rows||!Array.isArray(chart)||!chart.length)return fuNativeChart(snap,unit);
+  const turnia=unit==='turnia',who=turnia?'odontólogos':'inmobiliarias';
+  const period=FU_FUNNEL_PERIODS.some(([k])=>k===state.fu.funnelCompare)?state.fu.funnelCompare:'semana';
+  const win=fuFunnelWindows(period),labels=chart.map((x,i)=>x.label||`Paso ${i+1}`);
+  const dates=rows.map(r=>({id:r.id,d:fuReachDates(r)}));
+  const cur=fuFunnelCounts(dates.map(x=>x.d),labels.length,win.cur,win.open);
+  const prev=fuFunnelCounts(dates.map(x=>x.d),labels.length,win.prev,win.open);
+  const max=Math.max(1,...cur,...prev),focus=state.fu.chartFocus||null;
+  const pct=(a,b)=>b?Math.round(a/b*100):null;
+  const items=labels.map((label,i)=>{
+    const d=fuDelta(cur[i],prev[i]),on=focus?.mode==='window'&&focus.step===i;
+    // La conversión del paso anterior solo en el acumulado: en una semana, quienes llegan a un paso no son los mismos que llegaron al anterior.
+    const conv=period==='acumulado'&&i?`<small class="os-cmp-conv">${pct(cur[i],cur[i-1])??'—'}% del paso anterior · hace una semana ${pct(prev[i],prev[i-1])??'—'}%</small>`:'';
+    return `<li class="os-cmp-row"><button type="button" class="os-cmp-hit ${on?'is-on':''}" aria-pressed="${on}" data-fu="funnel-window" data-fu-step="${i}" data-testid="fu-funnel-compare-row"
+      title="Ver ${turnia?'los':'las'} ${int(cur[i])} que llegaron a ${esc(label)}">
+      <span class="os-cmp-top"><b>${i+1}. ${esc(label)}</b><span class="os-cmp-vals"><strong>${int(cur[i])}</strong> vs ${int(prev[i])}${d?`<span class="os-cmp-delta" data-dir="${d.dir}">${esc(d.text)}</span>`:''}</span></span>
+      <span class="os-cmp-track"><span class="os-cmp-bar" style="width:${(cur[i]/max*100).toFixed(2)}%"></span>${prev[i]?`<span class="os-cmp-prev" style="width:${(prev[i]/max*100).toFixed(2)}%" aria-hidden="true"></span>`:''}</span>
+      ${conv}</button></li>`;
+  }).join('');
+  // Tocar un paso lista a quienes llegaron a él en el período (la misma revisión de abajo).
+  let review='';
+  if(focus?.mode==='window'&&focus.step<labels.length){
+    const ids=new Set(dates.filter(x=>{const t=x.d[focus.step];return focus.step<x.d.length&&(t===null?win.open:t>=win.cur[0]&&t<win.cur[1]);}).map(x=>x.id));
+    const historical=(snap.chartRows||[]).filter(x=>ids.has(x.agencyId));
+    review=fuFunnelReviewList(snap,historical,{step:focus.step,mode:'arrived'},chart,unit);
+  }
+  return `<section class="os-native-funnel os-cmp-funnel" data-testid="followup-native-funnel" data-period="${period}">
+    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta ${turnia?'los odontólogos':'las inmobiliarias'} que llegaron a él en el período, por la fecha en que llegaron. Lo punteado es el período anterior hasta el mismo momento.</p></div>
+      <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${FU_FUNNEL_PERIODS.map(([key,label])=>`<button type="button" data-fu="funnel-compare" data-fu-period="${key}" aria-pressed="${period===key}" class="${period===key?'is-on':''}">${esc(label)}</button>`).join('')}</nav></div></div>
+    <p class="os-cmp-caption" data-testid="fu-funnel-compare-caption">${esc(win.caption)}</p>
+    <div class="os-native-legend"><span><i class="is-went"></i>${period==='pasada'?'Semana pasada':period==='acumulado'?'Hasta hoy':'Esta semana'}</span><span><i class="os-cmp-legend-prev"></i>${period==='pasada'?'Semana anterior':period==='acumulado'?'Hasta hace una semana':'Semana pasada a esta altura'}</span></div>
+    <ol class="os-cmp-chart" aria-label="Embudo comercial comparado con el período anterior">${items}</ol>
+    ${review}
+  </section>`;
+}
+
   function fuNativeChart(snap, unit='habita') {
   const chart=snap?.chart,lostAt=snap?.lostAt,rows=snap?.chartRows;
   const turnia=unit==='turnia',who=turnia?'odontólogos':'inmobiliarias',lostWord=turnia?'perdidos':'perdidas';
@@ -3522,9 +3608,9 @@
   // Habita's native "Embudo" contains the historical nine-step chart.
   // The secondary generic stages/rules board was an extra Chapa invention,
   // so omit it here and keep it for Turnia only.
-  if(scope==='habita')return fuNativeChart(snap);
+  if(scope==='habita')return fuFunnelChart(snap,'habita');
   // Turnia: the same «Funnel comercial» as habita., with its own steps, once its API sends the chart.
-  if(scope==='turnia'&&Array.isArray(snap.chart)&&Array.isArray(snap.lostAt)&&Array.isArray(snap.chartRows))return fuNativeChart(snap,'turnia');
+  if(scope==='turnia'&&Array.isArray(snap.chart)&&Array.isArray(snap.lostAt)&&Array.isArray(snap.chartRows))return fuFunnelChart(snap,'turnia');
   const stages=F.commercialStages(scope,snap);
   const customStageKeys=new Set((snap.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
@@ -3549,7 +3635,7 @@
   const activeVersions=(stage,action)=>versions.filter(v=>v.stage===stage && v.action===action);
   const selectedTechnical=snap.stages?.find(x=>x.key===activeTech);
   return `<section class="hero"><div><span class="eyebrow">${esc(fuName(scope).toUpperCase())} / EMBUDO</span><h1>Etapas y decisiones.</h1><p>La misma lectura del Follow-up de Habita: elegí una etapa y revisá sus pasos, situaciones, reglas y prospectos, sin cambiar la lógica del motor.</p></div></section>
-    ${scope==='habita'?fuNativeChart(snap):''}
+    ${scope==='habita'?fuFunnelChart(snap,'habita'):''}
     <section class="card glass" data-testid="followup-funnel"><div class="os-funnel-title"><div><span class="os-kicker">EMBUDO COMERCIAL</span><h2>${esc(fuName(scope))} · ${stages.length} etapas</h2></div><button type="button" class="btn small" data-view="etapas">ETAPAS Y SITUACIONES →</button></div>
     <div class="os-fu-stage-grid" data-testid="followup-funnel-stages">
       ${commercialStages.map(s=>`<button type="button" class="os-fu-stage is-${esc(s.key)} ${selected?.key===s.key?'is-on':''}" aria-pressed="${selected?.key===s.key}" data-fu="pipeline-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${int(s.waiting)}</strong></button>`).join('')}
@@ -4559,6 +4645,14 @@
         const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
         state.fu.chartFocus=null;await loadFollowup({quiet:true});render();break;
       }
+      case 'funnel-compare': {
+        state.fu.funnelCompare=ds.fuPeriod||'semana';state.fu.chartFocus=null;state.fu.funnelReviewLimit=80;render();break;
+      }
+      case 'funnel-window': {
+        const step=Number(ds.fuStep),prev=state.fu.chartFocus;
+        state.fu.chartFocus=prev?.mode==='window'&&prev.step===step?null:{step,mode:'window'};
+        state.fu.funnelReviewLimit=80;render();break;
+      }
       case 'funnel-select': {
         const next={step:Number(ds.fuStep),mode:ds.fuMode};
         const prev=state.fu.chartFocus;
@@ -5272,7 +5366,7 @@
       setTimeout(() => { if (t.isConnected && ds.armed === '1') { ds.armed = ''; t.innerHTML = ds.label; t.classList.remove('armed'); } }, 5000);
       return;
     }
-    if (ds.unit && t.closest('#units')) { go(ds.unit, ds.unit === 'todas' ? 'resumen' : 'hoy'); ensureLoaded(); return; }
+    if (ds.unit && t.closest('#units')) { switchUnit(ds.unit); return; }
     if (ds.view) { go(state.unit, ds.view); return; }
     if (ds.goto) { go(ds.goto, ds.viewTo || 'hoy'); ensureLoaded(); return; }
     if (ds.period) { state.period = ds.period; render(); loadMetrics().then(render); return; }

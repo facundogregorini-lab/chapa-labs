@@ -53,7 +53,7 @@ test('Native Habita rules editor is one aligned header + when + what + message +
 });
 
 test('Habita funnel shows exactly original nine-step historical chart, not second invented flowboard',()=>{
-  assert.match(app,/if\(scope==='habita'\)return fuNativeChart\(snap\)/);
+  assert.match(app,/if\(scope==='habita'\)return fuFunnelChart\(snap,'habita'\)/);
   assert.match(app,/data-testid="followup-native-funnel"/);
   assert.match(css,/body:is\(\[data-unit="habita"\],\[data-unit="turnia"\],\[data-unit="todas"\]\) \.os-native-segment\.is-stayed/);
 });
