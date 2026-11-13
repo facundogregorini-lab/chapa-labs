@@ -2919,6 +2919,21 @@
 }
   const FU_EXECUTOR_LABEL={extension:'Extensión',facu:'Facu',axel:'Axel'};
 
+  // Cuándo fue la última acción o contacto de la tarea: hoy, ayer o esta semana
+  // (desde el lunes), en la hora del navegador. «Pendiente» no filtra por fecha.
+  const FU_PERIODS=[['','Pendiente'],['hoy','Hoy'],['ayer','Ayer'],['semana','Esta semana']];
+  function fuInPeriod(x,period,now=new Date()) {
+  if(!period)return true;
+  const t=new Date(x?.since||'');
+  if(Number.isNaN(t.getTime()))return false;
+  const day=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const DAY=86400000;
+  if(period==='hoy')return t>=day&&t<new Date(day.getTime()+DAY);
+  if(period==='ayer')return t>=new Date(day.getTime()-DAY)&&t<day;
+  if(period==='semana'){const monday=new Date(day.getTime()-((day.getDay()+6)%7)*DAY);return t>=monday&&t<new Date(day.getTime()+DAY);}
+  return true;
+}
+
   function fuQueueSelection(scope) {
   const n=state.fu.n,q=fuQueueState();
   const snap=scope==='todas'?null:n.units[scope];
@@ -2945,11 +2960,14 @@
   const executors={extension:0,facu:0,axel:0};
   for(const x of filtered)executors[fuExecutor(x)]++;
   const byExecutor=q.executor?filtered.filter(x=>fuExecutor(x)===q.executor):filtered;
+  const periods={};
+  for(const [k] of FU_PERIODS)periods[k]=k?byExecutor.filter(x=>fuInPeriod(x,k)).length:byExecutor.length;
+  const byPeriod=q.period?byExecutor.filter(x=>fuInPeriod(x,q.period)):byExecutor;
   // La línea de WhatsApp (Turnia): para operar las dos en paralelo, cada una con su cola.
   const lines={};
-  for(const x of byExecutor)for(const l of (x.lines?.length?x.lines:['—']))lines[l]=(lines[l]||0)+1;
-  const byLine=q.line?F.filter(byExecutor,{line:q.line}):byExecutor;
-  return {q,snap,stages,current,all:base,rows:byLine,executors,lines};
+  for(const x of byPeriod)for(const l of (x.lines?.length?x.lines:['—']))lines[l]=(lines[l]||0)+1;
+  const byLine=q.line?F.filter(byPeriod,{line:q.line}):byPeriod;
+  return {q,snap,stages,current,all:base,rows:byLine,executors,periods,lines};
 }
 
   // ¿Tienen WhatsApp? (Turnia, op whatsapp-check): fijo o celular salió de cómo venía escrito el número y
@@ -3073,7 +3091,7 @@
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
-  const {q,snap,stages,current,rows,executors,lines}=fuQueueSelection(scope);
+  const {q,snap,stages,current,rows,executors,periods,lines}=fuQueueSelection(scope);
   const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
   const customStages=stages.filter(x=>customStageKeys.has(x.key));
@@ -3090,7 +3108,8 @@
   const stageCounter=(stage)=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
     (!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation))&&
     (!q.situation||x.situation===q.situation||x.catalogSituation===q.situation||x.productSituations?.includes(q.situation))&&
-    (!q.rule||x.ruleKey===q.rule)).length;
+    (!q.rule||x.ruleKey===q.rule)&&
+    (q.closed||!q.executor||fuExecutor(x)===q.executor)&&(q.closed||fuInPeriod(x,q.period))).length;
   const canonical=Object.entries(snap?.labels?.situations||{});
   const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
   const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed) &&
@@ -3105,8 +3124,20 @@
   const reasons=Object.entries(n.blocked.filter(x=>scope==='todas'||x.unit===scope).reduce((obj,x)=>{
     const k=String(x.blocked||'').split(':')[0].trim()||'Sin motivo';obj[k]=(obj[k]||0)+1;return obj;
   },{})).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  // Quién ejecuta y cuándo (13/11/2026): arriba de las tarjetas de etapas, para
+  // elegir primero de quién es la cola y de qué día, y que las tarjetas cuenten eso.
+  const topFilters=q.closed?'':`<div class="os-fu-queue-topfilters" data-testid="fu-queue-topfilters">
+    <div class="os-fu-executor-bar" role="group" aria-label="Quién ejecuta" data-testid="fu-queue-executor">
+      ${[['','Todos'],['extension','Extensión'],['facu','Facu'],['axel','Axel']]
+        .filter(([k])=>!k||k==='extension'||executors[k]>0||q.executor===k)
+        .map(([k,l])=>`<button type="button" data-fu="queue-executor" data-fu-executor="${k}" data-executor="${k||'todos'}" aria-pressed="${(q.executor||'')===k}" class="${(q.executor||'')===k?'is-on':''}">${k==='extension'?'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':''}${l}</button>`).join('')}
+    </div>
+    <div class="os-fu-period-bar" role="group" aria-label="Cuándo" data-testid="fu-queue-period">
+      ${FU_PERIODS.map(([k,l])=>`<button type="button" data-fu="queue-period" data-fu-period="${k}" aria-pressed="${(q.period||'')===k}" class="${(q.period||'')===k?'is-on':''}">${esc(l)} <b>${int(periods[k]||0)}</b></button>`).join('')}
+    </div>
+  </div>`;
   return `<section class="os-fu-center" data-testid="followup-queue">
-
+    ${topFilters}
     ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
       `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
         <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong><span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
@@ -3145,11 +3176,6 @@
       <label>TIPO<select class="input" data-fu-queue-select="group"><option value="">Todos</option>${F.GROUPS.map(g=>`<option value="${g}" ${q.group===g?'selected':''}>${esc(F.GROUP_LABEL[g])}</option>`).join('')}</select></label>
     </div></details>
     </div>
-    ${q.closed?'':`<div class="os-fu-executor-bar" role="group" aria-label="Quién ejecuta" data-testid="fu-queue-executor">
-      ${[['','Todos'],['extension','Extensión'],['facu','Facu'],['axel','Axel']]
-        .filter(([k])=>!k||k==='extension'||executors[k]>0||q.executor===k)
-        .map(([k,l])=>`<button type="button" data-fu="queue-executor" data-fu-executor="${k}" data-executor="${k||'todos'}" aria-pressed="${(q.executor||'')===k}" class="${(q.executor||'')===k?'is-on':''}">${k==='extension'?'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':''}${l}</button>`).join('')}
-    </div>`}
     ${!q.closed&&scope==='turnia'&&Object.keys(lines).some(l=>l!=='—')?`<div class="os-fu-executor-bar" role="group" aria-label="Línea de WhatsApp" data-testid="fu-queue-line">
       ${[['','Todas las líneas'],...Object.keys(lines).filter(l=>l!=='—').sort().map(l=>[l,'Línea '+l]),...(lines['—']?[['—','Sin chat']]:[])]
         .map(([k,l])=>`<button type="button" data-fu="queue-line" data-fu-line="${esc(k)}" aria-pressed="${(q.line||'')===k}" class="${(q.line||'')===k?'is-on':''}">${esc(l)}${k?` <b>${int(lines[k]||0)}</b>`:''}</button>`).join('')}
@@ -4391,6 +4417,7 @@
       case 'queue-more': fuQueueState().limit+=25;render();break;
       case 'queue-filters': {const q=fuQueueState();q.filtersOpen=!q.filtersOpen;render();break;}
       case 'queue-executor': {const q=fuQueueState();q.executor=ds.fuExecutor||null;q.limit=25;render();break;}
+      case 'queue-period': {const q=fuQueueState();q.period=ds.fuPeriod||null;q.limit=25;render();break;}
       case 'queue-line': {const q=fuQueueState();q.line=ds.fuLine||null;q.limit=25;render();break;}
       case 'funnel-period': {
         const p=fuChartPeriod();p.preset=ds.fuPeriod||'todo';p.from='';p.to='';
