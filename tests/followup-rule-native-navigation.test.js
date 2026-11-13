@@ -13,7 +13,10 @@ test('Las reglas abren en Contactado, como el panel Habita',()=>{
 
 test('La selección del paso técnico está integrada al editor de la regla nueva',()=>{
   assert.match(app,/availableTechnical\.map\(stageKey=>/);
-  assert.match(app,/data-fu-rules-tech aria-label="Etapa del embudo de la regla"/);
+  assert.match(app,/data-fu-rules-tech aria-label="Avance principal de la regla"/);
+  assert.match(app,/name="product_stage"/);
+  assert.match(app,/product_stages:productStages/);
+  assert.doesNotMatch(app,/ETAPA DEL EMBUDO/);
   assert.match(app,/case 'rules-new':/);
   assert.match(app,/ui\.technical=e\.target\.value/);
   assert.doesNotMatch(app,/PASO TÉCNICO DE LA REGLA/);
