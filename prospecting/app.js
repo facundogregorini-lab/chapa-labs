@@ -3502,9 +3502,8 @@
     const historical=(snap.chartRows||[]).filter(x=>ids.has(x.agencyId));
     review=fuFunnelReviewList(snap,historical,{step:focus.step,mode:'arrived'},chart,unit);
   }
-  return `<section class="os-native-funnel os-cmp-funnel" data-testid="followup-native-funnel" data-period="${period}">
-    <div class="os-native-head"><div><h2>Funnel comercial</h2><p>Cada paso cuenta ${turnia?'los odontólogos':'las inmobiliarias'} que llegaron a él en el período, por la fecha en que llegaron. Lo punteado es el período anterior hasta el mismo momento.</p></div>
-      <div class="os-native-period"><span>PERÍODO</span><nav aria-label="Período del embudo">${FU_FUNNEL_PERIODS.map(([key,label])=>`<button type="button" data-fu="funnel-compare" data-fu-period="${key}" aria-pressed="${period===key}" class="${period===key?'is-on':''}">${esc(label)}</button>`).join('')}</nav></div></div>
+  return `<section class="os-native-funnel os-cmp-funnel" data-testid="followup-native-funnel" data-period="${period}" aria-label="Funnel comercial">
+    <div class="os-native-period os-cmp-period"><nav aria-label="Período del embudo">${FU_FUNNEL_PERIODS.map(([key,label])=>`<button type="button" data-fu="funnel-compare" data-fu-period="${key}" aria-pressed="${period===key}" class="${period===key?'is-on':''}">${esc(label)}</button>`).join('')}</nav></div>
     <p class="os-cmp-caption" data-testid="fu-funnel-compare-caption">${esc(win.caption)}</p>
     <div class="os-native-legend"><span><i class="is-went"></i>${period==='pasada'?'Semana pasada':period==='acumulado'?'Hasta hoy':'Esta semana'}</span><span><i class="os-cmp-legend-prev"></i>${period==='pasada'?'Semana anterior':period==='acumulado'?'Hasta hace una semana':'Semana pasada a esta altura'}</span></div>
     <ol class="os-cmp-chart" aria-label="Embudo comercial comparado con el período anterior">${items}</ol>
@@ -4597,7 +4596,11 @@
       }
       case 'results-cohort': {
         const r=fuResultsView();
-        r.cohortBy=ds.fuCohort;render();break;
+        r.cohortBy=ds.fuCohort;r.cohortBack=0;render();break;
+      }
+      case 'results-cohort-back': {
+        const r=fuResultsView();
+        r.cohortBack=Math.max(0,Number(ds.fuBack)||0);render();break;
       }
       case 'results-period': {
         const r=fuResultsView();

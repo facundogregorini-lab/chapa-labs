@@ -66,3 +66,20 @@ test('Cambiar de producto arriba mantiene la pestaña y el lugar, con un fundido
   assert.match(css, /#main\.is-switching\{animation:os-unit-in \.22s ease-out\}/);
   assert.match(css, /prefers-reduced-motion:reduce\)\{#main\.is-switching\{animation:none\}/);
 });
+
+test('El embudo comparado arranca en los períodos, sin título ni descripción', () => {
+  const fn = app.slice(app.indexOf('  function fuFunnelChart('), app.indexOf('  function fuNativeChart('));
+  assert.doesNotMatch(fn, /<h2>Funnel comercial<\/h2>/);
+  assert.doesNotMatch(fn, /Cada paso cuenta/);
+  assert.match(fn, /aria-label="Funnel comercial"/);
+});
+
+test('Cohortes en el celular: etapas en filas y las 3 semanas más recientes en columnas', () => {
+  const R = require('../prospecting/results-view.js');
+  const rv = fs.readFileSync(path.join(__dirname, '../prospecting/results-view.js'), 'utf8');
+  assert.match(rv, /function cohortMobile\(stages,rows,by,who,view\)/);
+  assert.match(rv, /const SHOW=3/);
+  assert.match(css, /@media\(max-width:760px\)\{\n  \.rs-heat-desk\{display:none\}\n  \.rs-heat-mob\{display:block\}/);
+  assert.match(app, /case 'results-cohort-back':/);
+  assert.ok(R);
+});

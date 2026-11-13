@@ -257,6 +257,23 @@
   }
 
   // ── 3. Cohortes ──
+  /**
+   * En el celular (13/11/2026): la misma tabla dada vuelta, las etapas en filas y las cohortes en columnas
+   * (las 3 más recientes; «Anteriores» corre de a una), para leer el embudo de arriba hacia abajo sin
+   * deslizar de costado. En la computadora queda la tabla de siempre (CSS: .rs-heat-mob / .rs-heat-desk).
+   */
+  function cohortMobile(stages,rows,by,who,view){
+    if(!rows.length)return `<p class="rs-muted rs-heat-mob">Sin cohortes en este período.</p>`;
+    const SHOW=3,maxBack=Math.max(0,rows.length-SHOW);
+    const back=Math.min(maxBack,Math.max(0,Number(view.cohortBack)||0));
+    const cols=rows.slice(Math.max(0,rows.length-SHOW-back),rows.length-back);
+    const label=c=>esc(by==='version'?c.cohort:weekLabel(c.cohort));
+    const nav=maxBack?`<div class="rs-heat-mob-nav"><button type="button" data-fu="results-cohort-back" data-fu-back="${back+1}" ${back>=maxBack?'disabled':''} data-testid="followup-cohort-older">‹ Anteriores</button><button type="button" data-fu="results-cohort-back" data-fu-back="${back-1}" ${back<=0?'disabled':''} data-testid="followup-cohort-newer">Más recientes ›</button></div>`:'';
+    return `<div class="rs-heat-mob" data-testid="followup-results-cohorts-mobile">${nav}<table class="rs-heat rs-heat-v" style="--rs-cols:${cols.length}"><thead><tr><th>Etapa</th>${cols.map(c=>`<th><b>${label(c)}</b><small>${num(c.size)} ${who==='odontólogos'?'odont.':'inmob.'}</small></th>`).join('')}</tr></thead><tbody>
+      ${stages.map((s,i)=>`<tr><td class="rs-heat-lbl">${esc(s.title)}</td>${cols.map(c=>{const n=Number(c.reached?.[i])||0;const r=c.size?n/c.size:0;
+        return `<td class="rs-heat-cell" style="--rs-a:${(0.06+r*0.94).toFixed(2)}" data-dark="${r>0.45}" title="${esc(s.title)}: ${num(n)} de ${num(c.size)}"><b>${c.size?pc(r):'—'}</b><small>${num(n)}</small></td>`;}).join('')}</tr>`).join('')}
+    </tbody></table></div>`;
+  }
   function cohortSection(unit,cf,view){
     const stages=Array.isArray(cf?.stages)?cf.stages:[];
     const options=Object.entries(COHORTS).filter(([k])=>Array.isArray(cf?.[k]));
@@ -270,7 +287,7 @@
       <div class="rs-head"><div><h2><span class="rs-step">2</span>Cohortes</h2>
         <p>Con las etapas del embudo de Follow-up, desde ${unit==='habita'?'Contactado':'Saludado'}. Cada celda es el porcentaje de la cohorte que llegó a esa etapa: cuanto más oscura, mejor.</p></div>
         ${options.length>1?`<nav class="rs-seg" aria-label="Agrupación de cohortes">${options.map(([k,l])=>`<button type="button" class="${by===k?'is-on':''}" aria-pressed="${by===k}" data-fu="results-cohort" data-fu-cohort="${k}" data-testid="followup-cohort-${k}">${l}</button>`).join('')}</nav>`:''}</div>
-      ${stages.length?`<div class="rs-table-scroll"><table class="rs-heat" data-testid="followup-results-cohorts"><thead><tr><th>${by==='version'?'Segmento':'Semana'}</th>${stages.map(s=>`<th>${esc(s.title)}</th>`).join('')}</tr></thead><tbody>
+      ${stages.length?`${cohortMobile(stages,rows,by,who,view)}<div class="rs-table-scroll rs-heat-desk"><table class="rs-heat" data-testid="followup-results-cohorts"><thead><tr><th>${by==='version'?'Segmento':'Semana'}</th>${stages.map(s=>`<th>${esc(s.title)}</th>`).join('')}</tr></thead><tbody>
         ${rows.map(c=>`<tr><td class="rs-heat-lbl">${esc(by==='version'?c.cohort:weekLabel(c.cohort))}<small>${num(c.size)} ${who}</small></td>${stages.map((s,i)=>{const n=Number(c.reached?.[i])||0;const r=c.size?n/c.size:0;
           return `<td class="rs-heat-cell" style="--rs-a:${(0.06+r*0.94).toFixed(2)}" data-dark="${r>0.45}" title="${esc(s.title)}: ${num(n)} de ${num(c.size)}"><b>${c.size?pc(r):'—'}</b><small>${num(n)}</small></td>`;}).join('')}</tr>`).join('')||`<tr><td colspan="${stages.length+1}">Sin cohortes en este período.</td></tr>`}
       </tbody></table></div>
