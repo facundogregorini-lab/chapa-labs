@@ -2574,6 +2574,15 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 .os-fu-period-bar button.is-on{background:#123b2e;border-color:#123b2e;color:#fff}
 .os-fu-period-bar button.is-on b{color:#cfe3d8}
 .os-fu-period-bar button:focus-visible{outline:2px solid #188854;outline-offset:2px}
+/* Variación contra el período anterior (13/11/2026): abajo a la derecha de cada tarjeta, solo en Hoy · Ayer · Esta semana. */
+[data-testid="followup-reference-stage-cards"] .os-fu-stage{position:relative}
+.os-fu-stage-delta{position:absolute;right:9px;bottom:8px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0;line-height:1.4;font-variant-numeric:tabular-nums;white-space:nowrap}
+.os-fu-stage-delta[data-dir="up"]{background:#e3f4e8;color:#17663a}
+.os-fu-stage-delta[data-dir="down"]{background:#fbe9e7;color:#a3341f}
+.os-fu-stage-delta[data-dir="flat"]{background:#eef2ef;color:#5a6d63}
+:root[data-theme="dark"] .os-fu-stage-delta[data-dir="up"]{background:#1d4a30;color:#bfe8cc}
+:root[data-theme="dark"] .os-fu-stage-delta[data-dir="down"]{background:#4d2620;color:#f4c3b8}
+:root[data-theme="dark"] .os-fu-stage-delta[data-dir="flat"]{background:#2a3a31;color:#b9c9bf}
 @media(max-width:760px){
   .os-fu-queue-topfilters .os-fu-executor-bar{margin:0;max-width:none}
   .os-fu-period-bar button{min-height:44px}

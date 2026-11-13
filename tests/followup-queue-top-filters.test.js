@@ -68,3 +68,47 @@ test('La cola usa n.executed para los períodos y no ofrece ejecutar lo ya ejecu
   assert.match(app, /const executable=!closed&&!done&&/);
   assert.match(app, /x\.execution\.executedBy==='bot'\)return 'extension'/);
 });
+
+function windowsFns() {
+  const start = app.indexOf('  const FU_PERIODS=');
+  const end = app.indexOf('  function fuQueueSelection', start);
+  const ctx = {};
+  vm.runInNewContext(app.slice(start, end) + ';this.W=fuPeriodWindows;this.D=fuDelta;this.I=fuInWindow;', ctx);
+  return ctx;
+}
+
+test('Variación: el período anterior hasta el mismo punto de avance', () => {
+  const { W, I } = windowsFns();
+  const now = new Date(2026, 10, 13, 12, 50); // viernes 13/11 12:50
+  const at = (d, h, m = 0) => ({ since: new Date(2026, 10, d, h, m).toISOString() });
+  const hoy = W('hoy', now).prev;
+  assert.equal(I(at(12, 0, 0), hoy), true);   // ayer 0:00
+  assert.equal(I(at(12, 12, 40), hoy), true); // ayer antes de esta hora
+  assert.equal(I(at(12, 13, 0), hoy), false); // ayer después de esta hora
+  const ayer = W('ayer', now).prev;           // el miércoles entero
+  assert.equal(I(at(11, 23, 59), ayer), true);
+  assert.equal(I(at(12, 9), ayer), false);
+  const semana = W('semana', now).prev;       // lun 2/11 0:00 a vie 6/11 12:50
+  assert.equal(I(at(2, 0, 1), semana), true);
+  assert.equal(I(at(6, 12, 40), semana), true);
+  assert.equal(I(at(6, 13), semana), false);
+  assert.equal(I(at(1, 23), semana), false);
+  assert.equal(W('', now), null);
+});
+
+test('Variación: porcentaje, «nuevo» y nada si los dos son 0', () => {
+  const { D } = windowsFns();
+  assert.deepEqual({ ...D(57, 106) }, { dir: 'down', text: '▼ 46%' });
+  assert.deepEqual({ ...D(23, 10) }, { dir: 'up', text: '▲ 130%' });
+  assert.deepEqual({ ...D(18, 18) }, { dir: 'flat', text: '= 0%' });
+  assert.deepEqual({ ...D(4, 0) }, { dir: 'up', text: 'nuevo' });
+  assert.equal(D(0, 0), null);
+});
+
+test('La variación va solo en lo ejecutado, abajo a la derecha de cada tarjeta, y la etapa compartida se mantiene al cambiar de producto', () => {
+  assert.match(app, /const win=executed\?fuPeriodWindows\(q\.period\):null;/);
+  assert.match(app, /<strong>\$\{stageCounter\(s\)\}<\/strong>\$\{deltaPill\(s\)\}/);
+  assert.match(css, /\.os-fu-stage-delta\{position:absolute;right:9px;bottom:8px;/);
+  assert.match(app, /commercial:shared\?qv\.commercial:null/);
+  assert.match(app, /function fuPrefetchOther\(scope\)/);
+});

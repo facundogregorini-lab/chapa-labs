@@ -175,7 +175,12 @@
   }
   function go(unit, view, { replace } = {}) {
     const previousUnit = state.unit;
-    if (unit!==state.unit && state.fu?.queueView) state.fu.queueView={...state.fu.queueView,commercial:null,situation:null,rule:null,tech:null,closed:false,limit:25};
+    // Al cambiar de producto se mantienen el período, quién ejecuta, la búsqueda y la etapa comercial si
+    // existe en los dos (Prospectado, Demo enviada, Cuenta creada…); lo propio de cada uno vuelve a Todas.
+    if (unit!==state.unit && state.fu?.queueView) {
+      const qv=state.fu.queueView,shared=(window.ProspectingFollowup?.COMMERCIAL?.[unit]||[]).some(([k])=>k===qv.commercial);
+      state.fu.queueView={...qv,commercial:shared?qv.commercial:null,situation:null,rule:null,tech:null,closed:false,limit:25};
+    }
     if (unit !== state.unit && window.ProspectingAgencies && unit !== 'todas')
       state.agf = window.ProspectingAgencies.filtersFrom(new URLSearchParams(''), unit === 'turnia' ? window.ProspectingAgencies.TURNIA : window.ProspectingAgencies.HABITA);
     state.unit = unit;
@@ -2577,10 +2582,11 @@
     return (fuCounts[scope] = F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length);
   }
 
-  async function loadFollowup({ quiet } = {}) {
+  async function loadFollowup({ quiet, scope: only } = {}) {
     if (state.demo) { state.fu.n = F.normalize({}); state.fu.raw = { units: {} }; return; }
     if (!state.session || !state.session.user) return;
-    const scope = fuScope();
+    // `only`: traer otro producto en segundo plano (ver fuPrefetchOther), sin tocar el error de la vista.
+    const scope = only || fuScope();
     const period = fuChartPeriod();
     const signature = JSON.stringify(period);
     if (state.fu.loading) {
@@ -2616,9 +2622,10 @@
       state.fu.n = F.normalize(combined);
       state.fu.at = now;
       void fuCommentIndexLoad();
-      state.fu.error = scope !== 'todas' && !state.fu.n.units[scope]
+      if (!only) state.fu.error = scope !== 'todas' && !state.fu.n.units[scope]
         ? state.fu.n.errors[scope] || 'No se pudo actualizar este negocio.' : null;
     } catch (err) {
+      if (only) return;
       state.fu.error = err.message;
       if (err.status === 401) state.session.user = null;
       // Failed reads never replace verified data with an empty board.
@@ -2629,8 +2636,17 @@
       if (state.fu.pendingScope) {
         state.fu.pendingScope = null;
         setTimeout(() => loadFollowup({ quiet: true }), 0);
-      }
+      } else if (!only) setTimeout(() => fuPrefetchOther(scope), 0);
     }
+  }
+  // Pasar de habita. a Turnia (o al revés) sin «Cargando»: con uno a la vista, el otro se trae en segundo
+  // plano y se mantiene fresco (menos de 3 minutos), así el cambio muestra sus datos al instante.
+  function fuPrefetchOther(scope) {
+    if (state.demo || state.fu.loading || !['habita','turnia'].includes(scope)) return;
+    const other = scope === 'habita' ? 'turnia' : 'habita';
+    if (!units().some((u) => u.id === other)) return;
+    if (state.fu.n?.units?.[other] && Date.now() - (state.fu.loadedAt[other] || 0) < 3 * 60_000) return;
+    void loadFollowup({ quiet: true, scope: other });
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
 
@@ -2942,6 +2958,29 @@
   return true;
 }
 
+  // La variación de cada tarjeta en Hoy · Ayer · Esta semana: contra el período anterior hasta el mismo
+  // punto de avance. Hoy: de las 0 hasta ahora vs. ayer de las 0 hasta la misma hora. Ayer (cerrado): el día
+  // entero vs. el anterior entero. Esta semana: del lunes hasta ahora vs. la semana pasada del lunes hasta el
+  // mismo día y hora. En la hora del navegador; las APIs mandan 15 días de ejecutadas para cubrirlo.
+  function fuPeriodWindows(period,now=new Date()) {
+  const DAY=86400000,day=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime(),t=now.getTime();
+  if(period==='hoy')return {prev:[day-DAY,t-DAY],label:'ayer a esta hora'};
+  if(period==='ayer')return {prev:[day-2*DAY,day-DAY],label:'el día anterior'};
+  if(period==='semana'){const monday=day-((new Date(day).getDay()+6)%7)*DAY;return {prev:[monday-7*DAY,t-7*DAY],label:'la semana pasada a esta altura'};}
+  return null;
+}
+  function fuInWindow(x,[from,to]) {
+  const t=Date.parse(x?.since||'');
+  return Number.isFinite(t)&&t>=from&&t<to;
+}
+  /** «▲ 18%», «▼ 13%», «= 0%» o «nuevo» (antes 0); nada si los dos son 0. */
+  function fuDelta(cur,prev) {
+  if(!cur&&!prev)return null;
+  if(!prev)return {dir:'up',text:'nuevo'};
+  const pct=Math.round((cur-prev)/prev*100);
+  return pct>0?{dir:'up',text:`▲ ${pct}%`}:pct<0?{dir:'down',text:`▼ ${Math.abs(pct)}%`}:{dir:'flat',text:'= 0%'};
+}
+
   function fuQueueSelection(scope) {
   const n=state.fu.n,q=fuQueueState();
   const snap=scope==='todas'?null:n.units[scope];
@@ -3121,11 +3160,18 @@
   const baseStageRows=q.closed?n.noInteresados:executed?(n.executed||[]):q.kpi==='bloqueadas'?n.blocked:
     q.kpi==='respuestas'?n.queue.filter(x=>x.group==='respuestas'):
     q.kpi==='demos'?n.queue.filter(x=>x.group==='demos'):n.queue;
-  const stageCounter=(stage)=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
+  const stageCounter=(stage,inTime=(x)=>q.closed||fuInPeriod(x,q.period))=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
     (!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation))&&
     (!q.situation||x.situation===q.situation||x.catalogSituation===q.situation||x.productSituations?.includes(q.situation))&&
     (!q.rule||x.ruleKey===q.rule)&&
-    (q.closed||!q.executor||fuExecutor(x)===q.executor)&&(q.closed||fuInPeriod(x,q.period))).length;
+    (q.closed||!q.executor||fuExecutor(x)===q.executor)&&inTime(x)).length;
+  // En lo ejecutado, cada tarjeta suma abajo a la derecha su variación contra el período anterior.
+  const win=executed?fuPeriodWindows(q.period):null;
+  const deltaPill=(stage)=>{
+    if(!win)return '';
+    const cur=stageCounter(stage),prev=stageCounter(stage,x=>fuInWindow(x,win.prev)),d=fuDelta(cur,prev);
+    return d?`<span class="os-fu-stage-delta" data-dir="${d.dir}" data-testid="fu-stage-delta" title="${esc(`vs. ${win.label}: ${int(prev)}`)}">${esc(d.text)}</span>`:'';
+  };
   const canonical=Object.entries(snap?.labels?.situations||{});
   const override=Array.isArray(snap?.catalog?.overrides)?snap.catalog.overrides.filter(x=>!current||x.commercial_stage===current.key):[];
   const situ=[...canonical.filter(([key])=>!override.some(o=>o.key===key&&o.removed) &&
@@ -3156,8 +3202,8 @@
     ${topFilters}
     ${scope==='todas'?`<div class="os-fu-stage-grid" aria-label="Unidades"><button class="os-fu-stage ${!state.fu.f.unit||state.fu.f.unit==='todas'?'is-on':''}" data-fu="unit" data-fu-unit="todas">TODOS LOS NEGOCIOS <strong>${n.queue.length}</strong></button>${units().map(u=>`<button class="os-fu-stage ${state.fu.f.unit===u.id?'is-on':''}" data-fu="unit" data-fu-unit="${u.id}">${esc(u.name.toUpperCase())}<strong>${n.queue.filter(x=>x.unit===u.id).length}</strong></button>`).join('')}</div>`:
       `<div class="os-fu-stage-grid" aria-label="Etapas comerciales" data-testid="followup-reference-stage-cards">
-        <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong><span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
-        ${commercialStages.map(s=>`<button class="os-fu-stage is-${esc(s.key)} ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${stageCounter(s)}</strong></button>`).join('')}
+        <button class="os-fu-stage is-todas ${!current?'is-on':''}" type="button" aria-pressed="${!current}" data-fu="queue-stage" data-fu-stage=""><span class="os-fu-stage-icon">${fuStageGlyph('todas')}</span><span class="os-fu-stage-label">TODAS</span><strong>${stageCounter(null)}</strong>${deltaPill(null)||'<span class="os-fu-reference-spark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>'}</button>
+        ${commercialStages.map(s=>`<button class="os-fu-stage is-${esc(s.key)} ${current?.key===s.key?'is-on':''}" type="button" aria-pressed="${current?.key===s.key}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}"><span class="os-fu-stage-icon">${fuStageGlyph(s.key)}</span><span class="os-fu-stage-label">${esc(s.title.toUpperCase())}</span><strong>${stageCounter(s)}</strong>${deltaPill(s)}</button>`).join('')}
       </div>`}
     ${scope!=='todas'&&customStages.length?`<div class="os-fu-chipbar" data-testid="followup-queue-custom-stages"><strong>ETAPAS PERSONALIZADAS</strong><div class="os-fu-chips">
       ${customStages.map(s=>`<button type="button" aria-pressed="${current?.key===s.key}" class="${current?.key===s.key?'is-on':''}" data-fu="queue-stage" data-fu-stage="${esc(s.key)}">${esc(s.title)} <b>${stageCounter(s)}</b></button>`).join('')}
