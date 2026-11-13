@@ -251,7 +251,7 @@ test('Desktop preview shows next action, WhatsApp message and actual version not
 });
 
 test('Turnia shows the same «Funnel comercial» as habita. once its API sends the chart, with its own words',()=>{
-  assert.match(app,/if\(scope==='turnia'&&Array\.isArray\(snap\.chart\)&&Array\.isArray\(snap\.lostAt\)&&Array\.isArray\(snap\.chartRows\)\)return fuNativeChart\(snap,'turnia'\)/);
+  assert.match(app,/if\(scope==='turnia'&&Array\.isArray\(snap\.chart\)&&Array\.isArray\(snap\.lostAt\)&&Array\.isArray\(snap\.chartRows\)\)return fuFunnelChart\(snap,'turnia'\)/);
   assert.match(app,/'Visitaron, sin conversar'/);
   assert.match(app,/data-fu-review-unit=/);
   assert.match(app,/form\.dataset\.fuReviewUnit==='turnia'\?'turnia':'habita'/);
