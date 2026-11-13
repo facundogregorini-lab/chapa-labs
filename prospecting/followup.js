@@ -300,6 +300,17 @@
     return rows;
   }
 
+  /**
+   * El avance de una regla para mostrar: las subetapas en las que corre, solo si su
+   * etapa comercial tiene más de una y la regla no las cubre todas.
+   */
+  function progressOf(unit, snap, r) {
+    const covered = Array.isArray(r.product_stages) && r.product_stages.length ? r.product_stages : [r.stage];
+    const group = commercialStages(unit, snap).find((s) => s.technical.includes(r.stage));
+    const all = group ? group.technical : [r.stage];
+    return all.length > 1 && covered.length < all.length ? covered : [];
+  }
+
   /** Las reglas (habita.: editables; Turnia: la cadencia de su panel), en filas. */
   function ruleRows(unit, snap) {
     const labels = (snap.labels && snap.labels.situations) || {};
@@ -311,7 +322,7 @@
       stage: r.stage,
       stageTitle: r.title || titles[r.stage] || r.stage,
       when: r.catalog_situation ? (catalogLabels[r.catalog_situation]||r.catalog_situation) :
-        Array.isArray(r.situations) ? (r.situations.length ? r.situations.map((s) => labels[s] || s).join(', ') : 'Cualquier situación') : 'Al entrar en la etapa',
+        Array.isArray(r.situations) ? ([...progressOf(unit, snap, r).map((s) => titles[s] || s), ...r.situations.map((s) => labels[s] || s)].join(', ') || 'Cualquier situación') : 'Al entrar en la etapa',
       action: r.action_label || ACTION_LABEL[r.action] || r.action || '',
       wait: r.wait || (r.after_hours !== undefined ? (r.after_hours ? `${r.after_hours} h desde nuestro último mensaje` : 'Enseguida') : ''),
       window: r.hours_from !== undefined ? `${r.hours_from} a ${r.hours_to} h` : '',

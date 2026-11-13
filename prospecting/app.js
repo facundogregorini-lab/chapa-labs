@@ -3521,7 +3521,7 @@
     if(!checked.length){
       const any=document.createElement('span');
       any.className='fu-ref-chipbtn is-on is-static';
-      any.textContent='✓ CUALQUIER SITUACIÓN';
+      any.textContent='✓ CUALQUIER RESPUESTA';
       area.appendChild(any);
     }else for(const box of checked){
       const button=document.createElement('button');
@@ -3571,8 +3571,11 @@
     const cat=snap.catalog?.canonical?.find(x=>x.key===s);
     return (!cat||!cat.permanent_stop||s==='rechazo')&&!overrides.some(x=>x.key===s);
   });
-  const custom=(snap.catalog?.states||[]).filter(s=>s.active&&(s.maps_to||s.product_stage===key)
+  // Los estados de producto del catálogo decían lo mismo que el avance de la regla: ya no se ofrecen.
+  const custom=(snap.catalog?.states||[]).filter(s=>s.active&&s.source!=='product'&&s.maps_to
     &&(s.commercial_stage===stageCommercial||(snap.catalog?.stages||[]).some(x=>x.key===s.commercial_stage&&x.technical_stage===key)));
+  // Avance: las subetapas en las que corre la regla. Sin el campo (motor anterior), solo la suya.
+  const covered=(Array.isArray(r.product_stages)&&r.product_stages.length?r.product_stages:[key]).filter(s=>availableTechnical.includes(s));
   const strayAction=Boolean(existing&&r.action&&!allowed.includes(r.action));
   const strayAfter=Boolean(existing&&r.after_action&&!allowed.includes(r.after_action));
   const straySits=(r.situations||[]).filter(id=>!labels.some(([x])=>x===id));
@@ -3604,19 +3607,27 @@
     </header>
     <section class="fu-ref-when" data-testid="followup-part-when"><h3>◷ CUÁNDO SE EJECUTA</h3>
       ${create&&tpl?'<p class="os-warn-note">Regla copiada: revisá y adaptá la situación, el mensaje y la etapa antes de guardarla.</p>':''}
-      <label class="field"><span>ETAPA DEL EMBUDO</span>
-        ${create?`<select class="input" data-fu-rules-tech aria-label="Etapa del embudo de la regla">
+      ${availableTechnical.length>1?`<div class="field" data-testid="followup-rule-progress"><span>AVANCE (CUALQUIERA DE)</span>
+        ${create?`<select class="input" data-fu-rules-tech aria-label="Avance principal de la regla">
           ${availableTechnical.map(stageKey=>`<option value="${esc(stageKey)}" ${stageKey===key?'selected':''}>${esc(snap.stages?.find(x=>x.key===stageKey)?.title||stageKey)}</option>`).join('')}
-        </select>`:`<input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled><small>Para moverla a otra etapa, creá otra regla y conservá el historial.</small>`}
-      </label>
+        </select>`:''}
+        <div class="fu-ref-situation-selected">
+          ${availableTechnical.filter(stageKey=>!create||stageKey!==key).map(stageKey=>{
+            const anchor=stageKey===key, on=anchor||covered.includes(stageKey);
+            const missing=!on&&!(snap.catalog?.actions?.[stageKey]||[]).some(a=>a.key===r.action);
+            return `<label class="fu-ref-chipbtn fu-ref-chipcheck" title="${anchor?'El mensaje de esta regla vive acá':missing?'La acción de la regla no existe en esta situación':''}"><input type="checkbox" name="product_stage" value="${esc(stageKey)}" ${on?'checked':''} ${anchor||missing?'disabled':''}> ${esc(snap.stages?.find(x=>x.key===stageKey)?.title||stageKey)}</label>`;
+          }).join('')}
+        </div>
+        <small>${create?'El mensaje de la regla vive en el avance elegido arriba; marcá los otros en los que también corre.':'Sale del embudo, sola. La regla corre si la inmobiliaria está en alguno de los marcados.'}</small>
+      </div>`:''}
       ${strayAction||strayAfter?`<p class="os-warn-note" role="alert">Esta regla tiene ${strayAction?'una acción':'un paso previo'} que no corresponde a esta etapa: se conserva para que puedas apagarla sin perderla. Para usarla, elegí ${strayAction?'una acción':'un paso previo'} de la etapa.</p>`:''}
       ${invalidCatalog?'<p class="os-warn-note" role="alert">Esta situación personalizada no está disponible en la etapa elegida. Seleccioná otra o quitá la condición antes de guardar.</p>':''}
-      <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span>
+      <div class="field"><span>RESPUESTA (CUALQUIERA DE)</span>
         <div class="fu-ref-situation-editor" data-testid="followup-rule-situations">
           <div class="fu-ref-situation-selected" data-fu-sit-chips>
             ${(r.situations||[]).length
               ?(r.situations||[]).map(id=>`<button type="button" class="fu-ref-chipbtn is-on" data-fu="rules-remove-sit" data-fu-value="${esc(id)}" aria-label="Quitar ${esc(labels.find(x=>x[0]===id)?.[1]||id)}">✓ ${esc(labels.find(x=>x[0]===id)?.[1]||id)}</button>`).join('')
-              :'<span class="fu-ref-chipbtn is-on is-static">✓ CUALQUIER SITUACIÓN</span>'}
+              :'<span class="fu-ref-chipbtn is-on is-static">✓ CUALQUIER RESPUESTA</span>'}
           </div>
           <select class="input fu-ref-chipadd" data-fu-rule-add-sit aria-label="Agregar situación">
             <option value="">+ AGREGAR</option>
@@ -3628,7 +3639,7 @@
         </div>
       </div>
       ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation" data-fu-rule-custom><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
-      <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>${strayAfter?strayOption(r.after_action):''}
+      <label class="field" ${r.after_action?'':'hidden'}><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>${strayAfter?strayOption(r.after_action):''}
         ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
       <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
       <div class="fu-ref-send-window field" data-testid="followup-rule-send-window">
@@ -3699,7 +3710,12 @@
     }
     if(action==='encuesta_cierre'&&!situations.includes('rechazo')){toast('La encuesta de cierre requiere la situación No interesado.',true);return;}
     if(action!=='encuesta_cierre'&&situations.includes('rechazo')){toast('Para No interesado elegí la acción Encuesta de cierre.',true);return;}
+    // Avance: la subetapa de la regla (su casilla va deshabilitada o es el selector) más las marcadas.
+    const technical=F.commercialStages(unit,snap).find(s=>s.technical.includes(form.dataset.fuStage))?.technical||[form.dataset.fuStage];
+    const marked=fd.getAll('product_stage').map(String);
+    const productStages=technical.filter(s=>s===form.dataset.fuStage||marked.includes(s));
     const values={...(rule||{stage:form.dataset.fuStage,position:Number(form.dataset.fuPosition)||10}),
+      product_stages:productStages,
       action, name:String(fd.get('name')||'').slice(0,80),situations,
       catalog_situation:catalogKey||null,
       min_demo_activity_level:Number(fd.get('min_demo_activity_level')||0),

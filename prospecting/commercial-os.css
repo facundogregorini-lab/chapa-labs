@@ -810,6 +810,12 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) button.fu
   background:#d7f0de;border-color:#73ba8e;
 }
 body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipbtn.is-static{cursor:default}
+/* Avance de la regla: casillas con forma de chip; apagada, en gris. */
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipcheck{gap:6px;cursor:pointer}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipcheck:not(:has(input:checked)){
+  background:#f4f6f5;border-color:#d5dcd8;color:#5c6b64;
+}
+body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipcheck:has(input:disabled){cursor:default}
 body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .fu-ref-chipadd{
   flex:0 0 auto;max-width:min(240px,100%);min-height:32px;
   padding:5px 8px;border-radius:9px;color:#196340;
