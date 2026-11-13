@@ -22,7 +22,7 @@ test('mobile execution provides distinct Confirmar envío and Siguiente tarea CT
 test('next task uses existing filtered and ranked queue with no claimed, blocked or scheduled tasks', () => {
   assert.match(app, /function fuNextCandidate\(currentKey\)/);
   assert.match(app, /fuQueueSelection\(fuScope\(\)\)\.rows\.filter\(x=>/);
-  assert.match(app, /x\.key!==currentKey&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
+  assert.match(app, /x\.key!==currentKey&&x\.bucket!=='ejecutada'&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
   assert.match(app, /case 'next-after': await fuNext\(t\)/);
   assert.match(app, /if\(!next\)\{\s*toast\('No hay otra tarea libre/);
 });

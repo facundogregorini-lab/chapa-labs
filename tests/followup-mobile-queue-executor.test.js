@@ -31,7 +31,7 @@ test('la cola filtra por quién ejecuta y muestra Facu o Axel solo si tienen acc
   assert.doesNotThrow(() => new vm.Script(app));
   assert.match(app, /data-testid="fu-queue-executor"/);
   assert.match(app, /\.filter\(\(\[k\]\)=>!k\|\|k==='extension'\|\|executors\[k\]>0\|\|q\.executor===k\)/);
-  assert.match(app, /q\.executor\?filtered\.filter\(x=>fuExecutor\(x\)===q\.executor\):filtered/);
+  assert.match(app, /q\.executor\?list\.filter\(x=>fuExecutor\(x\)===q\.executor\):list/);
   assert.match(app, /case 'queue-executor':/);
   assert.match(app, /data-testid="fu-mobile-executor"/);
 });

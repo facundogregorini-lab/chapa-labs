@@ -2665,7 +2665,7 @@
 
   function fuFind(key) {
     const n = state.fu.n;
-    return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.noInteresados||[])].find((x) => x.key === key) : null;
+    return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.noInteresados||[]), ...(n.executed||[])].find((x) => x.key === key) : null;
   }
 
   // The task opens at once with what the queue already knows (name, stage,
@@ -2728,7 +2728,7 @@
     // Never navigate into a different operator's claim.
     if (!state.fu.n) return null;
     const free = fuQueueSelection(fuScope()).rows.filter(x=>
-      x.key!==currentKey&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action)
+      x.key!==currentKey&&x.bucket!=='ejecutada'&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action)
     );
     const ahead = free.find(x=>!state.fu.skipped.has(x.key));
     if (ahead || !free.length) return ahead || null;
@@ -2912,6 +2912,13 @@
   // Quién ejecuta cada acción: la extensión del producto (lo que no tiene
   // responsable o está asignado a «Extensión»), Facu o Axel a mano.
   function fuExecutor(x) {
+  // Lo ya ejecutado: quién lo confirmó (el bot es la pestaña de la extensión), no a quién está asignada.
+  if(x?.bucket==='ejecutada'&&x.execution){
+    if(x.execution.executedBy==='bot')return 'extension';
+    const by=String(x.execution.by||'').trim().toLowerCase();
+    if(by.startsWith('facu'))return 'facu';
+    if(by==='axel'||by.startsWith('axel '))return 'axel';
+  }
   const o=String(x?.owner||'').trim().toLowerCase();
   if(o.startsWith('facu'))return 'facu';
   if(o==='axel'||o.startsWith('axel '))return 'axel';
@@ -2919,8 +2926,9 @@
 }
   const FU_EXECUTOR_LABEL={extension:'Extensión',facu:'Facu',axel:'Axel'};
 
-  // Cuándo fue la última acción o contacto de la tarea: hoy, ayer o esta semana
-  // (desde el lunes), en la hora del navegador. «Pendiente» no filtra por fecha.
+  // «Pendiente» es la cola (lo que falta ejecutar). «Hoy», «Ayer» y «Esta semana» (desde el lunes, en la
+  // hora del navegador) son lo ya ejecutado en ese período (`n.executed`, un envío por fila): lo que se
+  // ejecuta deja la cola, así que filtrar la cola por fecha no traía lo hecho (13/11/2026).
   const FU_PERIODS=[['','Pendiente'],['hoy','Hoy'],['ayer','Ayer'],['semana','Esta semana']];
   function fuInPeriod(x,period,now=new Date()) {
   if(!period)return true;
@@ -2943,7 +2951,7 @@
     : q.kpi==='bloqueadas' ? n.blocked
     : q.kpi==='respuestas' ? n.queue.filter(x=>x.group==='respuestas')
     : q.kpi==='demos' ? n.queue.filter(x=>x.group==='demos') : n.queue;
-  const rows=base.filter(x=>{
+  const pick=(list)=>list.filter(x=>{
     if(scope!=='todas'&&x.unit!==scope)return false;
     if(current && !(current.technical.includes(x.stage) && (!current.situation||x.situation===current.situation)))return false;
     if(q.tech&&x.stage!==q.tech)return false;
@@ -2952,22 +2960,27 @@
     if(q.group&&x.group!==q.group)return false;
     return true;
   });
-  const filtered=F.filter(rows,{...state.fu.f,unit:scope==='todas'?state.fu.f.unit||'todas':scope,q:q.search});
   const sort={comercial:F.byPriority,score:(a,b)=>(b.score??-1)-(a.score??-1)||F.byPriority(a,b),
     antiguo:(a,b)=>String(a.since||'').localeCompare(String(b.since||'')),
     reciente:(a,b)=>String(b.since||'').localeCompare(String(a.since||''))};
-  filtered.sort(sort[q.order]||sort.comercial);
+  const narrow=(list,order)=>F.filter(pick(list),{...state.fu.f,unit:scope==='todas'?state.fu.f.unit||'todas':scope,q:q.search}).sort(sort[order]||sort.comercial);
+  const pending=narrow(base,q.order);
+  // Lo ejecutado va del más reciente al más viejo, salvo que se pida «Más antiguas».
+  const done=q.closed?[]:narrow(n.executed||[],q.order==='antiguo'?'antiguo':'reciente');
+  const ofPeriod=(period)=>period?done.filter(x=>fuInPeriod(x,period)):pending;
+  const period=q.closed?null:q.period;
+  const filtered=ofPeriod(period);
   const executors={extension:0,facu:0,axel:0};
   for(const x of filtered)executors[fuExecutor(x)]++;
-  const byExecutor=q.executor?filtered.filter(x=>fuExecutor(x)===q.executor):filtered;
+  const byWho=(list)=>q.executor?list.filter(x=>fuExecutor(x)===q.executor):list;
   const periods={};
-  for(const [k] of FU_PERIODS)periods[k]=k?byExecutor.filter(x=>fuInPeriod(x,k)).length:byExecutor.length;
-  const byPeriod=q.period?byExecutor.filter(x=>fuInPeriod(x,q.period)):byExecutor;
+  for(const [k] of FU_PERIODS)periods[k]=byWho(ofPeriod(k)).length;
+  const byPeriod=byWho(filtered);
   // La línea de WhatsApp (Turnia): para operar las dos en paralelo, cada una con su cola.
   const lines={};
   for(const x of byPeriod)for(const l of (x.lines?.length?x.lines:['—']))lines[l]=(lines[l]||0)+1;
   const byLine=q.line?F.filter(byPeriod,{line:q.line}):byPeriod;
-  return {q,snap,stages,current,all:base,rows:byLine,executors,periods,lines};
+  return {q,snap,stages,current,all:base,rows:byLine,executors,periods,lines,executed:Boolean(period)};
 }
 
   // ¿Tienen WhatsApp? (Turnia, op whatsapp-check): fijo o celular salió de cómo venía escrito el número y
@@ -3004,8 +3017,8 @@
       <td class="os-fu-name"><span class="os-fu-agency-name"><span class="os-fu-agency-icon" aria-hidden="true">${icon.building}</span><span class="os-fu-agency-copy"><strong>${esc(x.name)}</strong><small>${esc(x.sub&&x.sub!==x.name?x.sub:x.stageTitle||'')}${fuLineBadges(x)}</small></span></span></td>
       <td>${x.unit==='habita'?opts('stage',stages.map(v=>[v.technical.includes(x.stage)?x.stage:v.technical[0],v.title]),x.stage):esc(x.stageTitle||'—')}</td>
       <td>${opts('situation',situations,x.situation)}</td>
-      <td class="os-fu-next-cell"><b>${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
-      <td>${esc(ago(x.since)||'—')}</td>
+      <td class="os-fu-next-cell"><b>${x.bucket==='ejecutada'?'✓ ':''}${esc(closed?'Sin acciones':x.action||x.actionReason||'—')}</b></td>
+      <td>${esc((x.bucket==='ejecutada'?dayTime(x.since):ago(x.since))||'—')}</td>
       <td><button type="button" class="os-fu-inline-wa" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" title="Abrir WhatsApp" aria-label="WhatsApp de ${esc(x.name)}" ${x.wa?'':'disabled'}>${icon.wa}</button></td>
       <td>${x.unit==='habita'?opts('owner',['Todos','Facu','Axel','Extensión'].map(v=>[v,v]),owner):esc(owner)}</td>
       <td><span class="os-fu-priority" data-level="${esc(x.priority)}">${esc(F.PRIORITY_LABEL[x.priority]||'—')}</span></td>
@@ -3017,15 +3030,16 @@
   function fuQueueMobileCard(x,{closed=false}={}) {
     const me=state.session?.user?.name;
     const locked=x.claim&&x.claim.by!==me;
-    const executable=!closed&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action);
-    const stateText=closed?'CERRADA':x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
+    const done=x.bucket==='ejecutada';
+    const executable=!closed&&!done&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action);
+    const stateText=closed?'CERRADA':done?'EJECUTADA · '+dayTime(x.since).toUpperCase():x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
       locked?'TOMADA POR '+x.claim.by:x.claim?'YA TOMADA':!x.action?'SIN ACCIÓN':'LISTA';
     return `<article class="os-fu-mobile-item" data-testid="fu-mobile-item">
       <div class="os-fu-mobile-item-main">
         <div class="os-fu-mobile-item-body">
           <strong class="os-fu-mobile-item-name">${esc(x.name)}${fuCommentChip(x)}</strong>
           <span class="os-fu-mobile-item-stage">${esc(x.stageTitle||'')} · ${esc(x.situationLabel||'Sin clasificar')}${fuLineBadges(x)}</span>
-          <span class="os-fu-mobile-item-action">${esc(x.action||x.actionReason||'Sin acción programada')}</span>
+          <span class="os-fu-mobile-item-action">${done?'✓ ':''}${esc(x.action||x.actionReason||'Sin acción programada')}</span>
         </div>
         <div class="os-fu-mobile-item-control">
           ${executable?`<button type="button" class="btn primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-execute">EJECUTAR →</button>`:
@@ -3059,7 +3073,8 @@
     if(task?.item?.key===x.key)
       return '<aside class="os-fu-side os-fu-side-working" data-testid="followup-execution-aside">'+renderFuTask(task)+'</aside>';
     const locked=x.claim&&x.claim.by!==state.session?.user?.name;
-    const ready=!q.closed&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
+    const done=x.bucket==='ejecutada';
+    const ready=!q.closed&&!done&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
     const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x.versionId);
     const template=version?.body||'';
     const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
@@ -3074,7 +3089,7 @@
         <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
         <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
       </div>
-      <div class="os-fu-preview-card is-action"><strong>Próxima acción</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
+      <div class="os-fu-preview-card is-action"><strong>${done?'Acción ejecutada · '+esc(dayTime(x.since)):'Próxima acción'}</strong><p>${esc(x.action||x.actionReason||'Sin acción pendiente')}</p></div>
       <div class="os-fu-preview-card"><strong>Mensaje de WhatsApp · borrador</strong><p class="os-fu-preview-message">${esc(message||'El mensaje definitivo se prepara al tomar la tarea.')}</p></div>
       <div class="os-fu-preview-card"><strong>Observaciones</strong><p class="os-fu-preview-message">${esc(observations||'Sin observaciones registradas.')}</p></div>
       <div class="os-fu-preview-card" data-testid="followup-applied-rule"><strong>Regla aplicada</strong><p>${esc((snap.rules||[]).find(r=>r.key===x.ruleKey)?.name||x.action||'No hay regla activa')}</p></div>
@@ -3086,13 +3101,13 @@
       <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
       <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
-      '<p class="os-fu-caption">'+esc(locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
+      '<p class="os-fu-caption">'+esc(done?'Ejecutada '+dayTime(x.since)+' · '+FU_EXECUTOR_LABEL[fuExecutor(x)]:locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
     </aside>`;
   }
 
   function fuHoy() {
   const scope=fuScope(),n=state.fu.n;
-  const {q,snap,stages,current,rows,executors,periods,lines}=fuQueueSelection(scope);
+  const {q,snap,stages,current,rows,executors,periods,lines,executed}=fuQueueSelection(scope);
   const customStageKeys=new Set((snap?.catalog?.stages||[]).map(x=>x.key));
   const commercialStages=stages.filter(x=>!customStageKeys.has(x.key));
   const customStages=stages.filter(x=>customStageKeys.has(x.key));
@@ -3103,7 +3118,7 @@
     ['demos','DEMOS PENDIENTES',summary.demos,'Por crear o enviar'],
     ['bloqueadas','BLOQUEADAS',summary.blocked,`${summary.scheduled} programadas`],
   ];
-  const baseStageRows=q.closed?n.noInteresados:q.kpi==='bloqueadas'?n.blocked:
+  const baseStageRows=q.closed?n.noInteresados:executed?(n.executed||[]):q.kpi==='bloqueadas'?n.blocked:
     q.kpi==='respuestas'?n.queue.filter(x=>x.group==='respuestas'):
     q.kpi==='demos'?n.queue.filter(x=>x.group==='demos'):n.queue;
   const stageCounter=(stage)=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
@@ -3151,9 +3166,9 @@
     <section class="card glass os-fu-tablecard">
     <div class="os-fu-tablehead os-fu-tablehead-fast">
       <div class="os-fu-queue-heading"><h2>${esc((current?.title||'Cola de ejecución').toLocaleUpperCase('es-AR'))}</h2>
-        <span class="os-fu-ready-count">${int(rows.length)} ${q.closed?'no interesados':q.kpi==='bloqueadas'?'bloqueadas':rows.length===1?'listo':'listos'}</span></div>
+        <span class="os-fu-ready-count" data-testid="fu-queue-count">${int(rows.length)} ${q.closed?'no interesados':executed?(rows.length===1?'ejecutada':'ejecutadas'):q.kpi==='bloqueadas'?'bloqueadas':rows.length===1?'listo':'listos'}</span></div>
       <button type="button" class="btn primary os-fu-queue-next" data-fu="next"
-        ${!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''}
+        ${executed||!rows.some(x=>!x.claim&&!x.blocked&&!x.dueAt&&x.action)||q.closed?'disabled':''}
         data-testid="fu-take-next">EJECUTAR SIGUIENTE →</button>
     </div>
     <button type="button" class="os-fu-filters-toggle" data-fu="queue-filters" aria-expanded="${Boolean(q.filtersOpen)}" data-testid="fu-queue-filters-toggle"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Filtros${q.search||q.situation||q.rule||q.group||q.kpi!=='listas'||q.closed||q.order!=='comercial'?' · activos':''}</span><span class="os-fu-filters-chev" aria-hidden="true">⌄</span></button>
@@ -3183,10 +3198,10 @@
     </div>`:''}
     ${filterSummary.length?`<p class="os-fu-caption">Filtros activos: ${filterSummary.map(([k,v])=>esc(k+'='+v)).join(' · ')}</p>`:''}
     ${q.kpi==='bloqueadas'&&reasons.length?`<div class="os-fu-reasons">${reasons.map(([key,count])=>`<span>${esc(key)} · <b>${count}</b></span>`).join('')}</div>`:''}
-    <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>PRÓXIMA ACCIÓN</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
-    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed,selected:x.key===(rows.some(r=>r.key===state.fu.selectedQueueKey)?state.fu.selectedQueueKey:rows[0]?.key)})).join('')||'<tr><td colspan="8" class="empty">No hay contactos con estos filtros.</td></tr>'}</tbody></table></div>
+    <div class="table-wrap"><table class="os-fu-table os-fu-queue-table"><thead><tr><th>${scope==='turnia'?'CONTACTO':'INMOBILIARIA'}</th><th>ETAPA</th><th>SITUACIÓN</th><th>${executed?'ACCIÓN EJECUTADA':'PRÓXIMA ACCIÓN'}</th><th>${executed?'EJECUTADA':'ÚLTIMO CONTACTO'}</th><th>WHATSAPP</th><th>QUIÉN LO TOMA</th><th>PRIORIDAD</th></tr></thead>
+    <tbody>${rows.slice(0,q.limit).map(x=>fuQueueTableRow(x,{closed:q.closed,selected:x.key===(rows.some(r=>r.key===state.fu.selectedQueueKey)?state.fu.selectedQueueKey:rows[0]?.key)})).join('')||`<tr><td colspan="8" class="empty">${executed?'No se ejecutó nada en este período con estos filtros.':'No hay contactos con estos filtros.'}</td></tr>`}</tbody></table></div>
     <div class="os-fu-mobile-list" data-testid="fu-mobile-queue">
-      ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||'<p class="os-fu-mobile-empty">No hay tareas con estos filtros.</p>'}
+      ${rows.slice(0,q.limit).map(x=>fuQueueMobileCard(x,{closed:q.closed})).join('')||`<p class="os-fu-mobile-empty">${executed?'No se ejecutó nada en este período con estos filtros.':'No hay tareas con estos filtros.'}</p>`}
     </div>
     ${rows.length>q.limit?`<div style="text-align:center;padding:14px"><button type="button" class="btn" data-fu="queue-more">VER ${int(Math.min(25,rows.length-q.limit))} MÁS</button></div>`:''}
     <p class="os-fu-queue-foot">Conversaciones nuevas en 24 h: <strong>${int(summary.newToday)}</strong> · confirmadas hoy: <strong>${int(summary.doneToday)}</strong></p>
