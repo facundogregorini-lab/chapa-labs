@@ -3652,7 +3652,7 @@
       <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'Las versiones del mensaje se conservan con su historial y su estado A/B.'}</p>
     </section>
     <footer class="fu-ref-buttons"><button type="button" class="btn" data-fu="rules-cancel">CANCELAR</button>
-      <button type="submit" class="btn primary" data-testid="followup-rule-save" ${state.session?.open?'disabled title="Requiere sesión protegida"':''}>${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button></footer>
+      <button type="submit" class="btn primary" data-testid="followup-rule-save">${create?'CREAR REGLA':'GUARDAR CAMBIOS'}</button></footer>
   </form>`;
 }
 
