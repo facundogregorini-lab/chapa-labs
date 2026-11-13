@@ -3547,6 +3547,10 @@
   const key=stage||existing.stage;
   const actions=snap.catalog?.actions?.[key]||[{key:'principal',label:'Mensaje de la etapa'}];
   const allowed=actions.map(a=>a.key);
+  // Una regla vieja puede tener una acción o un paso previo que ya no son de su etapa: se muestran tal cual
+  // (para poder apagarla sin perderlos), nunca se reemplazan en silencio por otra acción.
+  const anyActionLabel=k=>Object.values(snap.catalog?.actions||{}).flat().find(a=>a.key===k)?.label||k;
+  const strayOption=k=>`<option value="${esc(k)}" selected>${esc(anyActionLabel(k))} · no corresponde a esta etapa</option>`;
   const tpl=create?(snap.rules||[]).find(r=>r.key===state.fu.ruleTemplate):null;
   const siblings=(snap.rules||[]).filter(r=>r.stage===key);
   const defaults={stage:key,action:allowed[0],situations:[key==='no-contactado'?'sin_respuesta':key==='no-responde'?'confirmo_numero':'interesado'],
@@ -3569,6 +3573,9 @@
   });
   const custom=(snap.catalog?.states||[]).filter(s=>s.active&&(s.maps_to||s.product_stage===key)
     &&(s.commercial_stage===stageCommercial||(snap.catalog?.stages||[]).some(x=>x.key===s.commercial_stage&&x.technical_stage===key)));
+  const strayAction=Boolean(existing&&r.action&&!allowed.includes(r.action));
+  const strayAfter=Boolean(existing&&r.after_action&&!allowed.includes(r.after_action));
+  const straySits=(r.situations||[]).filter(id=>!labels.some(([x])=>x===id));
   const invalidCatalog=Boolean(r.catalog_situation&&!custom.some(s=>s.key===r.catalog_situation));
   const surveyed=r.action==='encuesta_cierre';
   const allowRejection=allowed.includes('encuesta_cierre');
@@ -3602,6 +3609,7 @@
           ${availableTechnical.map(stageKey=>`<option value="${esc(stageKey)}" ${stageKey===key?'selected':''}>${esc(snap.stages?.find(x=>x.key===stageKey)?.title||stageKey)}</option>`).join('')}
         </select>`:`<input class="input" value="${esc(snap.stages?.find(x=>x.key===key)?.title||key)}" disabled><small>Para moverla a otra etapa, creá otra regla y conservá el historial.</small>`}
       </label>
+      ${strayAction||strayAfter?`<p class="os-warn-note" role="alert">Esta regla tiene ${strayAction?'una acción':'un paso previo'} que no corresponde a esta etapa: se conserva para que puedas apagarla sin perderla. Para usarla, elegí ${strayAction?'una acción':'un paso previo'} de la etapa.</p>`:''}
       ${invalidCatalog?'<p class="os-warn-note" role="alert">Esta situación personalizada no está disponible en la etapa elegida. Seleccioná otra o quitá la condición antes de guardar.</p>':''}
       <div class="field"><span>SITUACIÓN (CUALQUIERA DE)</span>
         <div class="fu-ref-situation-editor" data-testid="followup-rule-situations">
@@ -3616,10 +3624,11 @@
                .map(([id,label])=>`<option value="${esc(id)}">${esc(label)}</option>`).join('')}
           </select>
           ${labels.map(([id,label])=>`<input type="checkbox" class="fu-ref-situation-hidden" name="sit" value="${esc(id)}" data-label="${esc(label)}" ${(r.situations||[]).includes(id)?'checked':''} ${id==='rechazo'&&!allowRejection?'disabled':''} tabindex="-1" aria-hidden="true">`).join('')}
+          ${straySits.map(id=>`<input type="checkbox" class="fu-ref-situation-hidden" name="sit" value="${esc(id)}" data-label="${esc(snap.labels?.situations?.[id]||id)}" checked tabindex="-1" aria-hidden="true">`).join('')}
         </div>
       </div>
       ${custom.length?`<label class="field"><span>SITUACIÓN PERSONALIZADA</span><select class="input" name="catalog_situation" data-fu-rule-custom><option value="">Ninguna</option>${custom.map(s=>`<option value="${esc(s.key)}" ${r.catalog_situation===s.key?'selected':''}>${esc(s.label)}</option>`).join('')}</select></label>`:''}
-      <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>
+      <label class="field"><span>PASO PREVIO</span><select class="input" name="after_action"><option value="">Ningún paso</option>${strayAfter?strayOption(r.after_action):''}
         ${actions.filter(a=>a.key!==r.action&&a.key!=='encuesta_cierre').map(a=>`<option value="${esc(a.key)}" ${r.after_action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
       <label class="field"><span>ESPERA</span><div class="fu-ref-wait"><input class="input" name="after_hours" type="number" min="0" max="720" value="${Number(r.after_hours)||0}" required data-testid="followup-rule-hours"><small>horas desde nuestro último mensaje</small></div></label>
       <div class="fu-ref-send-window field" data-testid="followup-rule-send-window">
@@ -3643,7 +3652,7 @@
     </section>
     <section class="fu-ref-what" data-testid="followup-part-what"><h3>◇ QUÉ SE EJECUTA</h3>
       <label class="field"><span>ACCIÓN DE LA REGLA</span><select class="input" name="action" data-fu-rule-action data-testid="followup-rule-action">
-        ${actions.map(a=>`<option value="${esc(a.key)}" ${r.action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
+        ${strayAction?strayOption(r.action):''}${actions.map(a=>`<option value="${esc(a.key)}" ${r.action===a.key?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
       <label class="field"><span>VERSIÓN DEL MENSAJE</span><select class="input" data-fu-rule-version aria-label="Versión del mensaje vinculada a la acción" ${linkedVersions.length?'':'disabled'}>
         ${linkedVersions.map(v=>`<option value="${esc(v.id)}" ${selectedPreview?.id===v.id?'selected':''}>V${int(v.version)} (${v.status==='active'?'activa':v.status==='test'?'en prueba':'archivada'})</option>`).join('')||'<option value="">Sin versiones</option>'}
       </select></label>
