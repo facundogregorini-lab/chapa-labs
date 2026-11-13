@@ -73,16 +73,23 @@ test('each bar opens into its types of action, for the chosen day',()=>{
   assert.match(pending,/&lt;img src=x/);
 });
 
-test('2 · actions grouped by type; a row opens into the stages where it ran and its versions',()=>{
+test('2 · actions grouped by type, with their conversion below; a row opens into its funnel stages and their rates',()=>{
   const closed=R.render('habita',habita,{});
   assert.equal((closed.match(/data-testid="results-action-row"/g)||[]).length,2);
   assert.doesNotMatch(closed,/results-action-instances/);
-  const open=R.render('habita',habita,{action:'Precios'});
+  // The conversion comes from the product (conversionLabels) or, without it, from the stage's goal.
+  const labelled={...habita,stages:habita.stages.map(s=>({...s,goal:{'no-responde':'Interesado','sin-uso':'Cuenta con interacción'}[s.key]})),
+    results:{...habita.results,conversionLabels:{'no-contactado':'Respondió el saludo'}}};
+  const html=R.render('habita',labelled,{});
+  assert.match(html,/<b>Saludo<\/b><small class="rs-goal"[^>]*><i aria-hidden="true">◎<\/i> Conversión: Respondió el saludo<\/small>/);
+  assert.match(html,/Conversión: Pasó a la etapa siguiente del embudo · 2 etapas/);
+  assert.match(html,/40 enviadas → <b>10 convirtieron<\/b>/);
+  const open=R.render('habita',labelled,{action:'Precios'});
   assert.match(open,/data-testid="results-action-instances"/);
-  assert.match(open,/rs-stage is-hit">Contactado/);
-  assert.match(open,/rs-stage is-hit">Cuenta creada, sin uso/);
-  assert.match(open,/EN PRUEBA/);
-  assert.match(R.render('habita',habita,{action:'Saludo'}),/MEJOR/);
+  assert.equal((open.match(/data-testid="results-action-stage"/g)||[]).length,2);
+  assert.match(open,/<b>Contactado<\/b><small>→ Pasó a «Interesado»<\/small>[\s\S]*?5 enviadas → <b>1 convirtió<\/b>[\s\S]*?<b>20%<\/b>/);
+  assert.match(open,/<b>Cuenta creada, sin uso<\/b><small>→ Pasó a «Cuenta con interacción»<\/small>/);
+  assert.doesNotMatch(open,/rs-ver/);
 });
 
 test('2 · the period filter: «Esta semana» first and by default; an older habita. without it falls back',()=>{
@@ -91,6 +98,7 @@ test('2 · the period filter: «Esta semana» first and by default; an older hab
   assert.match(html,/aria-pressed="true" data-fu="results-window" data-fu-window="semana"[^>]*>Esta semana</);
   assert.equal((html.match(/data-testid="results-action-row"/g)||[]).length,1);
   assert.equal((R.render('habita',week,{windowKey:'7'}).match(/data-testid="results-action-row"/g)||[]).length,2);
+  assert.ok(html.indexOf('data-fu-window="semana"')<html.indexOf('data-fu-window="7"'),'Esta semana va primero');
   const old=R.render('habita',habita,{});
   assert.doesNotMatch(old,/data-fu-window="semana"/);
   assert.match(old,/aria-pressed="true" data-fu="results-window" data-fu-window="7"/);
