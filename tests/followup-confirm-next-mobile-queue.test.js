@@ -64,7 +64,7 @@ test('Mobile cards replace wide queue table without changing filtered data',()=>
 });
 
 test('Mobile execute is disabled for claimed, blocked, scheduled and closed items',()=>{
-  assert.match(app,/const executable=!closed&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
+  assert.match(app,/const executable=!closed&&!done&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
   assert.match(app,/TOMADA POR /);
   assert.match(app,/SIN ACCIÓN/);
   assert.match(app,/data-fu="claim" data-fu-key="\$\{esc\(x\.key\)\}"/);

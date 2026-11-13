@@ -101,7 +101,7 @@
 
   /** La cola de cada unidad ({ habita: snapshot, turnia: snapshot }) en una sola forma. */
   function normalize(units, now = Date.now()) {
-    const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], errors: {}, units: {} };
+    const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], executed: [], errors: {}, units: {} };
     for (const [unit, snap] of Object.entries(units || {})) {
       if (!snap || snap.error) { out.errors[unit] = (snap && snap.error) || 'Sin datos.'; continue; }
       if (snap.__warning) out.errors[unit] = 'Mostrando datos anteriores (no actualizados): ' + snap.__warning;
@@ -110,11 +110,18 @@
       out.scheduled.push(...(snap.scheduled || []).map((q) => item(unit, q, snap, 'programada', now)));
       out.blocked.push(...(snap.blocked || []).filter((q) => q.stage).map((q) => item(unit, q, snap, 'bloqueada', now)));
       out.noInteresados.push(...(snap.noInteresados || []).map((q) => item(unit, q, snap, 'cerrada', now)));
+      // Lo ejecutado en la semana (un envío por fila, ya fuera de la cola): para «Hoy / Ayer / Esta semana».
+      // La clave suma la fecha del envío: la misma inmobiliaria puede tener varios y estar además en la cola.
+      out.executed.push(...(snap.executed || []).filter((q) => q.execution && q.execution.at).map((q) => {
+        const x = item(unit, q, snap, 'ejecutada', now);
+        return { ...x, key: `${x.key}:enviada:${x.stage}:${q.action || ""}:${q.execution.at}`, since: q.execution.at };
+      }));
 
     }
     out.queue.sort(byPriority);
     out.scheduled.sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
     out.blocked.sort(byPriority);
+    out.executed.sort((a, b) => String(b.since).localeCompare(String(a.since)));
     return out;
   }
 
