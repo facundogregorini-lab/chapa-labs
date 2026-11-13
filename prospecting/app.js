@@ -3185,7 +3185,7 @@
     (!q.situation||x.situation===q.situation||x.catalogSituation===q.situation||x.productSituations?.includes(q.situation))&&
     (!q.rule||x.ruleKey===q.rule)&&
     (q.closed||!q.executor||fuExecutor(x)===q.executor)&&inTime(x)).length;
-  // En lo ejecutado, cada tarjeta suma abajo a la derecha su variación contra el período anterior.
+  // En lo ejecutado, cada tarjeta suma debajo del número su variación contra el período anterior.
   const win=executed?fuPeriodWindows(q.period):null;
   const deltaPill=(stage)=>{
     if(!win)return '';
