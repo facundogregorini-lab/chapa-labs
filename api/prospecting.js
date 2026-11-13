@@ -21,7 +21,7 @@ const authFetch = require('./_authfetch');
 const session = require('./_session');
 const { createFollowupCache } = require('./_followup-cache');
 const followupCache = createFollowupCache();
-const { createComments } = require('./_comments');
+const { createComments, cleanText: cleanCommentText } = require('./_comments');
 const core = require('../prospecting/core');
 const { UNITS } = require('../prospecting/units');
 
@@ -560,6 +560,21 @@ async function doTask(req, res, user) {
   if (sensitiveOps.has(f.op) && session.open() && unit.id !== 'habita')
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones de Turnia configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {
+    // habita.: todo lead que pasa a Facu lleva en sus comentarios por qué se le pasó.
+    // El motivo llega con el pedido (se guarda como comentario antes de pasarlo) o ya
+    // está escrito: un comentario de las últimas dos horas. Sin eso, no se pasa.
+    const handoffTo = f.op === 'handoff' ? String(f.para || '') : f.op === 'owner' && /^facu\b/i.test(String(f.responsable || '').trim()) ? 'Facu' : '';
+    if (unit.id === 'habita' && handoffTo && f.inmobiliaria) {
+      const motivo = cleanCommentText(f.motivo);
+      if (motivo) {
+        await comments().add(unit.id, f.inmobiliaria, { by: user.name, bot: f.ejecutor === 'bot', text: `Pasada a ${handoffTo}: ${motivo}`, name: f.nombre });
+      } else if (handoffTo === 'Facu') {
+        const thread = await comments().thread(unit.id, f.inmobiliaria);
+        const last = thread[thread.length - 1];
+        if (!last || !(Date.now() - Date.parse(last.at) < 2 * 3600_000))
+          return fail(res, 400, 'Para pasarla a Facu dejá un comentario con el motivo: qué pasó (con el mensaje y la hora) y qué decisión hace falta.');
+      }
+    }
     const startedAt = Date.now();
     const out = await callApi(unit, { method: 'POST', body: { by: user.name, followup: f }, timeout: ['whatsapp-sync', 'whatsapp-search', 'whatsapp-check'].includes(f.op) ? 280000 : 45000 });
     if (f.op !== 'queue' && f.op !== 'replies' && f.op !== 'whatsapp-search')

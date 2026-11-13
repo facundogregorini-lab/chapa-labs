@@ -65,3 +65,26 @@ test('Comments go through the session, are available for both businesses and mar
   const box = app.slice(app.indexOf('function fuCommentsBox(t)'), app.indexOf('function fuCommentsPaint'));
   assert.doesNotMatch(box, /habita/);
 });
+
+test('habita.: pasar un lead a Facu exige el motivo en sus comentarios', () => {
+  // El motivo que llega con el pedido se guarda como comentario antes de pasarlo.
+  assert.match(api, /text: `Pasada a \$\{handoffTo\}: \$\{motivo\}`/);
+  // Sin motivo, solo pasa si ya tiene un comentario de las últimas dos horas.
+  assert.match(api, /Para pasarla a Facu dejá un comentario con el motivo/);
+  assert.match(api, /f\.op === 'owner' && \/\^facu\\b\/i/);
+  // Se valida antes de llamar al producto.
+  assert.ok(api.indexOf("Para pasarla a Facu") < api.indexOf("followup: f }, timeout: ['whatsapp-sync'"));
+  // La pantalla pide el porqué y lo manda con el pase.
+  assert.match(app, /data-testid="fu-handoff-reason"/);
+  assert.match(app, /op:'handoff',inmobiliaria:it\.id,para:to,motivo,nombre:it\.name/);
+  assert.match(app, /if\(to==='Facu'&&!motivo\)/);
+});
+
+test('Las tareas para Facu o Axel muestran los comentarios en «Más información»', () => {
+  assert.match(app, /const fuForPerson = \(x\) => fuExecutor\(x\) !== 'extension'/);
+  assert.match(app, /\$\{fuCardCommentsBox\(x\)\}\s*<button type="button" class="btn os-fu-mobile-item-view"/);
+  assert.match(app, /data-fu-card-more="\$\{esc\(x\.key\)\}"/);
+  assert.match(app, /if\(form\.matches\('\[data-fu-card-comment-form\]'\)\)\{await fuCardCommentSend\(form\);return;\}/);
+  // Abrir «Más información» lee el hilo; nunca toma la tarea.
+  assert.match(app, /if\(d\.open\)\{state\.fu\.cardOpen=key;void fuCardCommentsLoad\(key\);\}/);
+});

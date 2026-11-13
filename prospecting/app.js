@@ -3047,7 +3047,7 @@
           ${closed?'':`<span class="os-fu-executor-chip" data-executor="${fuExecutor(x)}" data-testid="fu-mobile-executor">${fuExecutor(x)==='extension'?'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'}${esc(FU_EXECUTOR_LABEL[fuExecutor(x)])}</span>`}
         </div>
       </div>
-      <details class="os-fu-mobile-item-more" data-testid="fu-mobile-expand">
+      <details class="os-fu-mobile-item-more" data-testid="fu-mobile-expand" data-fu-card-more="${esc(x.key)}" ${state.fu.cardOpen===x.key?'open':''}>
         <summary>Más información <span aria-hidden="true">⌄</span></summary>
         <dl>
           <dt>Ciudad</dt><dd>${esc(x.zone||'—')}</dd>
@@ -3057,6 +3057,7 @@
           <dt>Última acción</dt><dd>${esc(x.lastText||'—')} ${x.since?'· '+esc(ago(x.since)):''}</dd>
           ${x.owner?`<dt>Responsable</dt><dd>${esc(x.owner)}</dd>`:''}
         </dl>
+        ${fuCardCommentsBox(x)}
         <button type="button" class="btn os-fu-mobile-item-view" data-fu="queue-view" data-fu-key="${esc(x.key)}">Ver ficha completa</button>
       </details>
     </article>`;
@@ -4173,6 +4174,77 @@
     return c ? `<span class="os-fu-comment-chip" data-testid="fu-comment-chip" title="Tiene comentarios">💬${c.n > 1 ? ` ${c.n}` : ''}</span>` : '';
   };
 
+  // ── Comentarios en «Más información» de las tareas para Facu (o Axel) ──
+  // Lo que es para una persona (responsable Facu o Axel, o pasada a uno de
+  // ellos) muestra en la tarjeta de la cola el hilo de comentarios del
+  // contacto y el campo para dejar uno, sin tomar la tarea.
+  state.fu.cardComments = {};
+  state.fu.cardOpen = null;
+  const fuForPerson = (x) => fuExecutor(x) !== 'extension' || /^Pasada a (Facu|Axel)\b/.test(String(x.blocked || ''));
+  function fuCardCommentsInner(x) {
+    const key = `${x.unit}:${x.id}`, c = state.fu.cardComments[key];
+    const list = c?.list || [];
+    const body = !c || c.loading ? '<p class="os-fu-comments-empty">Cargando comentarios…</p>'
+      : c.error ? `<p class="os-fu-comments-empty" role="alert">${esc(c.error)}</p>`
+      : list.length ? `<ol class="os-fu-comments-list">${list.map((m) => `<li data-author="${m.bot ? 'extension' : 'persona'}"><span class="os-fu-comment-meta"><b>${esc(fuCommentAuthor(m))}</b><time>${esc(dayTime(m.at))}</time></span><p>${esc(m.text)}</p></li>`).join('')}</ol>`
+      : '<p class="os-fu-comments-empty">Todavía no hay comentarios: falta el motivo por el que se pasó.</p>';
+    return `<h2>Comentarios${list.length ? ` <span class="os-fu-comments-count">${list.length}</span>` : ''}</h2>
+      ${body}
+      <form data-fu-card-comment-form data-fu-key="${esc(key)}">
+        <textarea class="input" aria-label="Nuevo comentario" name="texto" rows="2" maxlength="2000" required placeholder="Comentario para el equipo o la extensión"></textarea>
+        <button type="submit" class="btn primary" data-testid="fu-card-comment-send" ${c?.sending ? 'disabled' : ''}>${c?.sending ? 'Guardando…' : 'Dejar comentario'}</button>
+      </form>`;
+  }
+  function fuCardCommentsBox(x) {
+    if (state.demo || !x || !x.id || !fuForPerson(x)) return '';
+    return `<section class="os-fu-comments os-fu-card-comments" data-fu-card-comments="${esc(x.unit + ':' + x.id)}" data-testid="fu-card-comments" aria-live="polite">${fuCardCommentsInner(x)}</section>`;
+  }
+  /** Repaints only that card's box, keeping what is being typed. */
+  function fuCardCommentsPaint(key) {
+    const x = fuFind(key);
+    for (const box of main.querySelectorAll('[data-fu-card-comments]')) {
+      if (box.dataset.fuCardComments !== key || !x) continue;
+      const draft = box.querySelector('textarea')?.value || '';
+      box.innerHTML = fuCardCommentsInner(x);
+      const area = box.querySelector('textarea');
+      if (area && draft && !state.fu.cardComments[key]?.cleared) area.value = draft;
+      if (state.fu.cardComments[key]) state.fu.cardComments[key].cleared = false;
+    }
+  }
+  async function fuCardCommentsLoad(key) {
+    const x = fuFind(key);
+    if (!x || !fuForPerson(x) || state.demo) return;
+    const cur = state.fu.cardComments[key];
+    if (cur && (cur.loading || !cur.error)) { fuCardCommentsPaint(key); return; }
+    state.fu.cardComments[key] = { list: [], loading: true, error: null, sending: false };
+    fuCardCommentsPaint(key);
+    try {
+      const r = await api('comments', { query: { unit: x.unit, id: x.id } });
+      state.fu.cardComments[key] = { list: r.comments || [], loading: false, error: null, sending: false };
+    } catch (err) {
+      state.fu.cardComments[key] = { list: [], loading: false, error: err.message || 'No se pudieron leer los comentarios.', sending: false };
+    }
+    fuCardCommentsPaint(key);
+  }
+  async function fuCardCommentSend(form) {
+    const key = form.dataset.fuKey, x = fuFind(key), c = state.fu.cardComments[key];
+    const text = String(new FormData(form).get('texto') || '').trim();
+    if (!x || !text || c?.sending) return;
+    state.fu.cardComments[key] = { ...(c || { list: [], loading: false, error: null }), sending: true };
+    fuCardCommentsPaint(key);
+    try {
+      const r = await api('comments', { method: 'POST', body: { unit: x.unit, id: x.id, name: x.name, text, ...(agentMode() ? { ejecutor: 'bot' } : {}) } });
+      state.fu.cardComments[key] = { list: r.comments || [], loading: false, error: null, sending: false, cleared: true };
+      state.fu.commentIndex[key] = { n: (r.comments || []).length, at: new Date().toISOString() };
+      if (state.fu.comments.key === key) state.fu.comments = { key, list: r.comments || [], loading: false, error: null, sending: false };
+      toast('Comentario guardado.');
+    } catch (err) {
+      state.fu.cardComments[key] = { ...state.fu.cardComments[key], sending: false };
+      toast(err.message || 'No se pudo guardar el comentario.', true);
+    }
+    fuCardCommentsPaint(key);
+  }
+
   function renderFuTask(t) {
     const it = t.item || {};
     // After a confirmed send, show a durable receipt with a separate Next
@@ -4227,6 +4299,9 @@
           aria-label="Soltar esta tarea sin confirmar envío y tomar la siguiente de la misma cola">Siguiente tarea →</button>
         ${t.unit==='habita'? `<details class="os-fu-handoff" data-testid="fu-handoff">
           <summary class="btn" style="cursor:pointer">Pasar a Facu - Axel</summary>
+          <label class="os-fu-handoff-reason">Por qué se la pasás <small>(obligatorio para Facu; queda en sus comentarios)</small>
+            <textarea class="input" name="fu-handoff-motivo" rows="2" maxlength="2000" data-testid="fu-handoff-reason" placeholder="Qué pasó (mensaje y hora) y qué decisión hace falta"></textarea>
+          </label>
           <div class="btns">
             <button class="btn small" type="button" data-fu="handoff-facu">Pasar a Facu</button>
             <button class="btn small" type="button" data-fu="handoff-axel">Pasar a Axel</button>
@@ -4581,7 +4656,12 @@
       case 'handoff-axel': {
         if(!task||task.unit!=='habita'||state.fu.busy)break;
         const to=ds.fu==='handoff-facu'?'Facu':'Axel';
-        if(await fuOp(task.unit,{op:'handoff',inmobiliaria:it.id,para:to},{label:`Tarea pasada a ${to}.`})){
+        const reasonField=t.closest('[data-testid="fu-handoff"]')?.querySelector('[name="fu-handoff-motivo"]');
+        const motivo=String(reasonField?.value||'').trim();
+        // Todo lead que pasa a Facu lleva el porqué en sus comentarios.
+        if(to==='Facu'&&!motivo){toast('Escribí por qué se la pasás a Facu: queda en sus comentarios.',true);reasonField?.focus();break;}
+        if(await fuOp(task.unit,{op:'handoff',inmobiliaria:it.id,para:to,motivo,nombre:it.name},{label:`Tarea pasada a ${to}.`})){
+          if(motivo)delete state.fu.cardComments[`${task.unit}:${it.id}`];
           state.fu.task=null;render();void loadFollowup({quiet:true});
         }
         break;
@@ -4752,13 +4832,19 @@
     const d=e.target;
     if(d?.matches?.('[data-testid="fu-queue-advanced"]'))fuQueueState().advancedOpen=d.open;
     if(d?.matches?.('[data-testid="fu-queue-sort-options"]'))fuQueueState().sortOpen=d.open;
+    if(d?.matches?.('[data-fu-card-more]')){
+      const key=d.dataset.fuCardMore;
+      if(d.open){state.fu.cardOpen=key;void fuCardCommentsLoad(key);}
+      else if(state.fu.cardOpen===key)state.fu.cardOpen=null;
+    }
   }, true);
   document.addEventListener('submit', async (e) => {
     const form = e.target;
-    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form], [data-fu-comment-form]')) return;
+    if (!form.matches('[data-fu-chart-range], [data-fu-turnia-rule-form], [data-fu-change-stage], [data-fu-change-situation], [data-fu-funnel-review], [data-fu-situation], [data-fu-reply], [data-fu-owner], [data-fu-fail], [data-fu-snooze], [data-fu-version-form], [data-fu-rule-form], [data-fu-version-edit-form], [data-fu-stage-form], [data-fu-state-form], [data-fu-inbox-form], [data-fu-manual-reply-form], [data-fu-comment-form], [data-fu-card-comment-form]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     if(form.matches('[data-fu-comment-form]')){await fuCommentSend(form);return;}
+    if(form.matches('[data-fu-card-comment-form]')){await fuCardCommentSend(form);return;}
     if(form.matches('[data-fu-chart-range]')){
       const fd=new FormData(form),p=fuChartPeriod(),from=String(fd.get('desde')||''),to=String(fd.get('hasta')||'');
       if(from&&to&&to<from){toast('La fecha Hasta debe ser igual o posterior a Desde.',true);return;}
