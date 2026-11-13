@@ -2574,9 +2574,11 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 .os-fu-period-bar button.is-on{background:#123b2e;border-color:#123b2e;color:#fff}
 .os-fu-period-bar button.is-on b{color:#cfe3d8}
 .os-fu-period-bar button:focus-visible{outline:2px solid #188854;outline-offset:2px}
-/* Variación contra el período anterior (13/11/2026): abajo a la derecha de cada tarjeta, solo en Hoy · Ayer · Esta semana. */
-[data-testid="followup-reference-stage-cards"] .os-fu-stage{position:relative}
-.os-fu-stage-delta{position:absolute;right:9px;bottom:8px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0;line-height:1.4;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* Variación contra el período anterior (13/11/2026): solo en Hoy · Ayer · Esta semana. Va en su propia fila,
+   debajo del número (no flotando encima): en tarjetas angostas de escritorio tapaba los números de dos cifras. */
+[data-testid="followup-reference-stage-cards"] .os-fu-stage{position:relative;grid-template-rows:18px 26px auto}
+[data-testid="followup-reference-stage-cards"] .os-fu-stage-icon{align-self:start;margin-top:5px}
+.os-fu-stage-delta{grid-column:2;grid-row:3;justify-self:start;margin-top:5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:800;letter-spacing:0;line-height:1.4;font-variant-numeric:tabular-nums;white-space:nowrap}
 .os-fu-stage-delta[data-dir="up"]{background:#e3f4e8;color:#17663a}
 .os-fu-stage-delta[data-dir="down"]{background:#fbe9e7;color:#a3341f}
 .os-fu-stage-delta[data-dir="flat"]{background:#eef2ef;color:#5a6d63}

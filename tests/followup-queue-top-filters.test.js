@@ -105,10 +105,11 @@ test('Variación: porcentaje, «nuevo» y nada si los dos son 0', () => {
   assert.equal(D(0, 0), null);
 });
 
-test('La variación va solo en lo ejecutado, abajo a la derecha de cada tarjeta, y la etapa compartida se mantiene al cambiar de producto', () => {
+test('La variación va solo en lo ejecutado, en su propia fila debajo del número, y la etapa compartida se mantiene al cambiar de producto', () => {
   assert.match(app, /const win=executed\?fuPeriodWindows\(q\.period\):null;/);
   assert.match(app, /<strong>\$\{stageCounter\(s\)\}<\/strong>\$\{deltaPill\(s\)\}/);
-  assert.match(css, /\.os-fu-stage-delta\{position:absolute;right:9px;bottom:8px;/);
+  assert.match(css, /\.os-fu-stage-delta\{grid-column:2;grid-row:3;/);
+  assert.doesNotMatch(css, /\.os-fu-stage-delta\{[^}]*position:absolute/);
   assert.match(app, /commercial:shared\?qv\.commercial:null/);
   assert.match(app, /function fuPrefetchOther\(scope\)/);
 });
