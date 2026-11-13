@@ -2435,7 +2435,7 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
 .ov-head h2{margin:0;font-size:18px;font-weight:800}
 .ov-head h3{margin:0;font-size:16px;font-weight:800}
 .ov-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--ov-c,var(--muted));margin-right:7px;vertical-align:0}
-.ov-cols{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;align-items:end}
+.ov-cols{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;align-items:end}
 .ov-col{min-width:0;display:grid;justify-items:center;gap:5px;border:1px solid transparent;border-radius:12px;padding:8px 2px;background:none;color:inherit;font:inherit;cursor:pointer}
 .ov-col:hover,.ov-col.is-on{border-color:var(--glass-edge);background:var(--field)}
 .ov-col.is-worst .ov-real{box-shadow:0 0 0 2px var(--ov-bad)}
@@ -2623,7 +2623,7 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   .ov-top h1{font-size:22px}
   .ov-top p{font-size:13px}
   .ov-card{padding:14px;border-radius:18px}
-  .ov-cols{grid-template-columns:repeat(7,minmax(58px,1fr));overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .ov-cols{grid-auto-flow:column;grid-auto-columns:minmax(58px,1fr);overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .ov-cols::-webkit-scrollbar{display:none}
   .ov-name{overflow-wrap:normal;hyphens:auto;min-height:38px}
   .ov-bars{height:120px}
@@ -2676,7 +2676,7 @@ body:is([data-unit="habita"],[data-unit="turnia"],[data-unit="todas"]) .rs{--rs-
   .ov-head h3{font-size:15px}
   .ov-head .ov-muted{font-size:11.5px}
   .ov-card{padding:13px;gap:10px}
-  .ov-funnel .ov-cols{display:grid;grid-template-columns:1fr;gap:2px;overflow:visible;padding:0}
+  .ov-funnel .ov-cols{display:grid;grid-template-columns:1fr;grid-auto-flow:row;gap:2px;overflow:visible;padding:0}
   .ov-funnel .ov-col{display:grid;grid-template-columns:minmax(0,1fr) 46px 64px;grid-template-areas:"name val conv" "bars bars bars";
     align-items:center;justify-items:stretch;gap:3px 8px;padding:6px 8px;text-align:left}
   .ov-funnel .ov-name{grid-area:name;text-align:left;min-height:0;font-size:12px;overflow-wrap:normal;hyphens:none}
