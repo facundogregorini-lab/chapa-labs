@@ -40,3 +40,31 @@ test('Quién ejecuta y el período van arriba de las tarjetas de etapas', () => 
   assert.match(app, /case 'queue-period':/);
   assert.match(css, /\.os-fu-period-bar button\.is-on\{/);
 });
+
+test('Hoy, Ayer y Esta semana listan lo ejecutado (que ya salió de la cola), no la cola filtrada por fecha', () => {
+  const F = require('../prospecting/followup.js');
+  const now = Date.now();
+  const sent = (id, at, executedBy = 'bot') => ({ agencyId: id, name: 'Inmo ' + id, stage: 'no-contactado', action: 'principal', since: at,
+    execution: { status: 'sent', at, reason: null, executedBy, by: executedBy === 'bot' ? null : 'Facu' } });
+  const today = new Date(now - 60_000).toISOString();
+  const n = F.normalize({ habita: {
+    queue: [{ agencyId: 'q1', name: 'Del Rey', stage: 'sin-demo', action: 'principal', lastAction: { at: today } }],
+    executed: [...Array.from({ length: 50 }, (_, i) => sent('e' + i, today)), sent('h1', today, 'humano'), sent('e0', new Date(now - 120_000).toISOString())],
+  } });
+  assert.equal(n.queue.length, 1);
+  assert.equal(n.executed.length, 52);
+  // Cada envío es su propia fila: la misma inmobiliaria con dos envíos no se pisa.
+  assert.equal(new Set(n.executed.map((x) => x.key)).size, 52);
+  assert.ok(n.executed.every((x) => x.bucket === 'ejecutada' && x.since === x.execution.at));
+  assert.equal(n.executed.at(-1).since < today, true); // del más reciente al más viejo
+  assert.ok(!n.queue.some((x) => n.executed.some((e) => e.key === x.key)));
+});
+
+test('La cola usa n.executed para los períodos y no ofrece ejecutar lo ya ejecutado', () => {
+  const sel = app.slice(app.indexOf('  function fuQueueSelection'), app.indexOf('  // ¿Tienen WhatsApp?'));
+  assert.match(sel, /n\.executed/);
+  assert.match(sel, /period\?done\.filter\(x=>fuInPeriod\(x,period\)\):pending/);
+  assert.match(app, /x\.bucket!=='ejecutada'&&!x\.claim/);
+  assert.match(app, /const executable=!closed&&!done&&/);
+  assert.match(app, /x\.execution\.executedBy==='bot'\)return 'extension'/);
+});
