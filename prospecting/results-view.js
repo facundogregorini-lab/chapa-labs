@@ -12,7 +12,10 @@
   else root.ProspectingResults=api;
 })(typeof self!=='undefined'?self:this,function(){
   'use strict';
-  const WINDOWS={'7':'7 días','14':'14 días',todo:'Sin límite'};
+  /** Período de «Qué acciones convierten»: los mensajes enviados en ese lapso (no una ventana de atribución). */
+  const WINDOWS={semana:'Esta semana','7':'Últimos 7 días','14':'Últimos 14 días',todo:'Sin límite'};
+  // En este orden (un objeto pondría primero las claves numéricas).
+  const WINDOW_ORDER=['semana','7','14','todo'];
   const COHORTS={contacto:'Semana de contacto',respuesta:'Semana de primera respuesta',version:'Versión del saludo'};
   const PERIODS={semana:'Esta semana',hoy:'Hoy',ayer:'Ayer','7':'Últimos 7 días',custom:'Elegir fechas'};
   /** El lunes que abre la semana de un día (las semanas van de lunes a domingo). */
@@ -23,15 +26,13 @@
   const num=n=>Number.isFinite(Number(n))?Number(n).toLocaleString('es-AR'):'0';
   const pc=x=>x===null||x===undefined||!Number.isFinite(Number(x))?'—':(Math.round(Number(x)*1000)/10).toLocaleString('es-AR')+'%';
   const ratio=(a,b)=>b?a/b:null;
-  const hours=h=>h===null||h===undefined?'—':h<48?Math.round(h)+' h':(h/24).toFixed(1).replace('.',',')+' días';
   const dayLabel=d=>{const t=new Date(String(d)+'T12:00:00Z');return Number.isNaN(t.getTime())?String(d):t.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',timeZone:'UTC'});};
   const weekLabel=w=>{const t=new Date(String(w)+'T12:00:00Z');return Number.isNaN(t.getTime())?String(w):t.toLocaleDateString('es-AR',{day:'numeric',month:'short',timeZone:'UTC'});};
-  const STATUS={active:'ACTIVA',test:'EN PRUEBA',archived:'ARCHIVADA'};
 
   function defaults(view){
     const v=view||{};
     if(!Object.hasOwn(PERIODS,v.period))v.period='semana';
-    if(!Object.hasOwn(WINDOWS,v.windowKey))v.windowKey='7';
+    if(!Object.hasOwn(WINDOWS,v.windowKey))v.windowKey='semana';
     if(!Object.hasOwn(COHORTS,v.cohortBy))v.cohortBy='contacto';
     if(!Number.isFinite(v.wCov))v.wCov=60;
     if(!Number.isFinite(v.wOk))v.wOk=40;
@@ -180,8 +181,12 @@
   // ── 2. Acciones ──
   function actionRows(unit,snap,view,stageTitle,label){
     let versions;
+    // Los períodos que manda habita. (una versión anterior no manda «Esta semana»): si falta el elegido, el primero que haya.
+    const sent=snap?.results?.windows||{};
+    const periods=WINDOW_ORDER.filter(k=>sent[k]);
+    const win=periods.includes(view.windowKey)?view.windowKey:periods[0];
     if(unit==='habita'){
-      const w=snap?.results?.windows?.[view.windowKey];
+      const w=sent[win];
       versions=Array.isArray(w?.versions)?w.versions:[];
     }else{
       versions=[];
@@ -194,7 +199,7 @@
       for(const v of versions){const k=v.stage+':'+v.action;groups.set(k,[...(groups.get(k)||[]),v]);}
       for(const list of groups.values()){const m=list.filter(v=>!v.smallSample&&v.rate!==null);if(m.length>1)m.reduce((a,b)=>b.rate>a.rate?b:a).best=true;}
     }
-    const weekly=(unit==='habita'?snap?.results?.windows?.[view.windowKey]?.weeklyByType:snap?.results?.weeklyByType)||{};
+    const weekly=(unit==='habita'?sent[win]?.weeklyByType:snap?.results?.weeklyByType)||{};
     const byType=new Map();
     for(const v of versions){
       if(!v.executed&&v.status==='archived')continue;
@@ -210,6 +215,11 @@
     const rows=[...byType.values()].sort((a,b)=>b.executed-a.executed||a.type.localeCompare(b.type));
     const max=Math.max(1,...rows.map(r=>r.executed));
     const order=(snap?.stages||[]).map(s=>s.key);
+    // Qué cuenta como conversión de cada etapa: lo manda cada producto (conversionLabels); si no, el objetivo de la etapa.
+    const goals=Object.fromEntries((snap?.stages||[]).map(s=>[s.key,s.goal]));
+    const sent2=snap?.results?.conversionLabels||{};
+    const convOf=k=>sent2[k]||(goals[k]?`Pasó a «${goals[k]}»`:'Avanzó de paso');
+    const convRow=r=>{const l=[...new Set([...r.stages.keys()].map(convOf))];return l.length===1?l[0]:'Pasó a la etapa siguiente del embudo';};
     const spark=list=>{
       if(!Array.isArray(list)||list.length<2)return '';
       const pts=list.map(w=>w.executed?w.conversions/w.executed:0);
@@ -219,26 +229,30 @@
       const last=xy[xy.length-1];
       return `<svg class="rs-spark" viewBox="0 0 110 30" aria-hidden="true"><path d="${d} L${last[0]} 30 L3 30 Z" class="rs-spark-area"/><path d="${d}" class="rs-spark-line"/><circle cx="${last[0]}" cy="${last[1]}" r="2.6" class="rs-spark-dot"/></svg>`;
     };
+    // Un anillo con la tasa: lleno en la proporción de lo ejecutado que convirtió.
+    const ring=(conv,ex)=>{const r=ratio(conv,ex);const c=94.25;
+      return `<svg class="rs-ring-sm" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="rs-ring-bg"/><circle cx="18" cy="18" r="15" class="rs-ring-fg${r===null?' is-empty':''}" transform="rotate(-90 18 18)" stroke-dasharray="${c}" stroke-dashoffset="${(c*(1-(r||0))).toFixed(2)}"/></svg>`;};
+    const flow=(conv,ex,top)=>`<span class="rs-flow"><span class="rs-dual"><i class="is-base" style="width:${Math.round(ex/top*100)}%"></i><i class="is-ok" style="width:${Math.max(conv?2:0,Math.round(conv/top*100))}%"></i></span><small>${num(ex)} ${ex===1?'enviada':'enviadas'} → <b>${num(conv)} ${conv===1?'convirtió':'convirtieron'}</b></small></span>`;
     return `<section class="rs-card" data-testid="results-actions">
       <div class="rs-head"><div><h2><span class="rs-step">3</span>Qué acciones convierten</h2>
-        <p>Una fila por tipo de acción, sumando todas las etapas donde corre. Tocá o hacé doble clic en una fila para ver en qué etapas se ejecutó y cómo le fue a cada versión.</p></div>
-        ${unit==='habita'?`<nav class="rs-seg" aria-label="Ventana de conversión">${Object.entries(WINDOWS).map(([k,l])=>`<button type="button" class="${view.windowKey===k?'is-on':''}" aria-pressed="${view.windowKey===k}" data-fu="results-window" data-fu-window="${k}" data-testid="followup-window-${k}">${l}</button>`).join('')}</nav>`:'<span class="rs-muted">Conversión: avanzó de paso después del envío</span>'}</div>
-      <div class="rs-act-head" aria-hidden="true"><span></span><span>Acción</span><span>Ejecutadas y conversiones</span><span>Ejec.</span><span>Conv.</span><span>Tasa · 8 semanas</span></div>
-      <div class="rs-acts">${rows.map(r=>{const open=view.action===r.type;const hit=new Set(r.stages.keys());
-        return `<div class="rs-act ${open?'is-open':''}" role="button" tabindex="0" aria-expanded="${open}" data-fu="results-action" data-fu-action-type="${esc(r.type)}" data-testid="results-action-row">
+        <p>${unit==='habita'?'Los mensajes enviados en el período, una fila por acción':'Una fila por acción'}. Debajo de cada una, qué cuenta como conversión. Tocá una fila para ver cómo le fue en cada etapa del embudo.</p></div>
+        ${unit==='habita'?`<nav class="rs-seg" aria-label="Enviadas en">${periods.map(k=>[k,WINDOWS[k]]).map(([k,l])=>`<button type="button" class="${win===k?'is-on':''}" aria-pressed="${win===k}" data-fu="results-window" data-fu-window="${k}" data-testid="followup-window-${k}">${l}</button>`).join('')}</nav>`:''}</div>
+      <div class="rs-act-head" aria-hidden="true"><span></span><span>Acción y conversión</span><span>Enviadas → convirtieron</span><span>Ejec.</span><span>Conv.</span><span>Tasa · 8 semanas</span></div>
+      <div class="rs-acts">${rows.map(r=>{const open=view.action===r.type;const rate=ratio(r.conversions,r.executed);
+        return `<div class="rs-act ${open?'is-open':''}${r.executed?'':' is-idle'}" role="button" tabindex="0" aria-expanded="${open}" data-fu="results-action" data-fu-action-type="${esc(r.type)}" data-testid="results-action-row">
           <span class="rs-chev" aria-hidden="true">›</span>
-          <span class="rs-act-name"><b>${esc(r.type)}</b><small>${r.stages.size} ${r.stages.size===1?'etapa':'etapas'}</small></span>
-          <span class="rs-dual"><i class="is-base" style="width:${Math.round(r.executed/max*100)}%"></i><i class="is-ok" style="width:${Math.round(r.conversions/max*100)}%"></i></span>
+          <span class="rs-act-name"><b>${esc(r.type)}</b><small class="rs-goal" data-testid="results-action-goal"><i aria-hidden="true">◎</i> Conversión: ${esc(convRow(r))}${r.stages.size>1?` · ${num(r.stages.size)} etapas`:''}</small></span>
+          ${flow(r.conversions,r.executed,max)}
           <span class="rs-n">${num(r.executed)}</span><span class="rs-n rs-conv">${num(r.conversions)}</span>
-          <span class="rs-rate"><b>${pc(ratio(r.conversions,r.executed))}</b>${r.executed<SMALL&&r.executed?'<small>muestra chica</small>':''}${spark(weekly[r.type])}</span></div>
-        ${open?`<div class="rs-inst" data-testid="results-action-instances"><span class="rs-kicker">Dónde se ejecutó en el embudo</span>
-          <div class="rs-path">${order.map((k,i)=>`<span class="rs-stage ${hit.has(k)?'is-hit':''}">${esc(stageTitle(k))}</span>${i<order.length-1?'<i>›</i>':''}`).join('')}</div>
-          <div class="rs-inst-grid">${[...r.stages.values()].sort((a,b)=>order.indexOf(a.stage)-order.indexOf(b.stage)).map(s=>{const vmax=Math.max(0.0001,...s.versions.map(v=>v.rate||0));const h=s.hours.length?s.hours.sort((a,b)=>a-b)[Math.floor((s.hours.length-1)/2)]:null;
-            return `<article class="rs-inst-card"><h4>${esc(stageTitle(s.stage))}</h4>
-              <div class="rs-big"><div><strong>${num(s.executed)}</strong><small>ejecutadas</small></div><div><strong>${num(s.conversions)}</strong><small>conversiones</small></div><div><strong>${pc(ratio(s.conversions,s.executed))}</strong><small>tasa</small></div>${unit==='habita'?`<div><strong>${esc(hours(h))}</strong><small>tiempo mediano</small></div>`:''}</div>
-              <div class="rs-vers">${s.versions.sort((a,b)=>b.version-a.version).map(v=>`<div class="rs-ver"><b>V${num(v.version)}</b><span class="rs-vbar"><i style="width:${Math.round((v.rate||0)/vmax*100)}%"></i></span><span>${pc(v.rate)}</span>
-                <small>${num(v.executed)} ejecutadas${v.assisted?` · +${num(v.assisted)} asistencias`:''}${v.failed?` · ${num(v.failed)} no salieron`:''}${v.status&&v.status!=='active'?` · ${esc(STATUS[v.status]||v.status)}`:''}${v.best?' <em class="rs-pill is-best">MEJOR</em>':v.executed&&v.smallSample?' <em class="rs-pill">MUESTRA CHICA</em>':''}</small></div>`).join('')}</div></article>`;}).join('')}</div></div>`:''}`;}).join('')||'<p class="rs-muted">Todavía no hay acciones ejecutadas.</p>'}</div>
-      <p class="rs-muted">${unit==='habita'?'Conversión: la inmobiliaria pasó del paso en que estaba al recibir el mensaje, dentro de la ventana. Si varios mensajes la precedieron, cuenta solo el último (los otros son asistencias). ':'Conversión: la persona avanzó de paso después del envío, con la definición de Turnia. '}«MEJOR» solo entre versiones con ${SMALL} o más ejecutadas.</p>
+          <span class="rs-rate">${ring(r.conversions,r.executed)}<span class="rs-rate-v"><b>${pc(rate)}</b>${r.executed<SMALL&&r.executed?'<small>muestra chica</small>':''}</span>${spark(weekly[r.type])}</span></div>
+        ${open?(()=>{const st=[...r.stages.values()].sort((a,b)=>order.indexOf(a.stage)-order.indexOf(b.stage));const smax=Math.max(1,...st.map(s=>s.executed));
+          return `<div class="rs-inst" data-testid="results-action-instances"><span class="rs-kicker">Por etapa del embudo</span>
+          <div class="rs-st-head" aria-hidden="true"><span>Etapa → conversión</span><span>Enviadas → convirtieron</span><span>Tasa</span></div>
+          ${st.map(s=>`<div class="rs-st" data-testid="results-action-stage"><span class="rs-st-name"><b>${esc(stageTitle(s.stage))}</b><small>→ ${esc(convOf(s.stage))}</small></span>
+            ${flow(s.conversions,s.executed,smax)}
+            <span class="rs-rate">${ring(s.conversions,s.executed)}<span class="rs-rate-v"><b>${pc(ratio(s.conversions,s.executed))}</b>${s.executed&&s.executed<SMALL?'<small>muestra chica</small>':''}</span></span></div>`).join('')}
+          </div>`;})():''}`;}).join('')||'<p class="rs-muted">Todavía no hay acciones ejecutadas.</p>'}</div>
+      <p class="rs-muted">${unit==='habita'?'Si varios mensajes precedieron a una conversión, cuenta solo el último. Es la misma definición que «Exitosas» en la cola. La tendencia de 8 semanas no depende del período.':'Conversión con la definición de Turnia: la persona avanzó de paso después del envío.'}</p>
     </section>`;
   }
 

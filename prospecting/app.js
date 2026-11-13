@@ -3981,7 +3981,7 @@
 }
 
   function fuResultsView(){
-    return window.ProspectingResults.defaults(state.fu.resultsView||(state.fu.resultsView={windowKey:'7',cohortBy:'contacto',period:'semana'}));
+    return window.ProspectingResults.defaults(state.fu.resultsView||(state.fu.resultsView={windowKey:'semana',cohortBy:'contacto',period:'semana'}));
   }
   /** Las cohortes con las etapas del panel: habita. las manda calculadas; Turnia, desde sus cuentas (Odontólogos). */
   function fuResultsCohorts(id,snap){
