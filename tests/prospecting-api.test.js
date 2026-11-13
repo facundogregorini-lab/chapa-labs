@@ -277,7 +277,7 @@ test('el mismo envío confirmado dos veces seguidas se registra una sola vez', a
 
 test('metas del embudo: habita. en la pestaña Metas de su planilla; Turnia, por su API', async () => {
   process.env.HABITA_PROSPECTING_SHEET_ID = 'sheet-habita';
-  const rates = { interesados: 0.25, demos_enviadas: 0.2, cuentas_creadas: 0.5, activas: 0.5, pagos: 0.3 };
+  const rates = { interesados: 0.25, demos_enviadas: 0.2, visitadas: 0.6, interaccion: 0.5, cuentas: 0.5, activas: 0.5, pagos: 0.3 };
   const bad = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates: { ...rates, demos_enviadas: 2 } } });
   assert.equal(bad.statusCode, 400);
   const ok = await call('targets', { method: 'POST', cookie, body: { unit: 'habita', perWeek: 300, rates } });

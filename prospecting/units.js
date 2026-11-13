@@ -379,16 +379,21 @@
     },
     targets: [
       { key: 'saludos', label: 'Contactados', hint: 'Les llegó el primer mensaje', perWeek: 250, sheet: (a) => Boolean(a.firstContact) || a.stage !== 'por_contactar' && a.stage !== 'invalido' && a.stage !== 'baja' },
-      { key: 'interesados', label: 'Interesados', hint: 'Mostraron interés o recibieron la demo en el período', rate: 0.2, metrics: 'prospeccion.periodo.interesados' },
+      { key: 'interesados', label: 'Interesados', hint: 'Mostraron interés o recibieron la demo por primera vez en el período', rate: 0.2, metrics: 'prospeccion.periodo.interesados' },
       { key: 'demos_enviadas', label: 'Demos enviadas', hint: 'Inmobiliarias prospectadas a las que se les envió la demo en el período', rate: 0.75, metrics: 'prospeccion.periodo.demosEnviadas' },
-      { key: 'cuentas_creadas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta en el período', rate: 0.15, metrics: 'prospeccion.periodo.cuentas' },
+      { key: 'visitadas', label: 'Demos visitadas', hint: 'Abrieron su demo por primera vez en el período', rate: 0.6, metrics: 'prospeccion.periodo.visitadas' },
+      { key: 'interaccion', label: 'Demos con interacción', hint: 'Hicieron algo más que abrir su demo (interactuaron, descargaron, generaron) en el período', rate: 0.5, metrics: 'prospeccion.periodo.conInteraccion' },
+      { key: 'cuentas', label: 'Cuentas creadas', hint: 'Crearon o reclamaron su cuenta en el período', rate: 0.5, metrics: 'prospeccion.periodo.cuentas' },
       { key: 'activas', label: 'Cuentas activas', hint: 'Primera ambientación propia en el período', rate: 0.5, metrics: 'prospeccion.periodo.activas' },
       { key: 'pagos', label: 'Clientes', hint: 'Primer pago aprobado en el período', rate: 0.25, metrics: 'prospeccion.periodo.clientes' },
     ],
     // Qué etapa de la cola de Follow-up lleva a cada paso del embudo contra la meta (el índice de `targets`).
-    // Los pasos son las etapas de su Follow-up (11/11): Contactado, Interesado, Demo enviada, Cuenta creada,
-    // Cuenta activa y Cliente. «demos_enviadas» y «cuentas_creadas» son claves nuevas: su % cambió de base.
-    queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 2, 'sin-enviar': 2, 'no-abrio': 3, 'sin-interaccion': 3, 'sin-cuenta': 3, 'sin-uso': 4, 'sin-suscripcion': 5 },
+    // Los pasos son las etapas de su Follow-up: Contactado, Interesado, Demo enviada, Demo visitada, Demo con
+    // interacción, Cuenta creada, Cuenta activa y Cliente (13/11: se sumaron visitada e interacción, como en
+    // Turnia). «cuentas» reemplaza a «cuentas_creadas» porque su % ahora es sobre «Demos con interacción»
+    // (0,6 × 0,5 × 0,5 = el mismo 15% de antes sobre las demos enviadas): una meta guardada con la base vieja no se aplica.
+    // Cada inmobiliaria cuenta en el período en que llegó por primera vez al paso (amoblaia periodActivity).
+    queueSteps: { 'no-contactado': 0, 'no-responde': 1, 'sin-demo': 2, 'sin-enviar': 2, 'no-abrio': 3, 'sin-interaccion': 4, 'sin-cuenta': 5, 'sin-uso': 6, 'sin-suscripcion': 7 },
     product: [
       { label: 'Demos publicadas', path: 'demos.publicadas' },
       { label: 'Vinculadas', path: 'prospeccion.vinculados', hint: 'Crearon o reclamaron su cuenta' },
