@@ -268,14 +268,18 @@ test('embudo contra la meta: base por semana, conversión por paso y fuente', ()
   assert.deepEqual(tf.steps.map((s) => s.source), ['sheet', 'sheet', 'app', 'none']);
 });
 
-test('habita.: los pasos son las etapas de su Follow-up, con Interesados después de Contactados', () => {
+test('habita.: los pasos son las etapas de su Follow-up, con las tres de la demo como en Turnia', () => {
   const { habita } = require('../prospecting/units').UNITS;
-  assert.deepEqual(habita.targets.map((s) => s.label), ['Contactados', 'Interesados', 'Demos enviadas', 'Cuentas creadas', 'Cuentas activas', 'Clientes']);
-  assert.deepEqual(habita.targets.slice(1).map((s) => s.metrics), ['prospeccion.periodo.interesados', 'prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
+  assert.deepEqual(habita.targets.map((s) => s.label), ['Contactados', 'Interesados', 'Demos enviadas', 'Demos visitadas', 'Demos con interacción', 'Cuentas creadas', 'Cuentas activas', 'Clientes']);
+  assert.deepEqual(habita.targets.slice(1).map((s) => s.metrics), ['prospeccion.periodo.interesados', 'prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.visitadas', 'prospeccion.periodo.conInteraccion', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
   // La cola: cada etapa del Follow-up lleva al paso siguiente.
   assert.equal(habita.queueSteps['no-responde'], 1);
   assert.equal(habita.queueSteps['sin-demo'], 2);
-  assert.equal(habita.queueSteps['sin-suscripcion'], 5);
+  assert.equal(habita.queueSteps['no-abrio'], 3);
+  assert.equal(habita.queueSteps['sin-interaccion'], 4);
+  assert.equal(habita.queueSteps['sin-cuenta'], 5);
+  assert.equal(habita.queueSteps['sin-suscripcion'], 7);
+  for (const k of Object.values(habita.queueSteps)) assert.ok(habita.targets[k], k);
 });
 
 test('embudo contra la meta de Turnia con datos como los de su planilla: visitadas incluye a quienes conversaron', () => {

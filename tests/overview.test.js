@@ -92,7 +92,7 @@ test('habita: after the greetings, its funnel counts what prospected agencies di
   const U = require('../prospecting/units.js');
   const habita = (U.UNITS || U).habita || U.list().find((u) => u.id === 'habita');
   const paths = habita.targets.slice(1).map((s) => s.metrics);
-  assert.deepEqual(paths, ['prospeccion.periodo.interesados', 'prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
+  assert.deepEqual(paths, ['prospeccion.periodo.interesados', 'prospeccion.periodo.demosEnviadas', 'prospeccion.periodo.visitadas', 'prospeccion.periodo.conInteraccion', 'prospeccion.periodo.cuentas', 'prospeccion.periodo.activas', 'prospeccion.periodo.clientes']);
 });
 
 test('mobile order: both funnels first, then the queue of each product; no false «all on target»',()=>{

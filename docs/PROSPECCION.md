@@ -265,18 +265,20 @@ En el Embudo de cada unidad y en el resumen. Base: **250 saludos por semana** (s
 | Cuentas activas | 80% (`activas`) | Planilla: «Cuenta activa» |
 | Clientes | 60% (`clientes`) | Planilla: «Cliente» / «Cliente desde» = setup y mes 1 cobrados |
 
-**habita.** (etapas: Contactado, Interesado, Demo enviada, Cuenta creada, Cuenta activa, Cliente).
+**habita.** (etapas: Contactado, Interesado, Demo enviada, Demo visitada, Demo con interacción, Cuenta creada, Cuenta activa, Cliente). Cada inmobiliaria cuenta en el período en que llegó por primera vez al paso: volver a marcarla «Interesada», reenviarle la demo o que la vuelva a abrir no la cuenta de nuevo.
 
 | Paso | Meta (clave) | De dónde sale |
 | --- | --- | --- |
 | Contactados | 250 por semana (`saludos`) | Planilla: «Enviado» |
-| Interesados | 20% (`interesados`) | App: mostraron interés o recibieron la demo en el período (`prospeccion.periodo.interesados`) |
+| Interesados | 20% (`interesados`) | App: primer interés o primera demo enviada en el período (`prospeccion.periodo.interesados`) |
 | Demos enviadas | 75% (`demos_enviadas`) | App: demos enviadas a las cuentas prospectadas |
-| Cuentas creadas | 15% (`cuentas_creadas`) | App: crearon o reclamaron su cuenta |
+| Demos visitadas | 60% (`visitadas`) | App: abrieron su demo (`prospeccion.periodo.visitadas`) |
+| Demos con interacción | 50% (`interaccion`) | App: hicieron algo más que abrirla (`prospeccion.periodo.conInteraccion`) |
+| Cuentas creadas | 50% (`cuentas`) | App: crearon o reclamaron su cuenta |
 | Cuentas activas | 50% (`activas`) | App: primera ambientación propia |
 | Clientes | 25% (`pagos`) | App: primer pago aprobado |
 
-Las claves cuyo % cambió de base son nuevas (`demos_enviadas`, `cuentas_creadas`): una meta guardada con la definición anterior no se aplica a la nueva. Visitas e interacción con la demo de habita. siguen en Embudos (funnel de demos) y en Inmobiliarias.
+Las claves cuyo % cambió de base son nuevas (`demos_enviadas` y, desde el 13/11, `cuentas` en lugar de `cuentas_creadas`, porque ahora se mide sobre «Demos con interacción»): una meta guardada con la definición anterior no se aplica a la nueva.
 
 **Metas ajustables:** en el Embudo, «Editar metas» cambia los saludos por semana y el % de cada paso. Son del equipo (las ve todo el que abre el panel) y se guardan donde vive cada unidad: **Turnia**, en su configuración por su API (los saludos por semana son la misma meta semanal de su panel, `outreach_weekly_goal`; los % en `outreach_funnel_rates`); **habita.**, en la pestaña «Metas» de su planilla (se puede editar ahí también: el % como «45» o «45%»). «Volver a las de fábrica» vuelve a las de `units.js`.
 
