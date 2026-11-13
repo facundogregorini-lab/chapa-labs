@@ -2825,6 +2825,9 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
 
 /* Funnel comercial comparado (13/11/2026): barras horizontales, el período en verde y el anterior punteado. */
 .os-cmp-caption{font-size:11px;color:#708475;margin:12px 0 0}
+.os-cmp-period{min-width:0}
+.os-cmp-period nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;max-width:460px}
+.os-cmp-period nav button{min-height:40px}
 .os-native-legend .os-cmp-legend-prev{background:transparent;border:1.5px dashed #4b5d52;width:14px}
 .os-cmp-chart{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .os-cmp-hit{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:11px;padding:8px 8px 9px;cursor:pointer;font:inherit;color:inherit;transition:background .15s,border-color .15s}
@@ -2855,3 +2858,21 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
 @keyframes os-unit-in{from{opacity:.35;transform:translateY(6px)}to{opacity:1;transform:none}}
 #main.is-switching{animation:os-unit-in .22s ease-out}
 @media(prefers-reduced-motion:reduce){#main.is-switching{animation:none}}
+
+/* Cohortes en el celular (13/11/2026): la tabla dada vuelta, etapas en filas y semanas en columnas. */
+.rs-heat-mob{display:none}
+@media(max-width:760px){
+  .rs-heat-desk{display:none}
+  .rs-heat-mob{display:block}
+  .rs-heat.rs-heat-v{min-width:0;width:100%;table-layout:fixed;border-spacing:4px}
+  .rs-heat-v th:first-child{width:31%;text-align:left}
+  .rs-heat-v th{text-transform:none;letter-spacing:0;font-size:11px;vertical-align:bottom;line-height:1.25}
+  .rs-heat-v th b{display:block;font-size:13px;font-weight:800;color:var(--ink,#173e2c)}
+  .rs-heat-v th small{display:block;font-weight:600;color:var(--muted)}
+  .rs-heat-v .rs-heat-lbl{position:static;white-space:normal;font-size:12px;line-height:1.25;padding:6px 4px 6px 2px;background:transparent}
+  .rs-heat-v td.rs-heat-cell{padding:8px 2px}
+  .rs-heat-v .rs-heat-cell b{font-size:13px}
+  .rs-heat-mob-nav{display:flex;justify-content:space-between;gap:8px;margin:0 0 8px}
+  .rs-heat-mob-nav button{min-height:36px;padding:0 12px;border:1px solid #d5e5db;border-radius:999px;background:#fff;color:#1c3328;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+  .rs-heat-mob-nav button:disabled{opacity:.4;cursor:default}
+}
