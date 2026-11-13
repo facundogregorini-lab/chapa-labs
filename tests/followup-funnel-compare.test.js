@@ -83,3 +83,28 @@ test('Cohortes en el celular: etapas en filas y las 3 semanas más recientes en 
   assert.match(app, /case 'results-cohort-back':/);
   assert.ok(R);
 });
+
+test('Conversión entre pasos: de los que llegaron al anterior en la ventana, cuántos llegaron al siguiente hasta su cierre', () => {
+  const start = app.indexOf('  const FU_FUNNEL_PERIODS=');
+  const end = app.indexOf('  function fuFunnelChart(', start);
+  const ctx = { dayTime: (iso) => iso };
+  vm.runInNewContext(app.slice(start, end) + ';this.W=fuFunnelWindows;this.R=fuReachDates;this.V=fuFunnelConversion;this.P=fuPointsDelta;', ctx);
+  const now = new Date(2026, 10, 13, 13, 5);
+  const dd = (day, h = 10) => new Date(2026, 10, day, h).toISOString();
+  const rows = [
+    { step: 1, at: [dd(10), dd(12)] },     // saludado y demo esta semana
+    { step: 0, at: [dd(11)] },              // saludado esta semana, sin demo
+    { step: 1, at: [dd(4), dd(5)] },        // semana pasada: demo antes del corte
+    { step: 1, at: [dd(5), dd(7)] },        // semana pasada: demo después del corte (sáb)
+  ].map((r) => ctx.R(r));
+  const w = ctx.W('semana', now);
+  const c = ctx.V(rows, 1, w.cur, w.open), p = ctx.V(rows, 1, w.prev, w.open);
+  assert.deepEqual([c.base, c.went], [2, 1]);
+  assert.deepEqual([p.base, p.went], [2, 1]); // la del sábado no cuenta: después de vie 13:05
+  assert.equal(ctx.V([], 1, w.cur).rate, null);
+  assert.deepEqual({ ...ctx.P(0.36, 0.41) }, { dir: 'down', text: '▼ 5 pp' });
+  assert.deepEqual({ ...ctx.P(0.5, 0.5) }, { dir: 'flat', text: '= 0 pp' });
+  assert.equal(ctx.P(0.3, null), null);
+  assert.match(app, /sin base para comparar/);
+  assert.doesNotMatch(app.slice(app.indexOf('  function fuFunnelChart('), app.indexOf('  function fuNativeChart(')), />pasó</);
+});

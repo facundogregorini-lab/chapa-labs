@@ -3474,6 +3474,22 @@
   function fuFunnelCounts(dates,steps,[from,to],open=false) {
   return Array.from({length:steps},(_,i)=>dates.filter(d=>i<d.length&&(d[i]===null?open:d[i]>=from&&d[i]<to)).length);
 }
+  /**
+   * La conversión de un paso al siguiente en una ventana: de quienes llegaron al paso anterior dentro de
+   * ella, cuántos llegaron a este hasta su cierre (en «Esta semana», hasta ahora; en la anterior, hasta el
+   * mismo día y hora). Así las dos ventanas tuvieron el mismo tiempo para avanzar.
+   */
+  function fuFunnelConversion(dates,i,[from,to],open=false) {
+  const base=dates.filter(d=>i-1<d.length&&(d[i-1]===null?open:d[i-1]>=from&&d[i-1]<to));
+  const went=base.filter(d=>i<d.length&&(d[i]===null||d[i]<to)).length;
+  return {base:base.length,went,rate:base.length?went/base.length:null};
+}
+  /** «▲ 4 pp», «▼ 5 pp», «= 0 pp» entre dos tasas redondeadas. */
+  function fuPointsDelta(cur,prev) {
+  if(cur===null||prev===null)return null;
+  const d=Math.round(cur*100)-Math.round(prev*100);
+  return d>0?{dir:'up',text:`▲ ${d} pp`}:d<0?{dir:'down',text:`▼ ${-d} pp`}:{dir:'flat',text:'= 0 pp'};
+}
   function fuFunnelChart(snap, unit='habita') {
   const rows=Array.isArray(snap?.funnelDates)?snap.funnelDates:null,chart=snap?.chart;
   if(!rows||!Array.isArray(chart)||!chart.length)return fuNativeChart(snap,unit);
@@ -3484,16 +3500,22 @@
   const cur=fuFunnelCounts(dates.map(x=>x.d),labels.length,win.cur,win.open);
   const prev=fuFunnelCounts(dates.map(x=>x.d),labels.length,win.prev,win.open);
   const max=Math.max(1,...cur,...prev),focus=state.fu.chartFocus||null;
-  const pct=(a,b)=>b?Math.round(a/b*100):null;
+  const all=dates.map(x=>x.d);
+  // Entre cada par de pasos: la conversión del período y la del anterior, con la diferencia en puntos.
+  const connector=(i)=>{
+    const c=fuFunnelConversion(all,i,win.cur,win.open),p=fuFunnelConversion(all,i,win.prev,win.open);
+    if(c.rate===null)return `<li class="os-cmp-conv" data-testid="fu-funnel-conversion" aria-label="${esc(labels[i-1])} a ${esc(labels[i])}: sin base"><span class="os-cmp-conv-arrow" aria-hidden="true">↓</span><span class="os-cmp-conv-none">sin base para comparar</span></li>`;
+    const d=fuPointsDelta(c.rate,p.rate);
+    return `<li class="os-cmp-conv" data-testid="fu-funnel-conversion" title="${esc(`${int(c.went)} de ${int(c.base)} llegaron a ${labels[i]}`)}"><span class="os-cmp-conv-arrow" aria-hidden="true">↓</span><strong>${Math.round(c.rate*100)}%</strong>
+      <span class="os-cmp-conv-was">antes ${p.rate===null?'—':Math.round(p.rate*100)+'%'}${d?`<span class="os-cmp-delta" data-dir="${d.dir}">${esc(d.text)}</span>`:''}</span></li>`;
+  };
   const items=labels.map((label,i)=>{
     const d=fuDelta(cur[i],prev[i]),on=focus?.mode==='window'&&focus.step===i;
-    // La conversión del paso anterior solo en el acumulado: en una semana, quienes llegan a un paso no son los mismos que llegaron al anterior.
-    const conv=period==='acumulado'&&i?`<small class="os-cmp-conv">${pct(cur[i],cur[i-1])??'—'}% del paso anterior · hace una semana ${pct(prev[i],prev[i-1])??'—'}%</small>`:'';
-    return `<li class="os-cmp-row"><button type="button" class="os-cmp-hit ${on?'is-on':''}" aria-pressed="${on}" data-fu="funnel-window" data-fu-step="${i}" data-testid="fu-funnel-compare-row"
+    return `${i?connector(i):''}<li class="os-cmp-row"><button type="button" class="os-cmp-hit ${on?'is-on':''}" aria-pressed="${on}" data-fu="funnel-window" data-fu-step="${i}" data-testid="fu-funnel-compare-row"
       title="Ver ${turnia?'los':'las'} ${int(cur[i])} que llegaron a ${esc(label)}">
       <span class="os-cmp-top"><b>${i+1}. ${esc(label)}</b><span class="os-cmp-vals"><strong>${int(cur[i])}</strong> vs ${int(prev[i])}${d?`<span class="os-cmp-delta" data-dir="${d.dir}">${esc(d.text)}</span>`:''}</span></span>
       <span class="os-cmp-track"><span class="os-cmp-bar" style="width:${(cur[i]/max*100).toFixed(2)}%"></span>${prev[i]?`<span class="os-cmp-prev" style="width:${(prev[i]/max*100).toFixed(2)}%" aria-hidden="true"></span>`:''}</span>
-      ${conv}</button></li>`;
+      </button></li>`;
   }).join('');
   // Tocar un paso lista a quienes llegaron a él en el período (la misma revisión de abajo).
   let review='';
