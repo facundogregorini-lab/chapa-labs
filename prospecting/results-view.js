@@ -12,7 +12,8 @@
   else root.ProspectingResults=api;
 })(typeof self!=='undefined'?self:this,function(){
   'use strict';
-  const WINDOWS={'7':'7 días','14':'14 días',todo:'Sin límite'};
+  /** Período de «Qué acciones convierten»: los mensajes enviados en ese lapso (no una ventana de atribución). */
+  const WINDOWS={semana:'Esta semana','7':'Últimos 7 días','14':'Últimos 14 días',todo:'Sin límite'};
   const COHORTS={contacto:'Semana de contacto',respuesta:'Semana de primera respuesta',version:'Versión del saludo'};
   const PERIODS={semana:'Esta semana',hoy:'Hoy',ayer:'Ayer','7':'Últimos 7 días',custom:'Elegir fechas'};
   /** El lunes que abre la semana de un día (las semanas van de lunes a domingo). */
@@ -31,7 +32,7 @@
   function defaults(view){
     const v=view||{};
     if(!Object.hasOwn(PERIODS,v.period))v.period='semana';
-    if(!Object.hasOwn(WINDOWS,v.windowKey))v.windowKey='7';
+    if(!Object.hasOwn(WINDOWS,v.windowKey))v.windowKey='semana';
     if(!Object.hasOwn(COHORTS,v.cohortBy))v.cohortBy='contacto';
     if(!Number.isFinite(v.wCov))v.wCov=60;
     if(!Number.isFinite(v.wOk))v.wOk=40;
@@ -180,8 +181,12 @@
   // ── 2. Acciones ──
   function actionRows(unit,snap,view,stageTitle,label){
     let versions;
+    // Los períodos que manda habita. (una versión anterior no manda «Esta semana»): si falta el elegido, el primero que haya.
+    const sent=snap?.results?.windows||{};
+    const periods=Object.keys(WINDOWS).filter(k=>sent[k]);
+    const win=periods.includes(view.windowKey)?view.windowKey:periods[0];
     if(unit==='habita'){
-      const w=snap?.results?.windows?.[view.windowKey];
+      const w=sent[win];
       versions=Array.isArray(w?.versions)?w.versions:[];
     }else{
       versions=[];
@@ -194,7 +199,7 @@
       for(const v of versions){const k=v.stage+':'+v.action;groups.set(k,[...(groups.get(k)||[]),v]);}
       for(const list of groups.values()){const m=list.filter(v=>!v.smallSample&&v.rate!==null);if(m.length>1)m.reduce((a,b)=>b.rate>a.rate?b:a).best=true;}
     }
-    const weekly=(unit==='habita'?snap?.results?.windows?.[view.windowKey]?.weeklyByType:snap?.results?.weeklyByType)||{};
+    const weekly=(unit==='habita'?sent[win]?.weeklyByType:snap?.results?.weeklyByType)||{};
     const byType=new Map();
     for(const v of versions){
       if(!v.executed&&v.status==='archived')continue;
@@ -221,8 +226,8 @@
     };
     return `<section class="rs-card" data-testid="results-actions">
       <div class="rs-head"><div><h2><span class="rs-step">3</span>Qué acciones convierten</h2>
-        <p>Una fila por tipo de acción, sumando todas las etapas donde corre. Tocá o hacé doble clic en una fila para ver en qué etapas se ejecutó y cómo le fue a cada versión.</p></div>
-        ${unit==='habita'?`<nav class="rs-seg" aria-label="Ventana de conversión">${Object.entries(WINDOWS).map(([k,l])=>`<button type="button" class="${view.windowKey===k?'is-on':''}" aria-pressed="${view.windowKey===k}" data-fu="results-window" data-fu-window="${k}" data-testid="followup-window-${k}">${l}</button>`).join('')}</nav>`:'<span class="rs-muted">Conversión: avanzó de paso después del envío</span>'}</div>
+        <p>${unit==='habita'?'Los mensajes enviados en el período, una fila por tipo de acción':'Una fila por tipo de acción'}, sumando todas las etapas donde corre. Tocá o hacé doble clic en una fila para ver en qué etapas se ejecutó y cómo le fue a cada versión.</p></div>
+        ${unit==='habita'?`<nav class="rs-seg" aria-label="Enviadas en">${periods.map(k=>[k,WINDOWS[k]]).map(([k,l])=>`<button type="button" class="${win===k?'is-on':''}" aria-pressed="${win===k}" data-fu="results-window" data-fu-window="${k}" data-testid="followup-window-${k}">${l}</button>`).join('')}</nav>`:'<span class="rs-muted">Conversión: avanzó de paso después del envío</span>'}</div>
       <div class="rs-act-head" aria-hidden="true"><span></span><span>Acción</span><span>Ejecutadas y conversiones</span><span>Ejec.</span><span>Conv.</span><span>Tasa · 8 semanas</span></div>
       <div class="rs-acts">${rows.map(r=>{const open=view.action===r.type;const hit=new Set(r.stages.keys());
         return `<div class="rs-act ${open?'is-open':''}" role="button" tabindex="0" aria-expanded="${open}" data-fu="results-action" data-fu-action-type="${esc(r.type)}" data-testid="results-action-row">
@@ -238,7 +243,7 @@
               <div class="rs-big"><div><strong>${num(s.executed)}</strong><small>ejecutadas</small></div><div><strong>${num(s.conversions)}</strong><small>conversiones</small></div><div><strong>${pc(ratio(s.conversions,s.executed))}</strong><small>tasa</small></div>${unit==='habita'?`<div><strong>${esc(hours(h))}</strong><small>tiempo mediano</small></div>`:''}</div>
               <div class="rs-vers">${s.versions.sort((a,b)=>b.version-a.version).map(v=>`<div class="rs-ver"><b>V${num(v.version)}</b><span class="rs-vbar"><i style="width:${Math.round((v.rate||0)/vmax*100)}%"></i></span><span>${pc(v.rate)}</span>
                 <small>${num(v.executed)} ejecutadas${v.assisted?` · +${num(v.assisted)} asistencias`:''}${v.failed?` · ${num(v.failed)} no salieron`:''}${v.status&&v.status!=='active'?` · ${esc(STATUS[v.status]||v.status)}`:''}${v.best?' <em class="rs-pill is-best">MEJOR</em>':v.executed&&v.smallSample?' <em class="rs-pill">MUESTRA CHICA</em>':''}</small></div>`).join('')}</div></article>`;}).join('')}</div></div>`:''}`;}).join('')||'<p class="rs-muted">Todavía no hay acciones ejecutadas.</p>'}</div>
-      <p class="rs-muted">${unit==='habita'?'Conversión: la inmobiliaria pasó del paso en que estaba al recibir el mensaje, dentro de la ventana. Si varios mensajes la precedieron, cuenta solo el último (los otros son asistencias). ':'Conversión: la persona avanzó de paso después del envío, con la definición de Turnia. '}«MEJOR» solo entre versiones con ${SMALL} o más ejecutadas.</p>
+      <p class="rs-muted">${unit==='habita'?'Conversión: la inmobiliaria pasó del paso en que estaba al recibir el mensaje (el saludo, cuando contestó); es la misma definición que «Exitosas» en la cola. Si varios mensajes la precedieron, cuenta solo el último (los otros son asistencias). La tendencia de 8 semanas no depende del período. ':'Conversión: la persona avanzó de paso después del envío, con la definición de Turnia. '}«MEJOR» solo entre versiones con ${SMALL} o más ejecutadas.</p>
     </section>`;
   }
 

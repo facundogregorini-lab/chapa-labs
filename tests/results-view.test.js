@@ -85,6 +85,17 @@ test('2 · actions grouped by type; a row opens into the stages where it ran and
   assert.match(R.render('habita',habita,{action:'Saludo'}),/MEJOR/);
 });
 
+test('2 · the period filter: «Esta semana» first and by default; an older habita. without it falls back',()=>{
+  const week={...habita,results:{...habita.results,windows:{semana:{versions:[habita.results.windows['7'].versions[0]],weeklyByType:{}},...habita.results.windows}}};
+  const html=R.render('habita',week,{});
+  assert.match(html,/aria-pressed="true" data-fu="results-window" data-fu-window="semana"[^>]*>Esta semana</);
+  assert.equal((html.match(/data-testid="results-action-row"/g)||[]).length,1);
+  assert.equal((R.render('habita',week,{windowKey:'7'}).match(/data-testid="results-action-row"/g)||[]).length,2);
+  const old=R.render('habita',habita,{});
+  assert.doesNotMatch(old,/data-fu-window="semana"/);
+  assert.match(old,/aria-pressed="true" data-fu="results-window" data-fu-window="7"/);
+});
+
 test('3 · cohorts with the stages of the panel, as a heatmap',()=>{
   const html=R.render('habita',habita,{cohortBy:'version'});
   assert.match(html,/<th>Prospecto<\/th><th>Contactada<\/th>/);
