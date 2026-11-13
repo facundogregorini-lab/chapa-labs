@@ -2805,3 +2805,11 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
 .os-fu-opening .os-fu-opening-slow{margin:0;font-size:12px;color:#7a5a17;opacity:0;animation:os-fu-slow .2s ease 4s forwards}
 @keyframes os-fu-slow{to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.os-fu-opening .os-fu-opening-slow{animation-duration:0s}}
+
+/* Pasar a Facu: el porqué queda en los comentarios del contacto. */
+.os-fu-handoff-reason{display:grid;gap:6px;margin:10px 0 8px;font-size:13px;font-weight:600;color:#1d2b23}
+.os-fu-handoff-reason small{font-weight:500;color:#62786a}
+.os-fu-handoff-reason textarea{width:100%;min-width:0;min-height:60px;font-size:16px;resize:vertical}
+/* Comentarios en «Más información» de las tareas para Facu o Axel. */
+.os-fu-card-comments{margin:10px 0;padding:12px}
+.os-fu-card-comments .os-fu-comments-list{max-height:220px}
