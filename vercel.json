@@ -42,6 +42,10 @@
     {
       "path": "/api/prospecting?op=whatsapp-cron",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/prospecting?op=sofi-cron",
+      "schedule": "20 11 * * *"
     }
   ]
 }
