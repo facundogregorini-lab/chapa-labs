@@ -3527,6 +3527,7 @@
   return `<section class="os-native-funnel os-cmp-funnel" data-testid="followup-native-funnel" data-period="${period}" aria-label="Funnel comercial">
     <div class="os-native-period os-cmp-period"><nav aria-label="Período del embudo">${FU_FUNNEL_PERIODS.map(([key,label])=>`<button type="button" data-fu="funnel-compare" data-fu-period="${key}" aria-pressed="${period===key}" class="${period===key?'is-on':''}">${esc(label)}</button>`).join('')}</nav></div>
     <p class="os-cmp-caption" data-testid="fu-funnel-compare-caption">${esc(win.caption)}</p>
+    <p class="os-cmp-caption" data-testid="fu-funnel-basis">Cuenta a quienes llegaron a cada paso en el período, por la fecha en que llegaron (un saludado hace semanas que habló con Sofi esta semana suma acá). El funnel de ${turnia?'Odontólogos':'Inmobiliarias'} agrupa por la fecha del primer contacto; en «Acumulado» / «Todo» los dos dan lo mismo.</p>
     <div class="os-native-legend"><span><i class="is-went"></i>${period==='pasada'?'Semana pasada':period==='acumulado'?'Hasta hoy':'Esta semana'}</span><span><i class="os-cmp-legend-prev"></i>${period==='pasada'?'Semana anterior':period==='acumulado'?'Hasta hace una semana':'Semana pasada a esta altura'}</span></div>
     <ol class="os-cmp-chart" aria-label="Embudo comercial comparado con el período anterior">${items}</ol>
     ${review}
