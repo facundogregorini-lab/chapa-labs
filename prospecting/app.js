@@ -3740,7 +3740,7 @@
   const run=(snap.results?.experiments||[]).find(x=>versions.some(v=>v.id===x.control_id));
   const options=intent=>[['confirm_number','Confirma el número'],['offer_demo','Ofrece enviar la demo']].map(([k,v])=>`<option value="${k}" ${intent===k?'selected':''}>${v}</option>`).join('');
   const template=versions.find(v=>v.status==='archived'&&/piso_candidato|inmueble_candidato/.test(v.body));
-  const draft=(template?.body||'').replace(/[\[{]+piso_candidato_1_inmobiliaria[\]}]+/g,'{{inmueble_candidato}}');
+  const draft=(template?.body||'').replace(/[\[{]+piso_candidato_1_inmobiliaria[\]}]+/g,'{{inmueble_candidato}}').replace('con el piso de {{inmueble_candidato}}','con {{inmueble_candidato}}');
   const metrics=run?`<section><strong>Resultados ${run.ended_at?'del último test':'parciales'}</strong><small>Interesados dentro de las 72 h del saludo</small>
     ${run.arms.map((r,i)=>`<div class="ab-row"><span>${i?'B':'A'} · V${int(versions.find(v=>v.id===r.id)?.version)}</span><b>${r.mature?Math.round(100*r.interested/r.mature)+' %':'—'}</b></div>`).join('')}
     <details><summary>Ver detalle por variante</summary>${run.arms.map((r,i)=>`<p>${i?'B':'A'} · ${int(r.interested)} interesados / ${int(r.mature)} primeros contactos con 72 h cumplidas · ${int(r.pending)} pendientes.</p>`).join('')}</details></section>`:'';
@@ -5198,8 +5198,8 @@
     if(e.target.matches('[data-fu-results-weight]')&&window.ProspectingResults){
       const r=fuResultsView();r[e.target.dataset.fuResultsWeight]=Number(e.target.value)||0;r.weightsOpen=true;render();return;
     }
-    if(!e.target.matches('[data-fu-rule-version]')&&
-      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+    if(!e.target.matches('[data-fu-rule-version]')&& !e.target.closest('[data-ab-card]') &&
+      Boolean(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]')))
       fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-rule-add-sit]')){
       const form=e.target.closest('[data-fu-rule-form]');
@@ -5371,8 +5371,8 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
-    if(!e.target.matches('[data-fu-rule-version]')&&
-      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+    if(!e.target.matches('[data-fu-rule-version]')&& !e.target.closest('[data-ab-card]') &&
+      Boolean(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]')))
       fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
