@@ -543,6 +543,19 @@ async function doSofiCron(req, res) {
   }
 }
 
+// El resumen diario de Sofi para el equipo de cada consultorio (Turnia lo manda una vez por día hábil,
+// desde las 10; si el disparador de cada 10 minutos ya lo mandó, no hace nada).
+async function doResumenCron(req, res) {
+  const unit = UNITS.turnia;
+  if (!unit || !unit.api || !apiOf(unit)) return fail(res, 403, 'Falta la clave de la API de Turnia.');
+  try {
+    const out = await callApi(unit, { method: 'POST', body: { by: 'Resumen diario', followup: { op: 'resumen-sofi' } }, timeout: 280000 });
+    return res.status(200).json({ ok: true, resumenes: out && out.resumenes });
+  } catch (err) {
+    return fail(res, err.status && err.status < 500 ? err.status : 502, err.message);
+  }
+}
+
 async function doWhatsappCron(req, res) {
   const unit = UNITS.turnia;
   if (!unit || !unit.api || !apiOf(unit)) return fail(res, 403, 'Falta la clave de la API de Turnia.');
@@ -687,6 +700,7 @@ module.exports = async (req, res) => {
     // El cron no tiene sesión: solo pide la lectura de WhatsApp, que no manda nada.
     if (op === 'whatsapp-cron' && req.method === 'GET') return await doWhatsappCron(req, res);
     if (op === 'sofi-cron' && req.method === 'GET') return await doSofiCron(req, res);
+    if (op === 'resumen-cron' && req.method === 'GET') return await doResumenCron(req, res);
     const user = session.read(req);
     if (!user) return fail(res, 401, 'Iniciá sesión.');
     if (!googleReady()) return fail(res, 503, 'Falta configurar la cuenta de servicio de Google.', { code: 'NO_GOOGLE' });

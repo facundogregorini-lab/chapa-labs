@@ -46,6 +46,10 @@
     {
       "path": "/api/prospecting?op=sofi-cron",
       "schedule": "20 11 * * *"
+    },
+    {
+      "path": "/api/prospecting?op=resumen-cron",
+      "schedule": "5 13 * * 1-5"
     }
   ]
 }
