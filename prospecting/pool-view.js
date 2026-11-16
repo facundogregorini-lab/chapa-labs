@@ -28,7 +28,7 @@
   /** Las filas del filtro: estado y texto (nombre, zona, web o WhatsApp). */
   function filterRows(rows,view){
     const q=norm(view.q).trim();
-    return (rows||[]).filter(r=>(view.status==='todos'||r.status===view.status)
+    return (rows||[]).filter(r=>(view.status==='todos'||r.status===view.status||(view.status==='falta_inmueble'&&missingCandidate(r)))
       &&(!q||[r.name,r.zone,r.website,r.whatsapp,r.address].some(x=>norm(x).includes(q))));
   }
 
@@ -127,11 +127,14 @@
       <div class="pp-actions"><button class="btn primary" type="submit" ${o.saving?'disabled':''}>${o.saving?'AGREGANDO…':'AGREGAR'}</button></div></form></section>`;
   }
 
+  function missingCandidate(r){return r.status==='en_cola'&&(!r.profile?.demo_listing_url||!r.profile?.demo_listing_reference);}
+
   function list(data,view,o){
     const catalog=data.catalog,rows=filterRows(data.rows,view),shown=rows.slice(0,view.shown);
     const open=view.open?data.rows.find(r=>r.id===view.open):null;
     const counts=data.counts||{};
     const chips=[['todos','Todas',counts.total||0],...STATUS_ORDER.map(k=>[k,statusLabel(catalog,k),counts[k]||0])];
+    chips.push(['falta_inmueble','Falta inmueble',data.rows.filter(missingCandidate).length]);
     const ready=counts.calificado||0;
     return `${open?detail(open,catalog,o):''}${view.adding?createForm(catalog,o):''}
       <section class="card glass pp-list">

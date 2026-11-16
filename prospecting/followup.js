@@ -294,6 +294,7 @@
           status: v.status,
           channel: v.channel,
           body: v.body,
+          replyIntent: v.reply_intent,
           notes: v.notes || '',
           trigger: v.trigger_label || v.trigger || '',
           executed,
