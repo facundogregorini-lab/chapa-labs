@@ -561,6 +561,12 @@
   }
 
   function render() {
+    // Keep open editors mounted across background render cycles on the same rule.
+    const ruleKey=()=>main.querySelector('[data-fu-rule-form]')?.dataset.fuRuleKey;
+    const previousRule=ruleKey();
+    const editors=['[data-ab-card]:has([data-ab-config]:not([hidden]))','details.fu-ref-new-message[open]','[data-fu-version-edit-form]'];
+    const openEditors=editors.map(selector=>main.querySelector(selector));
+    const focus=document.activeElement;
     renderTop();
     if (!state.session) return;
     const s = state.session;
@@ -581,6 +587,19 @@
     }
     if((state.unit==='todas'||(state.unit==='habita'||state.unit==='turnia')&&(isFu()||state.view==='script'))&&!state.demo)
       main.innerHTML=habitaFuChrome(main.innerHTML);
+    if(previousRule===ruleKey() && state.session.user){
+      const targets=['[data-ab-card]','details.fu-ref-new-message','[data-fu-version-edit-form]'];
+      openEditors.forEach((old,index)=>{
+        if(!old)return;
+        const next=main.querySelector(targets[index]);
+        if(!next)return;
+        const identity=el=>JSON.stringify([el.dataset,el.querySelector('form')?.dataset]);
+        if(identity(old)!==identity(next))return;
+        if(index===0 && [...old.querySelectorAll('[data-ab-version="A"] option')].map(o=>o.value).join()!==[...next.querySelectorAll('[data-ab-version="A"] option')].map(o=>o.value).join())return;
+        next.replaceWith(old);
+        if(old.contains(focus))focus.focus({preventScroll:true});
+      });
+    }
     after();
   }
   // Cuenta regresiva del modo Enviar y aviso de un envío abierto sin confirmar (por ejemplo, tras recargar).
@@ -3739,16 +3758,18 @@
   if(stage!=='no-contactado'||action!=='principal'||!a)return '';
   const run=(snap.results?.experiments||[]).find(x=>versions.some(v=>v.id===x.control_id));
   const options=intent=>[['confirm_number','Confirma el número'],['offer_demo','Ofrece enviar la demo']].map(([k,v])=>`<option value="${k}" ${intent===k?'selected':''}>${v}</option>`).join('');
-  const template=versions.find(v=>v.status==='archived'&&/piso_candidato|inmueble_candidato/.test(v.body));
-  const draft=(template?.body||'').replace(/[\[{]+piso_candidato_1_inmobiliaria[\]}]+/g,'{{inmueble_candidato}}').replace('con el piso de {{inmueble_candidato}}','con {{inmueble_candidato}}');
+  const saved=versions.filter(v=>v.channel==='whatsapp');
+  const other=saved.find(v=>v.id!==a.id);
+  const choices=id=>saved.map(v=>`<option value="${esc(v.id)}" data-intent="${esc(v.replyIntent||'')}" ${v.id===id?'selected':''}>V${int(v.version)} · ${esc((v.body||'').slice(0,80))}</option>`).join('');
+  const arm=(letter,v,intent)=>`<label class="field"><span>Versión ${letter}</span><select class="input" data-ab-version="${letter}">${choices(v.id)}</select></label>
+    <label class="field"><span>¿Qué pide ${letter}?</span><select class="input" data-ab-intent="${letter}" ${v.replyIntent?'disabled':''}>${options(v.replyIntent||intent)}</select></label>`;
   const metrics=run?`<section><strong>Resultados ${run.ended_at?'del último test':'parciales'}</strong><small>Interesados dentro de las 72 h del saludo</small>
     ${run.arms.map((r,i)=>`<div class="ab-row"><span>${i?'B':'A'} · V${int(versions.find(v=>v.id===r.id)?.version)}</span><b>${r.mature?Math.round(100*r.interested/r.mature)+' %':'—'}</b></div>`).join('')}
     <details><summary>Ver detalle por variante</summary>${run.arms.map((r,i)=>`<p>${i?'B':'A'} · ${int(r.interested)} interesados / ${int(r.mature)} primeros contactos con 72 h cumplidas · ${int(r.pending)} pendientes.</p>`).join('')}</details></section>`:'';
   return `<div class="fu-ab" data-ab-card data-control="${esc(a.id)}" data-variant="${esc(b?.id||'')}"><div class="ab-row"><strong>Test A/B</strong><button type="button" class="ab-switch" role="switch" aria-label="Test A/B" aria-checked="${Boolean(b)}" data-fu="ab-toggle"><i></i></button></div>
     ${b?`<small>En curso · reparto 50/50</small>${[a,b].map((v,i)=>`<div class="ab-row"><span>${i?'B':'A'} · V${int(v.version)} · ${v.replyIntent==='offer_demo'?'Ofrece demo':'Confirma número'}</span><b>50 %</b></div>`).join('')}`:''}
-    <div data-ab-config hidden>${b?`<p>¿Con qué saludo querés seguir?</p>${[a,b].map((v,i)=>`<button type="button" class="btn small" data-fu="ab-save" data-winner="${esc(v.id)}">Finalizar y usar ${i?'B':'A'}</button>`).join('')}`:`<small>Una variante por inmobiliaria · 50 % cada una</small><label class="field"><span>A · V${int(a.version)}</span><small>${esc(a.body)}</small><select class="input" data-ab-a>${options(a.replyIntent||'confirm_number')}</select></label>
-    <label class="field"><span>B · Mensaje de WhatsApp</span><textarea class="input" rows="6" maxlength="4000" data-ab-body>${esc(draft)}</textarea></label><label class="field"><span>¿Qué pide B?</span><select class="input" data-ab-b>${options('offer_demo')}</select></label>
-    <button type="button" class="btn primary" data-fu="ab-save">Iniciar test 50/50</button>`}</div>${metrics}</div>`;
+    <div data-ab-config hidden>${b?`<p>¿Con qué saludo querés seguir?</p>${[a,b].map((v,i)=>`<button type="button" class="btn small" data-fu="ab-save" data-winner="${esc(v.id)}">Finalizar y usar ${i?'B':'A'}</button>`).join('')}`:other?`<small>Una variante por inmobiliaria · 50 % cada una</small>${arm('A',a,'confirm_number')}${arm('B',other,'offer_demo')}
+    <button type="button" class="btn primary" data-fu="ab-save">Iniciar test 50/50</button>`:'<p>Guardá una segunda versión desde «Nueva versión» para iniciar el test.</p>'}</div>${metrics}</div>`;
 }
 
   function fuRuleEditor(unit,snap) {
@@ -4016,7 +4037,7 @@
         <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>${candidateButton(unit)}
         <label class="field"><span>OBSERVACIONES PARA EL EQUIPO</span><textarea class="input" rows="3" name="notes" maxlength="2000" placeholder="Contexto para ejecutar esta versión…"></textarea></label>
         <div class="fu-ref-fields"><label class="field"><span>ACCIÓN</span><select class="input" name="action" aria-label="Acción">${(snap.catalog?.actions?.[stage]||[{key:action,label:action}]).map(a=>`<option value="${esc(a.key)}" ${a.key===action?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
-        <label class="field"><span>ESTADO</span><select class="input" name="status"><option value="test">Probar 50/50</option><option value="active">Reemplazar versión activa</option></select></label></div>
+        <label class="field"><span>ESTADO</span><select class="input" name="status">${unit==='habita'&&stage==='no-contactado'&&action==='principal'?'<option value="archived">Guardar sin activar</option>':''}${unit==='habita'&&stage==='no-contactado'&&action==='principal'?'':'<option value="test">Probar 50/50</option>'}<option value="active">Reemplazar versión activa</option></select></label></div>
         <button class="btn primary" type="submit" ${canEdit?'':'disabled title="Requiere sesión protegida"'}>GUARDAR NUEVA VERSIÓN</button>
       </form>
     </details>
@@ -4985,10 +5006,11 @@
       }
       case 'ab-save': {
         const card=t.closest('[data-ab-card]');
-        const ok=await fuOp('habita',{op:'ab-configure',control:card.dataset.control,variant:card.dataset.variant||null,winner:t.dataset.winner||null,
-          body:card.querySelector('[data-ab-body]')?.value,controlIntent:card.querySelector('[data-ab-a]')?.value,variantIntent:card.querySelector('[data-ab-b]')?.value},
+        if(!t.dataset.winner && card.querySelector('[data-ab-version="A"]')?.value===card.querySelector('[data-ab-version="B"]')?.value){toast('Elegí dos versiones distintas.',true);break;}
+        const ok=await fuOp('habita',{op:'ab-configure',control:card.querySelector('[data-ab-version="A"]')?.value||card.dataset.control,variant:card.querySelector('[data-ab-version="B"]')?.value||card.dataset.variant,winner:t.dataset.winner||null,
+          controlIntent:card.querySelector('[data-ab-intent="A"]')?.value,variantIntent:card.querySelector('[data-ab-intent="B"]')?.value},
           {label:t.dataset.winner?'Test finalizado.':'Test 50/50 iniciado.'});
-        if(ok){await loadFollowup({quiet:true});render();}
+        if(ok){card.querySelector('[data-ab-config]').hidden=true;await loadFollowup({quiet:true});render();}
         break;
       }
       case 'insert-candidate': {
@@ -5131,7 +5153,10 @@
     if (form.matches('[data-fu-version-form]')) {
       const unit = form.dataset.fuUnitId;
       const valores = { stage: form.dataset.fuStage, action: fd.action || 'principal', channel: 'whatsapp', trigger: '', body: fd.body, notes: String(fd.notes||''), ctas: ['whatsapp', 'demo', 'copy'], status: fd.status };
-      if (await fuOp(unit, { op: 'version-create', valores }, { label: 'Versión guardada.' })) loadFollowup();
+      if (await fuOp(unit, { op: 'version-create', valores }, { label: 'Versión guardada.' })) {
+        const details=form.closest('details');if(details)details.open=false;
+        await loadFollowup();
+      }
       return;
     }
     if (!task) return;
@@ -5307,6 +5332,15 @@
         syncFuRuleSituationChips(form);
         fuRulesState(state.unit).dirty=true;
       }
+    }
+    if(e.target.matches('[data-ab-version]')){
+      const card=e.target.closest('[data-ab-card]');
+      const intent=card.querySelector('[data-ab-intent="'+e.target.dataset.abVersion+'"]');
+      const saved=e.target.selectedOptions[0]?.dataset.intent;
+      intent.disabled=Boolean(saved);
+      if(saved)intent.value=saved;
+      card.querySelector('[data-fu="ab-save"]').disabled=card.querySelector('[data-ab-version="A"]').value===card.querySelector('[data-ab-version="B"]').value;
+      return;
     }
     if(e.target.matches('[data-fu-rules-tech]')){
       const ui=fuRulesState(state.unit);
