@@ -3136,14 +3136,14 @@
     const ready=!q.closed&&!done&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
     const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x.versionId);
     const template=version?.body||'';
-    const message=template.replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
+    const message=fillCandidate(template,x).replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
     const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
     return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
       <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
       <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
       <div class="os-fu-preview-actions">
-        <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
-        <button type="button" class="btn" data-copy-text="${esc(message)}" ${message?'':'disabled'}>${icon.copy} Copiar borrador</button>
+        <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
+        <button type="button" class="btn" data-copy-text="${esc(message)}" ${message&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.copy} Copiar borrador</button>
         <button type="button" class="btn" disabled title="Primero tomá y enviá la tarea">✓ Confirmar envío</button>
         <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
         <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
@@ -3879,7 +3879,7 @@
   return `<form class="section" data-fu-version-edit-form data-fu-unit-id="${unit}" data-fu-version="${esc(version.id)}" style="margin-top:12px">
     <div class="os-section-heading"><h3>EDITAR V${version.version}</h3><button type="button" class="btn small" data-fu="version-edit" data-fu-version="">CERRAR</button></div>
     <p class="os-warn-note">Editar el texto de una versión mezcla métricas del texto anterior y el nuevo. Para A/B creá otra versión.</p>
-    <label class="field"><span>Mensaje</span><textarea class="input" name="body" rows="6" required>${esc(version.body||'')}</textarea></label>
+    <label class="field"><span>Mensaje</span><textarea class="input" name="body" rows="6" required>${esc(version.body||'')}</textarea></label>${candidateButton(unit)}
     <label class="field"><span>Observaciones</span><textarea class="input" name="notes" rows="3">${esc(version.notes||'')}</textarea></label>
     <button class="btn primary" type="submit">GUARDAR VERSIÓN</button>
   </form>`;
@@ -3958,11 +3958,17 @@
   };
 }
 
+  function candidateButton(unit) {
+    return unit==='habita' ? '<button type="button" class="btn small" data-fu="insert-candidate">Insertar variable · Inmueble candidato</button>' : '';
+  }
+  function fillCandidate(body,item) {
+    return body.replace(/\{\{\s*inmueble_candidato\s*\}\}/g,()=>item?.candidateReference || '{{inmueble_candidato}}');
+  }
   function fuRulesMessage(unit, snap, rule, stage, create) {
   if(create)return `<section class="fu-ref-message" data-fu-new-rule-message data-testid="followup-rule-message">
   <div class="os-section-heading"><div><span class="os-kicker">QUÉ SE EJECUTA</span><h3>Mensaje de la nueva regla</h3></div></div>
   <p class="os-view-caption">Prepará el texto junto con la regla. Guardar crea la regla y, si escribís un mensaje, una versión activa para su acción.</p>
-  <label class="field"><span>MENSAJE A ENVIAR</span><textarea class="input" name="body" rows="9" maxlength="4000" placeholder="Escribí el mensaje o adaptá la plantilla…"></textarea></label>
+  <label class="field"><span>MENSAJE A ENVIAR</span><textarea class="input" name="body" rows="9" maxlength="4000" placeholder="Escribí el mensaje o adaptá la plantilla…"></textarea></label>${candidateButton(unit)}
   <p class="os-view-caption">Podés usar {{inmobiliaria}} y las variables que reconoce Habita. No se envía ningún mensaje al guardar esta pantalla.</p>
   <label class="field"><span>OBSERVACIONES (OPCIONAL)</span><textarea class="input" name="notes" rows="3" maxlength="2000" placeholder="Notas para el equipo…"></textarea></label>
   <p class="os-warn-note">Las versiones anteriores se conservan. Si esta acción ya tiene una versión activa, revisá lo existente antes de crear otra.</p>
@@ -3989,7 +3995,7 @@
       <summary>+ NUEVA VERSIÓN DEL MENSAJE</summary>
       <form data-fu-version-form data-fu-unit-id="${unit}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}">
         <p class="os-view-caption">Cada versión queda registrada por separado para preservar las métricas de las anteriores.</p>
-        <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>
+        <label class="field"><span>TEXTO DEL MENSAJE</span><textarea class="input" rows="5" name="body" maxlength="4000" required placeholder="Escribí el mensaje…"></textarea></label>${candidateButton(unit)}
         <label class="field"><span>OBSERVACIONES PARA EL EQUIPO</span><textarea class="input" rows="3" name="notes" maxlength="2000" placeholder="Contexto para ejecutar esta versión…"></textarea></label>
         <div class="fu-ref-fields"><label class="field"><span>ACCIÓN</span><select class="input" name="action" aria-label="Acción">${(snap.catalog?.actions?.[stage]||[{key:action,label:action}]).map(a=>`<option value="${esc(a.key)}" ${a.key===action?'selected':''}>${esc(a.label)}</option>`).join('')}</select></label>
         <label class="field"><span>ESTADO</span><select class="input" name="status"><option value="test">Probar 50/50</option><option value="active">Reemplazar versión activa</option></select></label></div>
@@ -4079,7 +4085,7 @@
   const name=sample?.shortName||sample?.name||org;
   const person=sample?.person||'';
   const body=active?.body||'';
-  const filled=body
+  const filled=fillCandidate(body,sample)
     .replaceAll('{{inmobiliaria}}',name).replaceAll('{{destinatario}}',name)
     .replaceAll('{{decisor}}',person).replaceAll('{{sdr}}','vos')
     .replaceAll('{{demo}}','[link a demo]').replaceAll('{{panel}}','[link a panel]');
@@ -4094,7 +4100,7 @@
           '<p class="fu-ref-wa-empty">Elegí una versión del mensaje para ver cómo quedaría. No se enviará nada desde esta vista.</p>'}</div>
       <div class="fu-ref-wa-bottom">
         <button type="button" class="btn small" data-view="hoy">IR A LA COLA</button>
-        <button type="button" class="btn small" data-fu="rules-preview-copy" data-fu-unit-id="${esc(unit)}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}" ${body?'':'disabled'}>COPIAR MENSAJE</button>
+        <button type="button" class="btn small" data-fu="rules-preview-copy" data-fu-unit-id="${esc(unit)}" data-fu-stage="${esc(stage)}" data-fu-rule-action="${esc(action)}" data-preview-text="${esc(filled)}" ${body&&!filled.includes('{{inmueble_candidato}}')?'':'disabled'}>COPIAR MENSAJE</button>
       </div>
     </div>
     <p class="os-view-caption">Simulación sin envío. El texto final y los enlaces reales se revisan al tomar cada contacto de la cola.</p>
@@ -4951,12 +4957,17 @@
         if(neighbor)await fuRulesMove(state.unit,ds.fuKey,neighbor.key);
         break;
       }
+      case 'insert-candidate': {
+        const field=t.closest('form')?.querySelector('textarea[name="body"]');
+        if(field){field.setRangeText('{{inmueble_candidato}}',field.selectionStart,field.selectionEnd,'end');field.dispatchEvent(new Event('input',{bubbles:true}));field.focus();}
+        break;
+      }
       case 'rules-preview-copy': {
         const unit=ds.fuUnitId, snap=state.fu.n?.units[unit];
         const versions=F.versionRows(unit,snap).filter(v=>v.stage===ds.fuStage&&v.action===ds.fuRuleAction);
         const version=versions.find(v=>v.id===state.fu.previewVersion)
           ||versions.find(v=>v.status==='active')||versions[0];
-        if(version?.body){copy(version.body);toast('Versión V'+version.version+' copiada sin enviarla.');}
+        if(version?.body && ds.previewText){copy(ds.previewText);toast('Versión V'+version.version+' copiada sin enviarla.');}
         else toast('No hay una versión del mensaje para copiar.',true);
         break;
       }

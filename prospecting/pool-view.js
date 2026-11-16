@@ -92,7 +92,7 @@
         <div class="pp-bars">${bar('Contactabilidad',row.score.contact)}${bar('Encaje',row.score.fit)}${bar('Facilidad de demo',row.score.demo)}
           <p class="pp-parts">${Object.entries(row.score.parts||{}).map(([k,v])=>PARTS[k]?`${esc(PARTS[k][0])} ${num(v)}/${PARTS[k][1]}`:'').filter(Boolean).join(' · ')}</p>
           ${(row.score.caps||[]).map(c=>`<p class="notice-line">${esc(c)}</p>`).join('')}</div>
-        <div class="pp-missing">${queued?'<p class="pp-ok">Ya está en la cola, esperando el saludo.</p>':discarded?`<p class="notice-line bad">Descartada: ${esc(row.discardReason||'sin motivo')}</p>`:row.missing.length?`<span class="os-kicker">PARA ENTRAR A LA COLA FALTA</span><ul>${row.missing.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:'<p class="pp-ok">Lista para entrar a la cola.</p>'}
+        <div class="pp-missing">${queued?(!row.profile?.demo_listing_url||!row.profile?.demo_listing_reference?'<p class="notice-line">Completar inmueble candidato antes del saludo.</p>':'<p class="pp-ok">Ya está en la cola, esperando el saludo.</p>'):discarded?`<p class="notice-line bad">Descartada: ${esc(row.discardReason||'sin motivo')}</p>`:row.missing.length?`<span class="os-kicker">PARA ENTRAR A LA COLA FALTA</span><ul>${row.missing.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:'<p class="pp-ok">Lista para entrar a la cola.</p>'}
           <small>Datos clave cargados: ${num(row.complete)}%</small></div>
       </div>
       ${row.notes?`<p class="pp-notes"><strong>Notas de la planilla:</strong> ${esc(row.notes)}</p>`:''}
