@@ -495,7 +495,7 @@ async function doScript(req,res,user){
 // Chapa no guarda ni recalcula la cola: cada app (habita., Turnia) la arma con sus reglas, sus
 // tomas de 10 minutos y sus resultados. Acá se juntan para verlas en una sola bandeja y cada acción
 // va a la app de su unidad a nombre de quien opera.
-const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'handoff', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search', 'whatsapp-check', 'conversations-backfill']);
+const FOLLOWUP_OPS = new Set(['queue', 'claim', 'open', 'confirm', 'fail', 'release', 'stage', 'handoff', 'situation', 'reply', 'replies', 'snooze', 'priority', 'owner', 'ab-configure', 'version-create', 'version-update', 'version-status', 'rule-save', 'rule-delete', 'rule-reorder', 'stage-create', 'state-save', 'state-delete', 'state-toggle', 'whatsapp-sync', 'whatsapp-search', 'whatsapp-check', 'conversations-backfill']);
 
 async function doFollowup(req, res) {
   const startedAt = Date.now();
@@ -570,7 +570,7 @@ async function doTask(req, res, user) {
   // SECURITY: a name-only, open Chapa session is not identity verification.
   // Keep the additional restriction for Turnia and other business units;
   // enable PROSPECTING_PASSWORD later to protect open-link access globally.
-  const sensitiveOps = new Set(['rule-save', 'rule-delete', 'rule-reorder', 'version-create', 'version-update', 'version-status', 'stage-create', 'state-save', 'state-delete', 'state-toggle']);
+  const sensitiveOps = new Set(['rule-save', 'rule-delete', 'rule-reorder', 'ab-configure', 'version-create', 'version-update', 'version-status', 'stage-create', 'state-save', 'state-delete', 'state-toggle']);
   if (sensitiveOps.has(f.op) && session.open() && unit.id !== 'habita')
     return fail(res, 403, 'Para editar reglas, versiones, etapas o situaciones de Turnia configurá PROSPECTING_PASSWORD (12 caracteres o más) en Chapa Labs.');
   try {

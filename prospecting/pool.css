@@ -66,3 +66,13 @@
   .pp-tools .input { max-width:none; }
   .pp-detail .card-head { flex-direction:column; }
 }
+
+.fu-ab {padding:14px 0;margin:12px 0;border-block:1px solid #d5e4da;color:#193e32}
+.fu-ab .ab-row {display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0}
+.fu-ab small {display:block;margin:6px 0;color:#476356}
+.fu-ab section,.fu-ab details,.fu-ab .field {display:block;margin-top:12px}
+.fu-ab summary {cursor:pointer;text-decoration:underline}
+.fu-ab .ab-switch {height:26px;width:46px;border:0;padding:3px;border-radius:20px;background:#778c81;cursor:pointer}
+.fu-ab .ab-switch i {display:block;border-radius:50%;width:20px;height:20px;background:white}
+.fu-ab .ab-switch[aria-checked=true] {background:#176745}
+.fu-ab .ab-switch[aria-checked=true] i {transform:translateX(20px)}

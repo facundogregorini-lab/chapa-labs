@@ -3734,6 +3734,23 @@
       picker.add(new Option(box.dataset.label||box.value,box.value));
   }
 
+  function fuAbCard(snap,stage,action,versions){
+  const a=versions.find(v=>v.status==='active'), b=versions.find(v=>v.status==='test');
+  if(stage!=='no-contactado'||action!=='principal'||!a)return '';
+  const run=(snap.results?.experiments||[]).find(x=>versions.some(v=>v.id===x.control_id));
+  const options=intent=>[['confirm_number','Confirma el número'],['offer_demo','Ofrece enviar la demo']].map(([k,v])=>`<option value="${k}" ${intent===k?'selected':''}>${v}</option>`).join('');
+  const template=versions.find(v=>v.status==='archived'&&/piso_candidato|inmueble_candidato/.test(v.body));
+  const draft=(template?.body||'').replace(/[\[{]+piso_candidato_1_inmobiliaria[\]}]+/g,'{{inmueble_candidato}}').replace('con el piso de {{inmueble_candidato}}','con {{inmueble_candidato}}');
+  const metrics=run?`<section><strong>Resultados ${run.ended_at?'del último test':'parciales'}</strong><small>Interesados dentro de las 72 h del saludo</small>
+    ${run.arms.map((r,i)=>`<div class="ab-row"><span>${i?'B':'A'} · V${int(versions.find(v=>v.id===r.id)?.version)}</span><b>${r.mature?Math.round(100*r.interested/r.mature)+' %':'—'}</b></div>`).join('')}
+    <details><summary>Ver detalle por variante</summary>${run.arms.map((r,i)=>`<p>${i?'B':'A'} · ${int(r.interested)} interesados / ${int(r.mature)} primeros contactos con 72 h cumplidas · ${int(r.pending)} pendientes.</p>`).join('')}</details></section>`:'';
+  return `<div class="fu-ab" data-ab-card data-control="${esc(a.id)}" data-variant="${esc(b?.id||'')}"><div class="ab-row"><strong>Test A/B</strong><button type="button" class="ab-switch" role="switch" aria-label="Test A/B" aria-checked="${Boolean(b)}" data-fu="ab-toggle"><i></i></button></div>
+    ${b?`<small>En curso · reparto 50/50</small>${[a,b].map((v,i)=>`<div class="ab-row"><span>${i?'B':'A'} · V${int(v.version)} · ${v.replyIntent==='offer_demo'?'Ofrece demo':'Confirma número'}</span><b>50 %</b></div>`).join('')}`:''}
+    <div data-ab-config hidden>${b?`<p>¿Con qué saludo querés seguir?</p>${[a,b].map((v,i)=>`<button type="button" class="btn small" data-fu="ab-save" data-winner="${esc(v.id)}">Finalizar y usar ${i?'B':'A'}</button>`).join('')}`:`<small>Una variante por inmobiliaria · 50 % cada una</small><label class="field"><span>A · V${int(a.version)}</span><small>${esc(a.body)}</small><select class="input" data-ab-a>${options(a.replyIntent||'confirm_number')}</select></label>
+    <label class="field"><span>B · Mensaje de WhatsApp</span><textarea class="input" rows="6" maxlength="4000" data-ab-body>${esc(draft)}</textarea></label><label class="field"><span>¿Qué pide B?</span><select class="input" data-ab-b>${options('offer_demo')}</select></label>
+    <button type="button" class="btn primary" data-fu="ab-save">Iniciar test 50/50</button>`}</div>${metrics}</div>`;
+}
+
   function fuRuleEditor(unit,snap) {
   if(unit!=='habita'||!state.fu.ruleEdit)return '';
   const create=state.fu.ruleEdit==='__new';
@@ -3863,6 +3880,7 @@
       <label class="field"><span>VERSIÓN DEL MENSAJE</span><select class="input" data-fu-rule-version aria-label="Versión del mensaje vinculada a la acción" ${linkedVersions.length?'':'disabled'}>
         ${linkedVersions.map(v=>`<option value="${esc(v.id)}" ${selectedPreview?.id===v.id?'selected':''}>V${int(v.version)} (${v.status==='active'?'activa':v.status==='test'?'en prueba':'archivada'})</option>`).join('')||'<option value="">Sin versiones</option>'}
       </select></label>
+      <div data-ab-slot>${!create?fuAbCard(snap,key,r.action,linkedVersions):''}</div>
       <div class="fu-ref-what-actions"><button type="button" class="btn small" data-fu="rules-message-focus">✎ EDITAR VERSIONES</button>
         <button type="button" class="btn small" data-fu="rules-version-new">＋ NUEVA VERSIÓN</button></div>
       <p class="os-view-caption">${surveyed?'La encuesta de cierre se envía solo si el motor confirma la situación «No interesado».':'Las versiones del mensaje se conservan con su historial y su estado A/B.'}</p>
@@ -4072,6 +4090,8 @@
     if(message)message.outerHTML=fuRulesMessage('habita',snap,updated,stage,ui.creating);
     const preview=main.querySelector('[data-testid="followup-preview"]');
     if(preview)preview.outerHTML=fuRulePreview('habita',snap,updated,stage,ui.creating);
+    const slot=form.querySelector('[data-ab-slot]');
+    if(slot)slot.innerHTML=original && action===original.action?fuAbCard(snap,stage,action,versions):'';
     form.dataset.fuRenderedAction=action;
   }
 
@@ -4957,6 +4977,20 @@
         if(neighbor)await fuRulesMove(state.unit,ds.fuKey,neighbor.key);
         break;
       }
+      case 'ab-toggle': {
+        const panel=t.closest('[data-ab-card]').querySelector('[data-ab-config]');
+        panel.hidden=!panel.hidden;
+        if(!t.closest('[data-ab-card]').dataset.variant)t.setAttribute('aria-checked',String(!panel.hidden));
+        break;
+      }
+      case 'ab-save': {
+        const card=t.closest('[data-ab-card]');
+        const ok=await fuOp('habita',{op:'ab-configure',control:card.dataset.control,variant:card.dataset.variant||null,winner:t.dataset.winner||null,
+          body:card.querySelector('[data-ab-body]')?.value,controlIntent:card.querySelector('[data-ab-a]')?.value,variantIntent:card.querySelector('[data-ab-b]')?.value},
+          {label:t.dataset.winner?'Test finalizado.':'Test 50/50 iniciado.'});
+        if(ok){await loadFollowup({quiet:true});render();}
+        break;
+      }
       case 'insert-candidate': {
         const field=t.closest('form')?.querySelector('textarea[name="body"]');
         if(field){field.setRangeText('{{inmueble_candidato}}',field.selectionStart,field.selectionEnd,'end');field.dispatchEvent(new Event('input',{bubbles:true}));field.focus();}
@@ -5164,8 +5198,8 @@
     if(e.target.matches('[data-fu-results-weight]')&&window.ProspectingResults){
       const r=fuResultsView();r[e.target.dataset.fuResultsWeight]=Number(e.target.value)||0;r.weightsOpen=true;render();return;
     }
-    if(!e.target.matches('[data-fu-rule-version]')&&
-      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+    if(!e.target.matches('[data-fu-rule-version]')&& !e.target.closest('[data-ab-card]') &&
+      Boolean(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]')))
       fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-rule-add-sit]')){
       const form=e.target.closest('[data-fu-rule-form]');
@@ -5337,8 +5371,8 @@
     if (e.target.matches && e.target.matches('[data-fu-details]')) state.fu.open[e.target.dataset.fuDetails] = e.target.open;
   }, true);
   document.addEventListener('input', (e) => {
-    if(!e.target.matches('[data-fu-rule-version]')&&
-      e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]'))
+    if(!e.target.matches('[data-fu-rule-version]')&& !e.target.closest('[data-ab-card]') &&
+      Boolean(e.target.closest('[data-fu-rule-form], [data-fu-turnia-rule-form], [data-fu-new-rule-message]')))
       fuRulesState(state.unit).dirty=true;
     if(e.target.matches('[data-fu-queue-search]')){
       const target=e.target,q=fuQueueState();q.search=target.value;q.limit=25;
