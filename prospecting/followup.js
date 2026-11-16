@@ -35,6 +35,7 @@
       name: q.name || '',
       sub: q.person || q.business || '',
       shortName: q.shortName || q.name || '',
+      candidateReference: q.candidateReference || '', candidateUrl: q.candidateUrl || '',
       person: q.person || '',
       website: q.website || '',
       properties: Number.isFinite(Number(q.properties)) ? Number(q.properties) : null,
