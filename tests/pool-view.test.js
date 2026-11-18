@@ -165,3 +165,25 @@ test('«Falta inmueble» cuenta las que están en cola con un aviso de portal', 
   ];
   assert.deepStrictEqual(Pool.filterRows(rows, Pool.defaults({ status: 'falta_inmueble' })).map((r) => r.id), ['a']);
 });
+
+test('la ficha muestra los avisos de «Crear demo»: si se importan, si ya están en su panel y qué falta', () => {
+  const at = new Date().toISOString();
+  const kit = { preloads: 1, notes: [], items: [
+    { key: 'demo_listing_url', label: 'Aviso para la demo', url: 'https://ficticia.test/p/1', check: { ok: true, photos: 12, title: 'Casa', error: null, at } },
+    { key: 'demo_preload_url_2', label: 'Precarga 2', url: 'https://ficticia.test/p/2', check: { ok: false, photos: 0, title: null, error: 'La publicación no trae fotos.', at } },
+    { key: 'demo_preload_url_3', label: 'Precarga 3', url: null, check: null },
+  ] };
+  const r = row('a', { kit, demoPrep: null, profile: { demo_listing_url: 'https://ficticia.test/p/1' } });
+  const html = Pool.render(data([r]), Pool.defaults({ open: 'a' }), {});
+  assert.match(html, /AVISOS PARA «CREAR DEMO»/);
+  assert.match(html, /se importa · 12 fotos/);
+  assert.match(html, /no se puede importar: La publicación no trae fotos\./);
+  assert.match(html, /Precarga 3<\/b> <span class="sub">sin cargar/);
+  assert.match(html, /data-pool="check" data-id="a" >|data-pool="check" data-id="a"  >|data-pool="check" data-id="a"/);
+  assert.match(html, /Cuando pase a Interesado/);
+  const prepared = Pool.render(data([{ ...r, demoPrep: { at, by: 'Preparación automática', attempts: 1, items: [{ key: 'demo_listing_url', url: 'https://ficticia.test/p/1', ok: true, demoId: 'd1', photos: 12, error: null }] } }]), Pool.defaults({ open: 'a' }), {});
+  assert.match(prepared, /en su panel, lista para importar/);
+  assert.match(prepared, /Preparada hoy \d\d:\d\d por Preparación automática\./);
+  const none = Pool.render(data([row('a', { profile: {} })]), Pool.defaults({ open: 'a' }), {});
+  assert.doesNotMatch(none, /pool-kit/);
+});

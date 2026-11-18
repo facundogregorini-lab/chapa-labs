@@ -387,6 +387,8 @@
     else if (act === 'explore') await poolOp(unit, { op: 'cola', cuenta: id, explorar: true }, 'Pasó a la cola por exploración.');
     else if (act === 'unqueue') await poolOp(unit, { op: 'sacar', cuenta: id }, 'Salió de la cola y volvió a Prospectos.');
     else if (act === 'reopen') await poolOp(unit, { op: 'reabrir', cuenta: id }, 'Reabierta.');
+    else if (act === 'check') await poolOp(unit, { op: 'comprobar', cuenta: id }, (r) => `Avisos comprobados: ${int(Object.values(r.checks || {}).filter((c) => c.ok).length)} de ${int(Object.keys(r.checks || {}).length)} se pueden importar.`);
+    else if (act === 'prepare') await poolOp(unit, { op: 'preparar', cuenta: id }, (r) => `En su panel: ${int((r.prep.items || []).filter((i) => i.ok).length)} de ${int((r.prep.items || []).length)} avisos, listos para importar.`);
     else if (act === 'autofill-run') await poolOp(unit, { op: 'completar' }, (r) => Pool.autofillRun(r.run));
     else if (act === 'recalc') await poolOp(unit, { op: 'recalcular' }, (r) => `Ranking recalculado en ${int(r.changed)} prospectos.`);
   });
