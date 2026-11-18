@@ -84,3 +84,9 @@
 .fu-ab .ab-switch i {display:block;border-radius:50%;width:20px;height:20px;background:white}
 .fu-ab .ab-switch[aria-checked=true] {background:#176745}
 .fu-ab .ab-switch[aria-checked=true] i {transform:translateX(20px)}
+
+.pp-kit { margin:12px 0; padding:10px 12px; border-radius:12px; background:var(--glass-soft); font-size:13px; }
+.pp-kit ul { margin:6px 0; padding-left:18px; display:grid; gap:4px; }
+.pp-kit a { word-break:break-all; }
+.pp-kit .bad { color:var(--bad, #b3261e); }
+.pp-kit .pp-actions { margin-top:6px; }
