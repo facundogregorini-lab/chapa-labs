@@ -113,3 +113,55 @@ test('la última corrida dice cuándo no hizo falta sumar y cuándo falló', () 
   assert.match(Pool.autofillRun({ at, target: 48, waiting: 0, asked: 48, added: 0, explore: 0, short: 48, error: 'Sin base' }), /no se pudo completar\. Sin base/);
   assert.match(Pool.autofillRun({ at, target: 48, waiting: 0, asked: 48, added: 48, explore: 7, short: 0 }), /^Última corrida \(hoy \d\d:\d\d\): entraron 48 de 48 \(7 por exploración\)\.$/);
 });
+
+// «Ya trabajadas»: lo que ya salió de la prospección, con la forma de `history` de habita.
+const situations = [['cliente', 'Cliente'], ['respondio', 'Respondió'], ['contactada', 'Contactada, sin respuesta'], ['en_cola', 'En cola, sin contactar'], ['descartada', 'Descartada']].map(([key, label]) => ({ key, label }));
+const worked = (id, situation, o = {}) => ({
+  id, agencyId: `g-${id}`, name: `Inmobiliaria Ficticia ${id}`, zone: 'Zona Test', website: `https://ficticia-${id}.test`, whatsapp: '+5492230000001', sdr: 'SDR Test',
+  situation, situationLabel: situations.find((s) => s.key === situation).label, detail: null, firstContactAt: null, lastContactAt: null, queuedAt: null, at: '2026-11-10T12:00:00Z', demoListing: null, ...o,
+});
+const withHistory = (history) => {
+  const d = data([row('a', { name: 'Peñalba Propiedades' })]);
+  d.catalog = { ...catalog, situations };
+  d.history = history;
+  d.historyCounts = { total: history.length, ...history.reduce((c, h) => ({ ...c, [h.situation]: (c[h.situation] || 0) + 1 }), {}) };
+  return d;
+};
+
+test('«Ya trabajadas» filtra por situación y por texto, y muestra en qué quedó cada una', () => {
+  const history = [
+    worked('b', 'cliente', { firstContactAt: '2026-11-02T15:00:00Z', lastContactAt: '2026-11-05T15:00:00Z' }),
+    worked('c', 'descartada', { name: 'Peñaloza Bienes Raíces', detail: 'Cerró la oficina' }),
+    worked('d', 'en_cola', { queuedAt: '2026-11-17T09:00:00Z' }),
+  ];
+  assert.deepStrictEqual(Pool.filterHistory(history, Pool.defaults({ situation: 'cliente' })).map((h) => h.id), ['b']);
+  assert.deepStrictEqual(Pool.filterHistory(history, Pool.defaults({ q: 'penaloza' })).map((h) => h.id), ['c']);
+  assert.deepStrictEqual(Pool.filterHistory(history, Pool.defaults({ q: 'ficticia-d' })).map((h) => h.id), ['d']);
+  const html = Pool.render(withHistory(history), Pool.defaults({ tab: 'trabajadas' }), {});
+  assert.match(html, /data-testid="pool-history"/);
+  assert.match(html, /YA TRABAJADAS 3/);
+  assert.match(html, /data-pool="situation" data-value="cliente" aria-pressed="false">Cliente 1/);
+  // Solo hay chips para las situaciones que tienen inmobiliarias.
+  assert.doesNotMatch(html, /data-value="respondio"/);
+  assert.match(html, /Cerró la oficina/);
+  assert.match(html, /En cola desde el 17\/11\/26/);
+  assert.match(html, /02\/11\/26/);
+  assert.equal((html.match(/data-testid="pool-history-row"/g) || []).length, 3);
+});
+
+test('al buscar en la lista avisa si ya se trabajó, para no sumarla de nuevo', () => {
+  const d = withHistory([worked('c', 'descartada', { name: 'Peñaloza Bienes Raíces' })]);
+  const html = Pool.render(d, Pool.defaults({ q: 'penaloza' }), {});
+  assert.match(html, /data-testid="pool-also-worked"/);
+  assert.match(html, /Ya trabajada: <b>Peñaloza Bienes Raíces<\/b> \(Descartada\)/);
+  assert.doesNotMatch(Pool.render(d, Pool.defaults({ q: 'otra' }), {}), /pool-also-worked/);
+  assert.doesNotMatch(Pool.render(d, Pool.defaults({}), {}), /pool-also-worked/);
+});
+
+test('«Falta inmueble» cuenta las que están en cola con un aviso de portal', () => {
+  const rows = [
+    row('a', { status: 'en_cola', profile: { demo_listing_url: 'https://www.argenprop.com/casa--1', demo_listing_reference: 'la casa de prueba' } }),
+    row('b', { status: 'en_cola', profile: { demo_listing_url: 'https://ficticia.test/aviso/1', demo_listing_reference: 'el PH de prueba' } }),
+  ];
+  assert.deepStrictEqual(Pool.filterRows(rows, Pool.defaults({ status: 'falta_inmueble' })).map((r) => r.id), ['a']);
+});

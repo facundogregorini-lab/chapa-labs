@@ -16,8 +16,9 @@
 
   function defaults(view){
     const v=view||{};
-    if(!['lista','aprendizajes'].includes(v.tab))v.tab='lista';
-    if(!['todos',...STATUS_ORDER].includes(v.status))v.status='todos';
+    if(!['lista','trabajadas','aprendizajes'].includes(v.tab))v.tab='lista';
+    if(typeof v.situation!=='string')v.situation='todas';
+    if(!['todos',...STATUS_ORDER,'falta_inmueble'].includes(v.status))v.status='todos';
     if(typeof v.q!=='string')v.q='';
     if(v.open===undefined)v.open=null;
     if(v.message===undefined)v.message=null;
@@ -30,6 +31,13 @@
     const q=norm(view.q).trim();
     return (rows||[]).filter(r=>(view.status==='todos'||r.status===view.status||(view.status==='falta_inmueble'&&missingCandidate(r)))
       &&(!q||[r.name,r.zone,r.website,r.whatsapp,r.address].some(x=>norm(x).includes(q))));
+  }
+
+  /** «Ya trabajadas»: por situación y texto (nombre, zona, web, WhatsApp o SDR). */
+  function filterHistory(history,view){
+    const q=norm(view.q).trim();
+    return (history||[]).filter(h=>(view.situation==='todas'||h.situation===view.situation)
+      &&(!q||[h.name,h.zone,h.website,h.whatsapp,h.sdr].some(x=>norm(x).includes(q))));
   }
 
   const fieldValue=(f,v)=>v===undefined||v===null||v===''?'':f.type==='bool'?(v===true?'si':v===false?'no':''):String(v);
@@ -158,7 +166,51 @@
       <small>${esc(autofillRun(af.last))}</small></form>`;
   }
 
-  function missingCandidate(r){return r.status==='en_cola'&&(!r.profile?.demo_listing_url||!r.profile?.demo_listing_reference);}
+  /** El día de Buenos Aires de una fecha («17/11/26»), o «—». */
+  function day(iso){
+    const d=new Date(iso||'');if(!iso||!Number.isFinite(d.getTime()))return '—';
+    return d.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'2-digit',month:'2-digit',year:'2-digit'});
+  }
+  const site=w=>w?`<a href="${esc(/^https?:/i.test(w)?w:'https://'+w)}" target="_blank" rel="noopener">${esc(String(w).replace(/^https?:\/\/(www\.)?/,'').replace(/\/$/,''))}</a>`:'';
+  const situationBadge=h=>`<span class="pp-status is-sit-${esc(h.situation)}">${esc(h.situationLabel||h.situation)}</span>`;
+
+  /** Todo lo que ya salió de la prospección y en qué quedó: para no volver a prospectar lo mismo. */
+  function worked(data,view){
+    const catalog=data.catalog||{},all=data.history||[],rows=filterHistory(all,view),shown=rows.slice(0,view.shown);
+    const counts=data.historyCounts||{total:all.length};
+    const chips=[['todas','Todas',counts.total||0],...(catalog.situations||[]).map(x=>[x.key,x.label,counts[x.key]||0]).filter(([,,n])=>n>0)];
+    return `<section class="card glass pp-list" data-testid="pool-history">
+        <div class="card-head"><div><span class="os-kicker">YA TRABAJADAS</span><h2>Lo que ya salió de la prospección</h2>
+          <p class="sub">Cada inmobiliaria que pasó a la cola, se contactó, es lead o cliente, se perdió, pidió la baja o se descartó, con en qué quedó. Antes de sumar una nueva, buscala acá.</p></div></div>
+        <div class="pp-toolbar">
+          <div class="chips" role="group" aria-label="Situación">${chips.map(([k,l,n])=>`<button type="button" class="chip" data-pool="situation" data-value="${esc(k)}" aria-pressed="${view.situation===k}">${esc(l)} ${num(n)}</button>`).join('')}</div>
+          <div class="pp-tools"><input class="input" type="search" data-pool-search placeholder="Buscar por nombre, zona, web o número" value="${esc(view.q)}" aria-label="Buscar"></div>
+        </div>
+        <div class="table-wrap"><table class="pp-table"><thead><tr><th>INMOBILIARIA</th><th>EN QUÉ QUEDÓ</th><th>DETALLE</th><th>PRIMER CONTACTO</th><th>ÚLTIMO CONTACTO</th><th>WHATSAPP</th><th>WEB</th><th>SDR</th></tr></thead><tbody>
+          ${shown.map(h=>`<tr data-testid="pool-history-row" data-situation="${esc(h.situation)}">
+            <td><strong>${esc(h.name)}</strong><div class="sub">${esc(h.zone||'')}</div></td>
+            <td>${situationBadge(h)}</td>
+            <td class="pp-why">${esc(h.detail||(h.situation==='en_cola'&&h.queuedAt?'En cola desde el '+day(h.queuedAt):''))}</td>
+            <td>${day(h.firstContactAt)}</td><td>${day(h.lastContactAt)}</td>
+            <td>${esc(h.whatsapp||'')}</td><td>${site(h.website)}</td><td>${esc(h.sdr||'')}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">No hay inmobiliarias en este filtro.</td></tr>'}
+        </tbody></table></div>
+        <div class="pp-cards">${shown.map(h=>`<div class="pp-card pp-card-history"><span><b>${esc(h.name)}</b>${situationBadge(h)}<small>${[h.zone,h.whatsapp].filter(Boolean).map(esc).join(' · ')}</small><small>${esc(h.detail||(h.firstContactAt?'Primer contacto: '+day(h.firstContactAt):''))}</small></span></div>`).join('')||'<p class="empty">No hay inmobiliarias en este filtro.</p>'}</div>
+        ${rows.length>shown.length?`<div class="pp-more"><button class="btn small" type="button" data-pool="more">VER ${num(Math.min(50,rows.length-shown.length))} MÁS (quedan ${num(rows.length-shown.length)})</button></div>`:''}
+      </section>`;
+  }
+
+  /** Al buscar en la lista: las que coinciden y ya se trabajaron, para no sumarlas de nuevo. */
+  function alsoWorked(data,view){
+    if(!norm(view.q).trim())return '';
+    const hits=filterHistory(data.history,{...view,situation:'todas'});
+    if(!hits.length)return '';
+    const names=hits.slice(0,3).map(h=>`<b>${esc(h.name)}</b> (${esc(h.situationLabel||h.situation)})`).join(', ');
+    return `<p class="notice-line" data-testid="pool-also-worked">Ya trabajada${hits.length===1?'':'s'}: ${names}${hits.length>3?` y ${num(hits.length-3)} más`:''}. <button class="btn ghost small" type="button" data-pool="tab" data-value="trabajadas">VER EN YA TRABAJADAS</button></p>`;
+  }
+
+  /** Un aviso de portal no sirve para armar la demo (el producto lo exige de la web propia). */
+  const portalListing=u=>/^(https?:\/\/)?([^/]+\.)?(argenprop\.com|zonaprop\.com\.ar|mercadolibre\.com\.ar)(\/|$)/i.test(String(u||'').trim());
+  function missingCandidate(r){return r.status==='en_cola'&&(!r.profile?.demo_listing_url||!r.profile?.demo_listing_reference||portalListing(r.profile.demo_listing_url));}
 
   function list(data,view,o){
     const catalog=data.catalog,rows=filterRows(data.rows,view),shown=rows.slice(0,view.shown);
@@ -174,6 +226,7 @@
           <div class="pp-tools"><input class="input" type="search" data-pool-search placeholder="Buscar por nombre, zona o número" value="${esc(view.q)}" aria-label="Buscar">
             <button class="btn small" type="button" data-pool="add-toggle" ${o.available?'':'disabled'}>+ AGREGAR</button></div>
         </div>
+        ${alsoWorked(data,view)}
         <form class="pp-fill" data-pool-form="fill"><span><strong>${num(ready)}</strong> calificada${ready===1?'':'s'} para entrar a la cola.</span>
           <label>Sumar <input name="cantidad" type="number" min="1" max="100" value="${Math.min(10,Math.max(1,ready))}" aria-label="Cuántas sumar"> a la cola</label>
           <button class="btn small primary" type="submit" ${!o.available||o.saving||!ready?'disabled':''}>SUMAR LAS MEJORES</button>
@@ -221,11 +274,11 @@
       return `${head(null)}<div class="skeleton"></div><div class="skeleton"></div>`;
     }
     const opts={...o,available:data.available!==false};
-    const tabs=`<nav class="pp-tabs" role="tablist">${[['lista','LISTA Y RANKING'],['aprendizajes','APRENDIZAJES']].map(([k,l])=>`<button type="button" role="tab" data-pool="tab" data-value="${k}" aria-selected="${view.tab===k}" class="${view.tab===k?'is-on':''}">${l}</button>`).join('')}</nav>`;
+    const tabs=`<nav class="pp-tabs" role="tablist">${[['lista','LISTA Y RANKING'],['trabajadas',`YA TRABAJADAS ${num((data.historyCounts||{}).total??(data.history||[]).length)}`],['aprendizajes','APRENDIZAJES']].map(([k,l])=>`<button type="button" role="tab" data-pool="tab" data-value="${k}" aria-selected="${view.tab===k}" class="${view.tab===k?'is-on':''}">${l}</button>`).join('')}</nav>`;
     const warn=(opts.available?'':'<div class="notice glass" role="status"><span class="badge off">FALTA UN PASO</span><span>Falta aplicar la migración de Prospectos en Supabase (202612140001_prospect_pool.sql). Hasta entonces la lista se ve, pero no se puede guardar.</span></div>')
       +(o.error?`<div class="notice glass" role="status"><span class="badge off">CONEXIÓN</span><span>No se pudo actualizar: ${esc(o.error)}</span><button class="btn small" type="button" data-pool="reload">REINTENTAR</button></div>`:'');
-    return head((data.counts||{}).total||0)+warn+tabs+(view.tab==='aprendizajes'?learning(data,view):list(data,view,opts));
+    return head((data.counts||{}).total||0)+warn+tabs+(view.tab==='aprendizajes'?learning(data,view):view.tab==='trabajadas'?worked(data,view):list(data,view,opts));
   }
 
-  return {defaults,filterRows,changes,display,render,autofillRun};
+  return {defaults,filterRows,filterHistory,changes,display,render,autofillRun};
 });
