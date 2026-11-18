@@ -67,6 +67,8 @@
     ['signals', 'Señales', /^se[ñn]ales|^motivo \/ pr[oó]ximo paso/i],
     ['notes', 'Notas', /^notas?/i],
     ['updated', 'Actualizado', /^actualizado/i],
+    // habita.: el id de la inmobiliaria (no el de la cuenta), para los enlaces de la ficha (su panel, su ficha del equipo).
+    ['agencyId', 'Inmobiliaria ID', /^inmobiliaria id$/i],
   ];
   const LABEL = Object.fromEntries(FIELDS.map(([k, l]) => [k, l]));
   const FIELD_KEYS = FIELDS.map(([k]) => k);
