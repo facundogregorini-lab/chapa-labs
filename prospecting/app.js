@@ -4701,7 +4701,8 @@
       case 'reply-to-queue': { state.fu.task=null;go(state.unit,'hoy');const x=[...state.fu.n.queue,...state.fu.n.blocked,...state.fu.n.scheduled].find(x=>x.unit===state.unit&&x.id===ds.fuId);if(x){state.fu.task={unit:x.unit,mode:'ver',item:x,name:x.name,messages:[],warnings:[],checklist:[],history:[],links:{}};render();}break; }
       case 'next-preview': {
         const rows=fuQueueSelection(fuScope()).rows;
-        const i=rows.findIndex(x=>x.key===state.fu.selectedQueueKey);
+        // Sin elegida, la tarjeta muestra la primera: «Siguiente» va a la segunda, no se queda en la misma.
+        const i=Math.max(0,rows.findIndex(x=>x.key===state.fu.selectedQueueKey));
         if(rows.length)state.fu.selectedQueueKey=rows[(i+1)%rows.length].key;
         render();break;
       }

@@ -50,3 +50,8 @@ test('«Abrir WhatsApp» de la cola lleva el mismo borrador que «Copiar borrado
   const side=app.slice(app.indexOf('function fuRecommended('),app.indexOf('function fuHoy()'));
   assert.match(side,/const message=fuDraftMessage\(x\)/);
 });
+test('«Siguiente tarea» avanza desde la primera aunque no haya una elegida',()=>{
+  const start=app.indexOf("case 'next-preview':");
+  const handler=app.slice(start,app.indexOf("case 'queue-whatsapp':",start));
+  assert.match(handler,/Math\.max\(0,rows\.findIndex/);
+});
