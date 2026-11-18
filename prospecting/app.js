@@ -375,8 +375,9 @@
     // Un enlace, un campo o un botón de formulario dentro de la fila no abren la ficha.
     if (t.dataset.pool === 'open' && e.target.closest('a, input, select, textarea, label')) return;
     const unit = state.unit, view = poolViewOf(unit), id = t.dataset.id, act = t.dataset.pool;
-    if (act === 'tab') { view.tab = t.dataset.value; render(); }
+    if (act === 'tab') { view.tab = t.dataset.value; view.shown = 50; render(); }
     else if (act === 'status') { view.status = t.dataset.value; view.shown = 50; render(); }
+    else if (act === 'situation') { view.situation = t.dataset.value; view.shown = 50; render(); }
     else if (act === 'more') { view.shown += 50; render(); }
     else if (act === 'open') { view.open = view.open === id ? null : id; view.adding = false; render(); if (view.open) main.querySelector('[data-testid="pool-detail"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     else if (act === 'close') { view.open = null; render(); }

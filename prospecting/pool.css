@@ -20,6 +20,10 @@
 .pp-status { display:inline-block; white-space:nowrap; font-size:11.5px; font-weight:750; padding:3px 9px; border-radius:999px; background:var(--glass-soft); box-shadow:inset 0 0 0 1px var(--glass-line); color:var(--ink); }
 .pp-status.is-calificado, .pp-status.is-en_cola { background:color-mix(in srgb, var(--good-text) 16%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--good-text) 40%, transparent); }
 .pp-status.is-descartado { color:var(--muted); text-decoration:line-through; }
+.pp-status.is-sit-cliente, .pp-status.is-sit-demo, .pp-status.is-sit-interesada, .pp-status.is-sit-respondio { background:color-mix(in srgb, var(--good-text) 16%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--good-text) 40%, transparent); }
+.pp-card-history { grid-template-columns:1fr; cursor:default; }
+.pp-card-history .pp-status { justify-self:start; margin:4px 0 2px; }
+.pp-status.is-sit-perdida, .pp-status.is-sit-baja, .pp-status.is-sit-descartada, .pp-status.is-sit-numero_invalido { color:var(--muted); }
 .pp-more { text-align:center; padding:10px; }
 .pp-cards { display:none; }
 .pp-detail .pp-detail-actions { display:flex; gap:8px; align-items:center; }
