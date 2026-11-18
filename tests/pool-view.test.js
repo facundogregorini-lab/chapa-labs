@@ -87,3 +87,29 @@ test('sin la migración avisa y no deja guardar; sin datos muestra el error con 
   assert.match(Pool.render(null, {}, { error: 'habita. no respondió a tiempo.' }), /data-pool="reload"/);
   assert.match(Pool.render(null, {}, {}), /skeleton/);
 });
+
+test('el llenado automático muestra si está activo, la meta y la última corrida', () => {
+  const at = new Date().toISOString();
+  const af = { available: true, enabled: true, target: null, effectiveTarget: 48, cap: 48, last: { at, by: 'Llenado automático', target: 48, waiting: 4, asked: 44, added: 12, explore: 2, short: 32 } };
+  const html = Pool.render({ ...data([row('a')]), autofill: af }, Pool.defaults({}), {});
+  assert.match(html, /data-pool-form="autofill"/);
+  assert.match(html, /name="activo" value="1" checked/);
+  assert.match(html, /el cupo diario, 48/);
+  assert.match(html, /entraron 12 de 44 \(2 por exploración\)\. Faltaron 32: no había más calificadas\./);
+  assert.match(html, /data-pool="autofill-run"/);
+  const off = Pool.render({ ...data([row('a')]), autofill: { ...af, enabled: false, target: 20, last: null } }, Pool.defaults({}), {});
+  assert.doesNotMatch(off, /name="activo" value="1" checked/);
+  assert.match(off, /value="20"/);
+  assert.match(off, /Todavía no corrió\./);
+  const missing = Pool.render({ ...data([row('a')]), autofill: { available: false } }, Pool.defaults({}), {});
+  assert.match(missing, /202612270001_prospect_autofill\.sql/);
+  assert.doesNotMatch(missing, /data-pool-form="autofill"/);
+  assert.doesNotMatch(Pool.render(data([row('a')]), Pool.defaults({}), {}), /pool-autofill/);
+});
+
+test('la última corrida dice cuándo no hizo falta sumar y cuándo falló', () => {
+  const at = new Date().toISOString();
+  assert.match(Pool.autofillRun({ at, target: 48, waiting: 50, asked: 0, added: 0, explore: 0, short: 0 }), /ya tenía 50 primeros saludos para una meta de 48/);
+  assert.match(Pool.autofillRun({ at, target: 48, waiting: 0, asked: 48, added: 0, explore: 0, short: 48, error: 'Sin base' }), /no se pudo completar\. Sin base/);
+  assert.match(Pool.autofillRun({ at, target: 48, waiting: 0, asked: 48, added: 48, explore: 7, short: 0 }), /^Última corrida \(hoy \d\d:\d\d\): entraron 48 de 48 \(7 por exploración\)\.$/);
+});

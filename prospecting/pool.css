@@ -8,6 +8,10 @@
 .pp-fill { display:flex; gap:10px 14px; align-items:center; flex-wrap:wrap; padding:10px 12px; margin-bottom:12px; border-radius:12px; background:var(--glass-soft); font-size:13px; }
 .pp-fill input { width:64px; padding:5px 6px; border-radius:8px; border:1px solid var(--glass-line); background:var(--field); color:var(--ink); font:inherit; }
 .pp-fill small { flex:1 1 100%; color:var(--muted); }
+.pp-auto { display:flex; gap:8px 14px; align-items:center; flex-wrap:wrap; padding:10px 12px; margin:-4px 0 12px; border-radius:12px; border:1px dashed var(--glass-line); font-size:13px; }
+.pp-auto input[type=number] { width:64px; padding:5px 6px; border-radius:8px; border:1px solid var(--glass-line); background:var(--field); color:var(--ink); font:inherit; }
+.pp-auto-on { display:inline-flex; gap:6px; align-items:center; }
+.pp-auto small { flex:1 1 100%; color:var(--muted); }
 .pp-table td, .pp-table th { vertical-align:middle; }
 .pp-table tr[data-pool="open"] { cursor:pointer; }
 .pp-table tr.is-open td { background:color-mix(in srgb, var(--accent) 9%, transparent); }
