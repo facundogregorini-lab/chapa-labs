@@ -41,3 +41,12 @@ test('Inline mutations only accept confirmed server receipts and refresh source 
  assert.match(handler,/await loadFollowup/);
  assert.doesNotMatch(handler,/confirmExecution|op:'confirm'/);
 });
+test('«Abrir WhatsApp» de la cola lleva el mismo borrador que «Copiar borrador»',()=>{
+  const start=app.indexOf("case 'queue-whatsapp':");
+  const handler=app.slice(start,app.indexOf("case 'queue-view':",start));
+  assert.ok(start>0);
+  assert.match(handler,/fuDraftMessage\(x\)/);
+  assert.doesNotMatch(handler,/openWhatsApp\(x\.phone,''\)/);
+  const side=app.slice(app.indexOf('function fuRecommended('),app.indexOf('function fuHoy()'));
+  assert.match(side,/const message=fuDraftMessage\(x\)/);
+});

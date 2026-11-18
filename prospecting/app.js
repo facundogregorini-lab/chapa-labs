@@ -3217,6 +3217,17 @@
     </article>`;
   }
 
+  // El borrador de la tarjeta: la versión activa de su acción con sus variables. Es el mismo texto que
+  // muestra «Mensaje de WhatsApp · borrador», que copia «Copiar borrador» y que lleva «Abrir WhatsApp».
+  function fuDraftVersion(x) {
+    const snap=state.fu.n?.units?.[x?.unit];
+    return (snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x?.versionId)||null;
+  }
+  function fuDraftMessage(x) {
+    const template=fuDraftVersion(x)?.body||'';
+    return fillCandidate(template,x).replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
+  }
+
   function fuRecommended(scope,rows,selected,q) {
     const x=rows.find(r=>r.key===state.fu.selectedQueueKey)||rows[0]||null;
     if(!x)return '<aside class="os-fu-side" data-testid="followup-recommended">No hay contactos con estos filtros.</aside>';
@@ -3229,9 +3240,8 @@
     const locked=x.claim&&x.claim.by!==state.session?.user?.name;
     const done=x.bucket==='ejecutada';
     const ready=!q.closed&&!done&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
-    const version=(snap?.stages||[]).flatMap(s=>s.versions||[]).find(v=>v.id===x.versionId);
-    const template=version?.body||'';
-    const message=fillCandidate(template,x).replaceAll('{{inmobiliaria}}',x.shortName||x.name).replaceAll('{{decisor}}',x.person||'');
+    const version=fuDraftVersion(x);
+    const message=fuDraftMessage(x);
     const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
     return `<aside class="os-fu-side os-fu-preview-side" data-testid="followup-recommended">
       <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
@@ -4697,8 +4707,10 @@
       }
       case 'queue-whatsapp': {
         const x=fuFind(ds.fuKey);
-        if(x?.wa&&x.phone)openWhatsApp(x.phone,'');
-        else toast('Este contacto no tiene WhatsApp válido.',true);
+        if(!x?.wa||!x.phone){toast('Este contacto no tiene WhatsApp válido.',true);break;}
+        // Con el borrador ya escrito, igual que «Copiar borrador». Si le falta el inmueble, el chat abre vacío.
+        const draft=fuDraftMessage(x);
+        openWhatsApp(x.phone,draft.includes('{{inmueble_candidato}}')?'':draft);
         break;
       }
       case 'queue-view': {
