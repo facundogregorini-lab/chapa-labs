@@ -500,6 +500,9 @@
   ).join('');
   document.body.dataset.unit = state.unit;
   $('#os-place').textContent = state.unit === 'todas' ? 'GENERAL' : (unitOf(state.unit)?.name || state.unit).toUpperCase();
+  // El buscador busca en habita. y Turnia a la vez; el texto nombra lo que se busca en cada espacio.
+  $('#gsearch').placeholder = state.unit === 'habita' ? 'Buscar inmobiliaria o teléfono' : state.unit === 'turnia' ? 'Buscar consultorio o teléfono' : 'Buscar cuenta o teléfono';
+  $('#gsearch').title = 'Nombre, teléfono o código de la demo (/p/…), en habita. y Turnia';
   const userBtn = $('#user'), user = state.session && state.session.user;
   userBtn.hidden = !user && !state.demo;
   userBtn.textContent = state.demo ? 'Ej.' : user ? user.name.slice(0,2).toUpperCase() : '';
@@ -1753,16 +1756,25 @@
     const input = $('#gsearch');
     if (box) box.hidden = true;
     if (input) { input.value = ''; input.setAttribute('aria-expanded', 'false'); }
+    closeSearch();
     if (state.unit !== unitId) go(unitId, UNIT_VIEWS.includes(state.view) ? state.view : 'cuentas');
     openDrawer(accountId);
   }
   $('#gsearch').addEventListener('input', () => { clearTimeout(renderGlobalResults.t); renderGlobalResults.t = setTimeout(renderGlobalResults, 120); });
-  $('#gsearch').addEventListener('focus', () => { ensureLoaded(); if ($('#gsearch').value.trim()) renderGlobalResults(); });
+  // Las cuentas de cada negocio se leen al usar el buscador, una vez y sin redibujar la vista: en Follow-up
+  // no se cargan solas (la cola lee su propia foto), y sin esto el buscador quedaba en «Cargando las cuentas…».
+  function loadForSearch() {
+    if (state.demo) { ensureLoaded(); return; }
+    if (!state.session || !state.session.user) return;
+    const missing = units().filter((u) => !state.data[u.id] || (!state.data[u.id].accounts && !state.data[u.id].loading && !state.data[u.id].error));
+    for (const u of missing) loadUnit(u.id, { quiet: true, noSync: true }).finally(() => { if ($('#gsearch').value.trim()) renderGlobalResults(); });
+  }
+  $('#gsearch').addEventListener('focus', () => { loadForSearch(); if ($('#gsearch').value.trim()) renderGlobalResults(); });
   $('#gsearch').addEventListener('keydown', (e) => {
     const box = $('#gresults');
     const items = [...box.querySelectorAll('[data-gresult]')];
     const cur = items.findIndex((x) => x.getAttribute('aria-selected') === 'true');
-    if (e.key === 'Escape') { box.hidden = true; e.target.value = ''; return; }
+    if (e.key === 'Escape') { box.hidden = true; e.target.value = ''; closeSearch(); e.target.blur(); return; }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && items.length) {
       e.preventDefault();
       const next = (cur + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
@@ -1775,7 +1787,42 @@
     const it = e.target.closest('[data-gresult]');
     if (it) openFromSearch(it.dataset.gunit, it.dataset.gresult);
   });
-  document.addEventListener('click', (e) => { if (!e.target.closest('.gsearch')) { const b = $('#gresults'); if (b) b.hidden = true; } });
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.gsearch') || e.target.closest('#gsearch-open')) return;
+    const b = $('#gresults'); if (b) b.hidden = true;
+    closeSearch();
+  });
+  // En celular el buscador es una lupa arriba a la derecha: al tocarla se abre a todo el ancho.
+  function openSearch() {
+    $('#top').classList.add('is-searching');
+    $('#gsearch-open').setAttribute('aria-expanded', 'true');
+    const input = $('#gsearch');
+    input.focus();
+    if (input.value.trim()) renderGlobalResults();
+  }
+  function closeSearch() {
+    if (!$('#top').classList.contains('is-searching')) return;
+    $('#top').classList.remove('is-searching');
+    $('#gsearch-open').setAttribute('aria-expanded', 'false');
+  }
+  $('#gsearch-open').addEventListener('click', () => ($('#top').classList.contains('is-searching') ? closeSearch() : openSearch()));
+  $('#gsearch-close').addEventListener('click', () => {
+    $('#gsearch').value = '';
+    $('#gresults').hidden = true;
+    $('#gsearch').setAttribute('aria-expanded', 'false');
+    closeSearch();
+  });
+  // «/» o Ctrl/Cmd+K: ir al buscador desde cualquier lugar del panel (salvo mientras se escribe en otro campo).
+  document.addEventListener('keydown', (e) => {
+    const typing = e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]');
+    const shortcut = (e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey);
+    if (!shortcut && (e.key !== '/' || typing || e.metaKey || e.ctrlKey || e.altKey)) return;
+    const input = $('#gsearch');
+    if (!input || input.closest('[hidden]')) return;
+    e.preventDefault();
+    if (getComputedStyle($('#gsearch-open')).display !== 'none') openSearch();
+    else { input.focus(); input.select(); }
+  });
 
   // ─── Onboarding (posventa: garantías del Programa Fundadores) ─
   // Cada cliente: desde que se cobró el setup, operativo en 14 días (si no, se devuelve el setup) y

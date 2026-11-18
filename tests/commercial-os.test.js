@@ -37,3 +37,21 @@ test('Responsive design preserves mobile access to legacy product tools', () => 
   assert.match(css, /\.os-legacy-nav \{ display:flex/);
   assert.match(css, /\.os-stage-rail/);
 });
+test('Global search stays visible in the Follow-up header and loads accounts when used', () => {
+  const html = read('index.html');
+  const css = read('commercial-os.css');
+  const app = read('app.js');
+  for (const id of ['gsearch-open', 'gsearch-close']) assert.equal((html.match(new RegExp('id="' + id + '"', 'g')) || []).length, 1, id);
+  // The Follow-up header hides the breadcrumb and theme, never the search.
+  const desktopHide = css.slice(css.indexOf('Arriba a la derecha: el buscador global'), css.indexOf('@media(max-width:760px)', css.indexOf('Arriba a la derecha: el buscador global')));
+  assert.ok(desktopHide.includes('.os-top #theme'));
+  assert.doesNotMatch(desktopHide, /\.os-top \.gsearch,/);
+  assert.match(css, /:has\(\.habita-fu-workspace-head\) \.os-top \.gsearch\{\n  display:block/);
+  // Mobile: a magnifier opens it full width.
+  assert.match(css, /:has\(\.habita-fu-workspace-head\) \.os-top \.os-search-toggle\{\n    display:grid/);
+  assert.match(css, /\.os-top\.is-searching \.gsearch\{/);
+  // Follow-up views don't load accounts on their own: the search must load them itself.
+  assert.match(app, /function loadForSearch\(\)/);
+  assert.match(app, /loadUnit\(u\.id, \{ quiet: true, noSync: true \}\)/);
+  assert.match(app, /addEventListener\('focus', \(\) => \{ loadForSearch\(\)/);
+});

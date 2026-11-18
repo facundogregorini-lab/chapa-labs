@@ -640,7 +640,16 @@ button.chip:hover { background: var(--glass-strong); }
 
 /* Buscador global (arriba): cualquier cuenta de cualquier unidad, por nombre, teléfono o código. */
 .gsearch { position: relative; flex: 0 1 260px; min-width: 180px; }
-.gsearch .input { width: 100%; }
+.gsearch .input { width: 100%; padding-left: 36px; }
+.gsearch .input::-webkit-search-cancel-button { display: none; }
+.gsearch-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #5f7c6b; pointer-events: none; }
+.gsearch-kbd {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  min-width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px;
+  border: 1px solid #d5e3d8; background: #f4f9f5; color: #5f7c6b; font: 700 11px/1 inherit;
+}
+.gsearch:focus-within .gsearch-kbd, .gsearch:has(.input:not(:placeholder-shown)) .gsearch-kbd { display: none; }
+.gsearch-close, .os-search-toggle { display: none; }
 .gresults {
   position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: min(420px, calc(100vw - 32px));
   max-height: min(420px, 70vh); overflow: auto; padding: 6px; border-radius: 18px; display: grid; gap: 2px;

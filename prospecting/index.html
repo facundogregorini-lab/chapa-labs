@@ -13,8 +13,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/prospecting/glass.css">
-<link rel="stylesheet" href="/prospecting/commercial-os.css?v=20261112-abrir">
+<link rel="stylesheet" href="/prospecting/glass.css?v=20261118-buscador">
+<link rel="stylesheet" href="/prospecting/commercial-os.css?v=20261118-buscador">
 <link rel="stylesheet" href="/prospecting/pool.css?v=20261111-prospectos">
 </head>
 <body data-unit="todas">
@@ -44,8 +44,12 @@
         <strong id="os-place">GENERAL</strong>
       </div>
       <div class="os-top-actions">
+        <button class="btn icon os-search-toggle" id="gsearch-open" type="button" aria-label="Buscar una cuenta" title="Buscar (/)" aria-controls="gsearch" aria-expanded="false" data-testid="global-search-open"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></button>
         <div class="gsearch" role="search">
-          <input class="input" id="gsearch" type="search" placeholder="Buscar nombre, teléfono o código" aria-label="Buscar una cuenta en todo el panel" aria-controls="gresults" aria-expanded="false" autocomplete="off" data-testid="global-search">
+          <svg class="gsearch-icon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          <input class="input" id="gsearch" type="search" placeholder="Buscar nombre, teléfono o código" aria-label="Buscar una cuenta en todo el panel" aria-controls="gresults" aria-expanded="false" autocomplete="off" enterkeyhint="search" data-testid="global-search">
+          <kbd class="gsearch-kbd" aria-hidden="true">/</kbd>
+          <button class="gsearch-close" id="gsearch-close" type="button" aria-label="Cerrar la búsqueda" data-testid="global-search-close">✕</button>
           <div class="gresults glass strong" id="gresults" role="listbox" aria-label="Resultados" hidden></div>
         </div>
         <button class="btn icon ghost" id="theme" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro / oscuro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg></button>
@@ -71,7 +75,7 @@
 <script src="/prospecting/results-view.js?v=20261111-mobile-limpio"></script>
 <script src="/prospecting/pool-view.js?v=20261111-prospectos"></script>
 <script src="/prospecting/overview.js?v=20261111-mobile-limpio"></script>
-<script src="/prospecting/app.js?v=20261112-abrir"></script>
+<script src="/prospecting/app.js?v=20261118-buscador"></script>
 <script src="/prospecting/voice.js"></script>
 </body>
 </html>

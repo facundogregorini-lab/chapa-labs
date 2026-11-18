@@ -139,7 +139,7 @@ La bandeja de quienes escribieron último, en las dos unidades. **Enviar** traba
 - **Respuestas sugeridas nuevas en Responder:** si contesta el profesional en persona («Soy la Dra. …»), el Paso 2 y el Paso 3 le hablan a él; si la recepción pregunta «¿ya hablaste con la Dra.?», la respuesta transparente con el link; si el «no» ya dice que tienen un sistema, se pregunta cuál; si desconfían del link, no se insiste y se ofrece una llamada. Los textos se editan en Turnia (Panel → Prospección → Mensajes).
 
 **En todo el panel (09/11):**
-- **Buscador global**, arriba: por nombre, consultorio o inmobiliaria, código (el de la demo, `perez-a1b`) o teléfono (alcanzan los últimos 3 números). Encuentra a cualquiera, esté o no en la cola del día, y abre su ficha.
+- **Buscador global**, arriba a la derecha (en celular, la lupa al lado de la cuenta): por nombre, consultorio o inmobiliaria, código (el de la demo, `perez-a1b`) o teléfono (alcanzan los últimos 3 números). Encuentra a cualquiera de habita. o Turnia, esté o no en la cola del día, y abre su ficha. Con `/` o Ctrl/Cmd+K se va directo al buscador. No es lo mismo que «Buscar contacto…» de la cola, que busca solo dentro de lo que la cola tiene filtrado.
 - **Las filas de Hoy** llevan `data-phone`, `data-wa-url` (con el mensaje que le toca), `data-demo-url`, `data-state` y `data-line`. Muestran los mensajes usados (x/3), la línea y si comparten el número.
 - **«Ya lo mandé»** en cada fila de Hoy y en la ficha («Ya lo mandé a mano»): registra un envío hecho directo desde WhatsApp, sin pasar por la cola.
 - **Conversaciones abiertas** se muestra completa (antes cortaba en 15).
