@@ -3249,7 +3249,7 @@
       <div class="os-fu-preview-actions">
         <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
         <button type="button" class="btn" data-copy-text="${esc(message)}" ${message&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.copy} Copiar borrador</button>
-        <button type="button" class="btn" disabled title="Primero tomá y enviá la tarea">✓ Confirmar envío</button>
+        <button type="button" class="btn" ${ready?`data-fu="preview-confirm" data-fu-key="${esc(x.key)}" data-testid="followup-preview-confirm" title="Ya lo enviaste: se guarda el envío y pasás a la siguiente"`:'disabled title="No está lista para ejecutar"'}>✓ Confirmar envío y siguiente</button>
         <button type="button" class="btn" data-fu="next-preview" ${rows.length<2?'disabled':''}>Siguiente tarea →</button>
         <button type="button" class="btn" data-fu="queue-edit-situation" data-fu-key="${esc(x.key)}">Reclasificar</button>
       </div>
@@ -3263,7 +3263,7 @@
         <dt>Zona</dt><dd>${esc(x.zone||'—')}</dd></dl></div>
       <div class="os-fu-preview-card"><strong>Resumen / Contexto</strong><p>${esc(x.lastText||'Sin acciones previas registradas.')}</p></div>
       <div class="os-fu-preview-card"><strong>Qué dijo</strong><p>${esc(x.situationNote||'Sin texto original registrado.')}</p></div>
-      <p class="os-fu-caption">Para confirmar el envío, primero tomá la tarea; abrir WhatsApp nunca confirma el envío.</p>
+      <p class="os-fu-caption">Abrir WhatsApp nunca confirma el envío: después de mandarlo, tocá «Confirmar envío y siguiente».</p>
       ${ready?'<button class="btn primary os-fu-side-execute" type="button" data-fu="claim" data-fu-key="'+esc(x.key)+'" data-testid="followup-recommended-execute">TOMAR TAREA →</button>':
       '<p class="os-fu-caption">'+esc(done?'Ejecutada '+dayTime(x.since)+' · '+FU_EXECUTOR_LABEL[fuExecutor(x)]:locked?'La está ejecutando '+x.claim.by:x.blocked||(x.dueAt?'Programada':'No está lista para ejecutar'))+'</p>'}
     </aside>`;
@@ -4884,6 +4884,19 @@
         break;
       }
       case 'claim': { const x = fuFind(ds.fuKey) || it; if (x) await fuClaim(x); break; }
+      // Desde la tarjeta de la cola, después de mandarlo por WhatsApp: se toma la tarea y se guarda el
+      // envío con el mismo «Confirmar envío y siguiente» de la tarea tomada (un solo toque).
+      case 'preview-confirm': {
+        const x = fuFind(ds.fuKey);
+        if (!x || state.fu.busy) break;
+        t.disabled = true; t.textContent = 'Guardando envío…'; t.setAttribute('aria-busy', 'true');
+        if (!(await fuClaim(x))) { if (t.isConnected) { t.disabled = false; t.removeAttribute('aria-busy'); t.textContent = '✓ Confirmar envío y siguiente'; } break; }
+        if (state.fu.task?.mode !== 'ejecutar' || state.fu.task?.item?.key !== x.key) break;
+        const confirm = main.querySelector('[data-fu="confirm-and-next"]') || main.querySelector('[data-fu="confirm"]');
+        if (confirm) confirm.click();
+        else toast('La tarea quedó tomada: confirmá el envío desde su ficha.', true);
+        break;
+      }
       case 'next': await fuNext(t); break;
       case 'back':
         // Back to the queue at once: the release travels in the background and

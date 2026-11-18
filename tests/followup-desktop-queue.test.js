@@ -55,3 +55,13 @@ test('«Siguiente tarea» avanza desde la primera aunque no haya una elegida',()
   const handler=app.slice(start,app.indexOf("case 'queue-whatsapp':",start));
   assert.match(handler,/Math\.max\(0,rows\.findIndex/);
 });
+test('La tarjeta de la cola confirma el envío de un toque (toma la tarea y usa «Confirmar envío y siguiente»)',()=>{
+  const side=app.slice(app.indexOf('function fuRecommended('),app.indexOf('function fuHoy()'));
+  assert.match(side,/data-fu="preview-confirm"/);
+  assert.doesNotMatch(side,/Primero tomá y enviá la tarea/);
+  const start=app.indexOf("case 'preview-confirm':");
+  const handler=app.slice(start,app.indexOf("case 'next':",start));
+  assert.ok(start>0);
+  assert.match(handler,/await fuClaim\(x\)/);
+  assert.match(handler,/data-fu="confirm-and-next"/);
+});
