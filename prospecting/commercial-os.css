@@ -2932,3 +2932,6 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
   .rs-heat-mob-nav button{min-height:36px;padding:0 12px;border:1px solid #d5e5db;border-radius:999px;background:#fff;color:#1c3328;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
   .rs-heat-mob-nav button:disabled{opacity:.4;cursor:default}
 }
+
+/* Con la ficha abierta, el buscador y la cuenta quedan detrás del velo: no se montan sobre el título de la ficha. */
+body:has(#drawer:not([hidden])) .top.os-top{z-index:30!important}

@@ -2413,6 +2413,7 @@
         </div>`}
         ${u.api && !u.api.rows && !isReadOnly(state.unit) ? accountSection(a, u) : ''}
         ${productActivity(a, u)}
+        ${linksSection(a, u, link)}
         <div class="section"><h3>Datos</h3>
           <dl class="facts">
             ${a.org && a.org !== a.name ? `<dt>${esc(u.entity.org)}</dt><dd>${esc(a.org)}</dd>` : ''}
@@ -2452,6 +2453,27 @@
   }
 
   // La cuenta real que se le dio (Turnia): mide «cuentas creadas» y «activas» de la prospección.
+  // Enlaces de la ficha: lo que se comparte o se abre con esta cuenta (su demo, su panel, precios, su ficha en la app).
+  // «Copiar» de la demo y del panel pide el link a habita. (el mismo de «Demo» y «Panel» en la lista de inmobiliarias).
+  function linksSection(a, u, link) {
+    const ext = (href, label) => `<a class="btn small" href="${esc(href)}" target="_blank" rel="noopener">${icon.ext} ${esc(label)}</a>`;
+    const items = [];
+    if (u.id === 'habita') {
+      const site = 'https://www.habitaia.app';
+      if (link) items.push(ext(link, 'Abrir su demo'));
+      if (a.agencyId) {
+        items.push(`<button type="button" class="btn small" data-ag-link="demo" data-id="${esc(a.agencyId)}" ${link ? '' : 'disabled title="Todavía no tiene una demo publicada"'}>🔗 <span>Copiar link de la demo</span></button>`);
+        items.push(`<button type="button" class="btn small" data-ag-link="panel" data-id="${esc(a.agencyId)}">🔑 <span>Copiar link de su panel</span></button>`);
+        items.push(ext(`${site}/admin/inmobiliarias/${encodeURIComponent(a.agencyId)}`, 'Su ficha en habita.'));
+      } else if (link) items.push(`<button type="button" class="btn small" data-copy-text="${esc(link)}">🔗 Copiar link de la demo</button>`);
+      items.push(ext(`${site}/precios`, 'Precios'), ext(`${site}/galeria`, 'Galería'));
+    } else {
+      if (link) items.push(ext(link, 'Abrir su demo'), `<button type="button" class="btn small" data-copy-text="${esc(link)}">🔗 Copiar link de la demo</button>`);
+      if (u.appUrl) items.push(ext(u.appUrl, `Abrir ${u.appName}`));
+    }
+    return `<div class="section" data-testid="drawer-links"><h3>Enlaces</h3><div class="btns">${items.join('')}</div></div>`;
+  }
+
   function accountSection(a, u) {
     const clinics = (state.data[state.unit] && state.data[state.unit].clinics) || [];
     if (a.accountAt || a.accountClinic) {

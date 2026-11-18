@@ -55,3 +55,13 @@ test('Global search stays visible in the Follow-up header and loads accounts whe
   assert.match(app, /loadUnit\(u\.id, \{ quiet: true, noSync: true \}\)/);
   assert.match(app, /addEventListener\('focus', \(\) => \{ loadForSearch\(\)/);
 });
+test('Account drawer has a links section and the header stays behind an open drawer', () => {
+  const app = read('app.js');
+  const core = read('core.js');
+  const css = read('commercial-os.css');
+  assert.match(core, /\['agencyId', 'Inmobiliaria ID', \/\^inmobiliaria id\$\/i\]/);
+  const fn = app.slice(app.indexOf('function linksSection('), app.indexOf('function accountSection('));
+  for (const s of ['data-ag-link="demo"', 'data-ag-link="panel"', '/admin/inmobiliarias/', '/precios', '/galeria', 'data-testid="drawer-links"']) assert.ok(fn.includes(s), s);
+  assert.match(app, /\$\{linksSection\(a, u, link\)\}/);
+  assert.match(css, /body:has\(#drawer:not\(\[hidden\]\)\) \.top\.os-top\{z-index:30!important\}/);
+});
