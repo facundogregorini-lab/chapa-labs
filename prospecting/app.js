@@ -358,7 +358,7 @@
       const { result } = await api('pool', { method: 'POST', body: { unit, prospectos } });
       if (done) toast(typeof done === 'function' ? done(result) : done);
       state.poolSaving = false;
-      if (prospectos.op !== 'guardar' && prospectos.op !== 'recalcular') loadFollowup({ quiet: true }); // la cola cambia cuando una entra o sale
+      if (prospectos.op !== 'guardar' && prospectos.op !== 'recalcular' && prospectos.op !== 'automatico') loadFollowup({ quiet: true }); // la cola cambia cuando una entra o sale
       await loadPool(unit, { quiet: true });
       return result;
     } catch (err) {
@@ -386,6 +386,7 @@
     else if (act === 'explore') await poolOp(unit, { op: 'cola', cuenta: id, explorar: true }, 'Pasó a la cola por exploración.');
     else if (act === 'unqueue') await poolOp(unit, { op: 'sacar', cuenta: id }, 'Salió de la cola y volvió a Prospectos.');
     else if (act === 'reopen') await poolOp(unit, { op: 'reabrir', cuenta: id }, 'Reabierta.');
+    else if (act === 'autofill-run') await poolOp(unit, { op: 'completar' }, (r) => Pool.autofillRun(r.run));
     else if (act === 'recalc') await poolOp(unit, { op: 'recalcular' }, (r) => `Ranking recalculado en ${int(r.changed)} prospectos.`);
   });
   document.addEventListener('keydown', (e) => {
@@ -414,6 +415,9 @@
       await poolOp(unit, { op: 'llenar', cantidad: Number(values.cantidad) }, (r) => r.added.length
         ? `${int(r.added.length)} a la cola${r.added.some((x) => x.explore) ? ` (${int(r.added.filter((x) => x.explore).length)} por exploración)` : ''}.`
         : 'No había calificadas para sumar.');
+    } else if (kind === 'autofill') {
+      const meta = String(values.meta || '').trim();
+      await poolOp(unit, { op: 'automatico', activo: values.activo === '1', meta: meta ? Number(meta) : null }, values.activo === '1' ? 'Llenado automático activo.' : 'Llenado automático apagado.');
     } else if (kind === 'create') {
       state.poolDuplicate = null;
       const valores = {};

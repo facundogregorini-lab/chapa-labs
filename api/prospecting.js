@@ -641,7 +641,7 @@ async function doComments(req, res, user) {
 
 // Prospectos: las inmobiliarias antes de la cola, con su ranking y los aprendizajes. El producto
 // (habita.) define datos, estados y ranking; acá solo se pasa el pedido a nombre de quien opera.
-const POOL_OPS = new Set(['guardar', 'cola', 'sacar', 'descartar', 'reabrir', 'llenar', 'crear', 'recalcular']);
+const POOL_OPS = new Set(['guardar', 'cola', 'sacar', 'descartar', 'reabrir', 'llenar', 'crear', 'recalcular', 'automatico', 'completar']);
 async function doPool(req, res, user) {
   const unit = UNITS[req.method === 'GET' ? req.query.unit : (req.body || {}).unit];
   if (!unit) return fail(res, 404, 'No existe esa unidad.');
@@ -654,7 +654,7 @@ async function doPool(req, res, user) {
     }
     const p = req.body.prospectos && typeof req.body.prospectos === 'object' ? req.body.prospectos : null;
     if (!p || !POOL_OPS.has(p.op)) return fail(res, 400, 'Operación de Prospectos desconocida.');
-    const out = await callApi(unit, { method: 'POST', body: { by: user.name, prospectos: p }, timeout: p.op === 'llenar' || p.op === 'recalcular' ? 120000 : 45000 });
+    const out = await callApi(unit, { method: 'POST', body: { by: user.name, prospectos: p }, timeout: p.op === 'llenar' || p.op === 'recalcular' || p.op === 'completar' ? 120000 : 45000 });
     // La cola cambia cuando una inmobiliaria entra o sale.
     followupCache.invalidate(unit.id + '|');
     return res.status(200).json({ result: out });

@@ -127,6 +127,37 @@
       <div class="pp-actions"><button class="btn primary" type="submit" ${o.saving?'disabled':''}>${o.saving?'AGREGANDO…':'AGREGAR'}</button></div></form></section>`;
   }
 
+  /** La hora de Buenos Aires de una corrida («hoy 06:00», «17/11 06:00»). */
+  function runWhen(iso){
+    const d=new Date(iso);if(!Number.isFinite(d.getTime()))return '';
+    const day=x=>x.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'numeric',month:'numeric'});
+    const hour=d.toLocaleTimeString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    return `${day(d)===day(new Date())?'hoy':day(d)} ${hour}`;
+  }
+  /** Qué pasó en la última corrida del llenado automático, en una línea. */
+  function autofillRun(run){
+    if(!run)return 'Todavía no corrió.';
+    const when=runWhen(run.at);
+    if(run.error)return `Última corrida (${when}): no se pudo completar. ${run.error}`;
+    if(!run.asked)return `Última corrida (${when}): la cola ya tenía ${num(run.waiting)} primeros saludos para una meta de ${num(run.target)}; no hizo falta sumar.`;
+    const explore=run.explore?` (${num(run.explore)} por exploración)`:'';
+    const short=run.short?` Faltaron ${num(run.short)}: no había más calificadas.`:'';
+    return `Última corrida (${when}): entraron ${num(run.added)} de ${num(run.asked)}${explore}.${short}`;
+  }
+  /** El llenado automático: si está activo, la meta diaria y qué pasó la última vez. */
+  function autofill(af,o){
+    if(!af)return '';
+    if(!af.available)return `<div class="pp-auto" data-testid="pool-autofill"><span><strong>Llenado automático:</strong> falta aplicar su migración en la base (202612270001_prospect_autofill.sql). Mientras tanto, la cola se llena con «Sumar las mejores».</span></div>`;
+    const target=af.target??'';
+    return `<form class="pp-auto" data-pool-form="autofill" data-testid="pool-autofill">
+      <label class="pp-auto-on"><input type="checkbox" name="activo" value="1" ${af.enabled?'checked':''} ${o.saving?'disabled':''}> <strong>Llenado automático</strong></label>
+      <span>${af.enabled?'Cada mañana a las 06:00 suma las mejores calificadas':'Apagado: la cola se llena solo con «Sumar las mejores»'} hasta que la cola tenga
+        <input name="meta" type="number" min="1" max="100" value="${esc(target)}" placeholder="${esc(af.cap)}" aria-label="Meta diaria"> primeros saludos${af.target==null?` (el cupo diario, ${num(af.cap)})`:''}.</span>
+      <button class="btn small" type="submit" ${o.saving?'disabled':''}>GUARDAR</button>
+      <button class="btn small" type="button" data-pool="autofill-run" ${o.saving||!o.available?'disabled':''}>COMPLETAR AHORA</button>
+      <small>${esc(autofillRun(af.last))}</small></form>`;
+  }
+
   function missingCandidate(r){return r.status==='en_cola'&&(!r.profile?.demo_listing_url||!r.profile?.demo_listing_reference);}
 
   function list(data,view,o){
@@ -147,6 +178,7 @@
           <label>Sumar <input name="cantidad" type="number" min="1" max="100" value="${Math.min(10,Math.max(1,ready))}" aria-label="Cuántas sumar"> a la cola</label>
           <button class="btn small primary" type="submit" ${!o.available||o.saving||!ready?'disabled':''}>SUMAR LAS MEJORES</button>
           <small>De cada tanda de 5 o más, ${Math.round((catalog.exploreShare||0)*100)}% entra al azar entre las demás que ya tienen WhatsApp y aviso: así el ranking se pone a prueba.</small></form>
+        ${autofill(data.autofill,o)}
         <div class="table-wrap"><table class="pp-table"><thead><tr><th>RANKING</th><th>INMOBILIARIA</th><th>ESTADO</th><th>CONTACTO</th><th>ENCAJE</th><th>DEMO</th><th>DATOS</th><th>QUÉ FALTA</th><th></th></tr></thead><tbody>
           ${shown.map(r=>`<tr data-pool="open" data-id="${esc(r.id)}" tabindex="0" class="${view.open===r.id?'is-open':''}" data-testid="pool-row">
             <td><strong class="pp-rank">${num(r.score.total)}</strong></td>
@@ -195,5 +227,5 @@
     return head((data.counts||{}).total||0)+warn+tabs+(view.tab==='aprendizajes'?learning(data,view):list(data,view,opts));
   }
 
-  return {defaults,filterRows,changes,display,render};
+  return {defaults,filterRows,changes,display,render,autofillRun};
 });
