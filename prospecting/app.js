@@ -2859,7 +2859,7 @@
     // Never navigate into a different operator's claim.
     if (!state.fu.n) return null;
     const free = fuQueueSelection(fuScope()).rows.filter(x=>
-      x.key!==currentKey&&x.bucket!=='ejecutada'&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action)
+      x.key!==currentKey&&x.bucket!=='ejecutada'&&!x.claim&&!fuStopped(x)&&!x.dueAt&&Boolean(x.action)
     );
     const ahead = free.find(x=>!state.fu.skipped.has(x.key));
     if (ahead || !free.length) return ahead || null;
@@ -2987,9 +2987,9 @@
     const other = x.claim && x.claim.by !== me;
     const pill = { alta: 'live', media: 'demo', baja: 'plain' }[x.priority];
     const status = x.claim ? `<span class="badge ${other ? 'off' : 'live'}">${other ? `Lo tiene ${esc(x.claim.by)}` : 'Lo tenés vos'}</span>`
-      : x.blocked ? `<span class="badge off" title="${esc(x.blocked)}">Bloqueada</span>`
+      : x.blocked ? `<span class="badge off" title="${esc(x.blocked)}">${x.heldFor ? `Para ${esc(x.heldFor)}` : 'Bloqueada'}</span>`
       : x.dueAt ? `<span class="badge plain">Sale ${esc(dayTime(x.dueAt))}</span>` : '';
-    const action = !button ? '' : other || x.blocked || x.dueAt || !x.action ? '' : `<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">${icon.wa} ${esc(x.action)}</button>`;
+    const action = !button ? '' : other || fuStopped(x) || x.dueAt || !x.action ? '' : `<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-execute">${icon.wa} ${esc(x.action)}</button>`;
     return `<div class="arow" data-testid="fu-item" data-fu-unit-id="${esc(x.unit)}" data-fu-open="${esc(x.key)}" data-priority="${esc(x.priority)}" data-group="${esc(x.group)}" tabindex="0" role="button" aria-label="Abrir ${esc(x.name)}">
       <div class="who"><strong>${esc(x.name)}</strong><div class="meta">${fuDot(x.unit)}${x.sub && x.sub !== x.name ? `<span>${esc(x.sub)}</span>·` : ''}${x.zone ? `<span>${esc(x.zone)}</span>` : ''}<span class="stage">${esc(x.stageTitle)}</span>${fuLineBadges(x)}${x.situation && x.situation !== 'sin_respuesta' ? `<span class="signal">${esc(x.situationLabel)}</span>` : ''}<span class="badge ${pill}">${esc(F.PRIORITY_LABEL[x.priority])}</span>${x.owner ? `<span>· ${esc(x.owner)}</span>` : ''}${x.since ? `<span>· últ. ${esc(ago(x.since))}</span>` : ''}${x.ads ? '<span class="signal">Paga anuncios</span>' : ''}${status}</div>
       ${x.blocked ? `<div class="meta" style="color:var(--bad-text)">${esc(x.blocked)}</div>` : ''}</div>
@@ -3042,6 +3042,10 @@
 
   // Quién ejecuta cada acción: la extensión del producto (lo que no tiene
   // responsable o está asignado a «Extensión»), Facu o Axel a mano.
+  // Lo que frena «Ejecutar». Una tarea de Facu o Axel (`heldFor`) está fuera de la cola de la
+  // extensión, pero desde el panel se ejecuta igual que cualquier otra (19/11/2026): antes quedaba
+  // «PARA FACU» sin botón, porque se armaba como bloqueada.
+  function fuStopped(x) { return Boolean(x?.blocked) && !(x.heldFor && !agentMode()); }
   function fuExecutor(x) {
   // Lo ya ejecutado: quién lo confirmó (el bot es la pestaña de la extensión), no a quién está asignada.
   if(x?.bucket==='ejecutada'&&x.execution){
@@ -3203,7 +3207,9 @@
     const me=state.session?.user?.name;
     const locked=x.claim&&x.claim.by!==me;
     const done=x.bucket==='ejecutada';
-    const executable=!closed&&!done&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action);
+    const executable=!closed&&!done&&!x.claim&&!fuStopped(x)&&!x.dueAt&&Boolean(x.action);
+    // Una respuesta para Facu sin tarea armada: el paso es contestarle por WhatsApp.
+    const reply=!closed&&!done&&!executable&&x.bucket==='facu'&&!x.heldFor&&x.wa&&!agentMode();
     const stateText=closed?'CERRADA':done?'EJECUTADA · '+dayTime(x.since).toUpperCase():x.bucket==='facu'?'PARA FACU':x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
       locked?'TOMADA POR '+x.claim.by:x.claim?'YA TOMADA':!x.action?'SIN ACCIÓN':'LISTA';
     return `<article class="os-fu-mobile-item" data-testid="fu-mobile-item">
@@ -3215,6 +3221,7 @@
         </div>
         <div class="os-fu-mobile-item-control">
           ${executable?`<button type="button" class="btn primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-execute">EJECUTAR →</button>`:
+          reply?`<button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-reply">RESPONDER →</button>`:
           `<span class="os-fu-mobile-item-status">${esc(stateText)}</span>`}
           ${closed?'':`<span class="os-fu-executor-chip" data-executor="${fuExecutor(x)}" data-testid="fu-mobile-executor">${fuExecutor(x)==='extension'?'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7Z"/></svg>':'<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>'}${esc(FU_EXECUTOR_LABEL[fuExecutor(x)])}</span>`}
         </div>
@@ -3257,7 +3264,7 @@
       return '<aside class="os-fu-side os-fu-side-working" data-testid="followup-execution-aside">'+renderFuTask(task)+'</aside>';
     const locked=x.claim&&x.claim.by!==state.session?.user?.name;
     const done=x.bucket==='ejecutada';
-    const ready=!q.closed&&!done&&!x.blocked&&!x.dueAt&&!locked&&Boolean(x.action);
+    const ready=!q.closed&&!done&&!fuStopped(x)&&!x.dueAt&&!locked&&Boolean(x.action);
     const version=fuDraftVersion(x);
     const message=fuDraftMessage(x);
     const observations=[x.situationNote,version?.notes].filter(Boolean).join('\n\n');
@@ -4646,7 +4653,7 @@
           ${exec ? `${t.warnings.map((w) => `<div class="notice glass"><span>${esc(w)}</span></div>`).join('')}${fuDemoWarning(t)}
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
             <div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes||'Sin observaciones registradas.')}</p></div>`
-          : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !it.blocked && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
+          : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !fuStopped(it) && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
           <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
         </section>
         <section class="card glass os-fu-execution-card"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>

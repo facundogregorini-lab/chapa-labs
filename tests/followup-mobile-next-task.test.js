@@ -22,7 +22,7 @@ test('mobile execution provides distinct Confirmar envío and Siguiente tarea CT
 test('next task uses existing filtered and ranked queue with no claimed, blocked or scheduled tasks', () => {
   assert.match(app, /function fuNextCandidate\(currentKey\)/);
   assert.match(app, /fuQueueSelection\(fuScope\(\)\)\.rows\.filter\(x=>/);
-  assert.match(app, /x\.key!==currentKey&&x\.bucket!=='ejecutada'&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
+  assert.match(app, /x\.key!==currentKey&&x\.bucket!=='ejecutada'&&!x\.claim&&!fuStopped\(x\)&&!x\.dueAt&&Boolean\(x\.action\)/);
   assert.match(app, /case 'next-after': await fuNext\(t\)/);
   assert.match(app, /if\(!next\)\{\s*toast\('No hay otra tarea libre/);
 });
@@ -50,13 +50,19 @@ test('other navigation keeps current business and active queue filters', () => {
 
 // The real function, run against a queue: «Siguiente tarea» used to come back
 // to the first task (A → B → A) because a skipped task returns to its place.
-function nextCandidateWith(rows) {
+// The real fuStopped too: a task for Facu (`heldFor`) is not a stop for the panel, only for the extension.
+function stoppedFn(agent = false) {
+  const m = app.match(/  function fuStopped\(x\) \{[^\n]*\}/);
+  assert.ok(m);
+  return new Function('agentMode', m[0] + '\n return fuStopped;')(() => agent);
+}
+function nextCandidateWith(rows, { agent = false } = {}) {
   const start = app.indexOf('  state.fu.skipped = new Set();');
   const end = app.indexOf('  async function fuNext(clicked', start);
   assert.ok(start > 0 && end > start);
   const state = { fu: { n: {} } };
-  const fn = new Function('state', 'fuQueueSelection', 'fuScope', app.slice(start, end) + '\n return fuNextCandidate;');
-  return { state, next: fn(state, () => ({ rows }), () => 'habita') };
+  const fn = new Function('state', 'fuQueueSelection', 'fuScope', 'fuStopped', app.slice(start, end) + '\n return fuNextCandidate;');
+  return { state, next: fn(state, () => ({ rows }), () => 'habita', stoppedFn(agent)) };
 }
 const row = (key, extra = {}) => ({ key, action: 'Mandar demo', ...extra });
 
@@ -77,4 +83,10 @@ test('«Siguiente tarea» skips taken, blocked and scheduled tasks and starts ov
   assert.equal(next('E').key, 'A');     // end of the list: back to the top
   assert.equal(state.fu.skipped.size, 0);
   assert.equal(nextCandidateWith([row('A')]).next('A'), null);
+});
+
+test('«Siguiente tarea» includes a task for Facu in the panel, never in the extension tab', () => {
+  const rows = [row('A'), row('B', { blocked: 'Pasada a Facu. Retomar para volver a ejecutar.', heldFor: 'Facu' }), row('C', { blocked: 'Completar inmueble candidato en Prospectos.' })];
+  assert.equal(nextCandidateWith(rows).next('A').key, 'B');
+  assert.equal(nextCandidateWith(rows, { agent: true }).next('A'), null);
 });
