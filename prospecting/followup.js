@@ -78,8 +78,19 @@
       score: q.score === undefined ? null : q.score,
       demoUrl: q.demoUrl || '',
       execution: q.execution || null,
+      createDemo: isHabita ? createDemoPath(q) : null,
       bucket,
     };
+  }
+
+  /**
+   * «Crear demo» a mano (habita.): la propiedad que Prospectos dejó en su panel, o una demo nueva.
+   * Solo en «Interesado, sin demo», esté la tarea lista o bloqueada. La ruta es del panel del equipo.
+   */
+  function createDemoPath(q) {
+    if (!q || q.stage !== 'sin-demo' || !q.agencyId) return null;
+    const main = ((q.demoKit && q.demoKit.prep && q.demoKit.prep.items) || []).find((i) => i.key === 'demo_listing_url' && i.ok && i.demoId);
+    return main ? `/admin/inmobiliarias/${q.agencyId}/propiedades/${main.demoId}?seccion=fotos` : `/admin/inmobiliarias/${q.agencyId}/propiedades/nueva`;
   }
 
   /**
@@ -442,7 +453,8 @@
     }
     const count = (rows) => rows.reduce((o, r) => ((o[r.state] = (o[r.state] || 0) + 1), o), {});
     if (snap.leads && Array.isArray(snap.leads.rows)) {
-      const rows = snap.leads.rows.map((r) => ({ ...r, unit, key: `${unit}:${r.agencyId}`, queued: queued.has(r.agencyId) }));
+      const rows = snap.leads.rows.map((r) => ({ ...r, unit, key: `${unit}:${r.agencyId}`, queued: queued.has(r.agencyId),
+        createDemo: r.createDemo || (queued.get(r.agencyId) || {}).createDemo || null }));
       return { complete: true, staleDays: snap.leads.staleDays || 3, alerts: snap.leads.alerts || [], rows,
         stages: (snap.leads.stages || []).map((s) => ({ ...s, states: s.states || {}, rules: s.rules || [] })) };
     }
@@ -450,11 +462,11 @@
       unit, key: x.key.replace(/:facu$/, ''), agencyId: x.id, name: x.name, stage: x.stage, situation: x.situationLabel || x.situation,
       state: fallbackState(x), reason: x.blocked || (x.dueAt ? `Programada para ${x.dueAt}` : 'Puede salir ahora.'),
       who: x.claim ? x.claim.by : /Axel/.test(String(x.blocked || '')) ? 'Axel' : /Facu/.test(String(x.blocked || '')) ? 'Facu' : null,
-      days: null, next: x.action || null, ruleKey: x.ruleKey || null, lastRule: null, queued: true,
+      days: null, next: x.action || null, ruleKey: x.ruleKey || null, lastRule: null, queued: true, createDemo: x.createDemo || null,
     }));
     const stages = stagesOf.map((s) => { const own = rows.filter((r) => r.stage === s.key); return { ...s, count: own.length, states: count(own), rules: [] }; });
     return { complete: false, staleDays: 3, alerts: [], rows, stages };
   }
 
-  return { leads, LEAD_STATES, LEAD_STATE_LABEL, LEAD_STUCK, whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  return { createDemoPath, leads, LEAD_STATES, LEAD_STATE_LABEL, LEAD_STUCK, whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });

@@ -3220,6 +3220,7 @@
           <span class="os-fu-mobile-item-action">${done?'✓ ':''}${esc(x.action||x.actionReason||'Sin acción programada')}</span>
         </div>
         <div class="os-fu-mobile-item-control">
+          ${x.createDemo&&!closed&&!done?fuCreateDemoButton(x.unit,x.createDemo,{small:true,testid:'fu-mobile-create-demo'}):''}
           ${executable?`<button type="button" class="btn primary" data-fu="claim" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-execute">EJECUTAR →</button>`:
           reply?`<button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" data-testid="fu-mobile-reply">RESPONDER →</button>`:
           `<span class="os-fu-mobile-item-status">${esc(stateText)}</span>`}
@@ -3272,6 +3273,7 @@
       <div class="os-fu-preview-head"><span class="os-fu-preview-product">● ${esc(fuName(x.unit).toUpperCase())}</span><h2>${esc(x.name)}</h2>
       <div class="os-fu-preview-tags"><span>ETAPA · ${esc(stage?.title||x.stageTitle||'—')}</span><span>SITUACIÓN · ${esc(x.situationLabel||'—')}</span><span>QUIÉN LO TOMA · ${esc(x.owner||'Todos')}</span></div></div>
       <div class="os-fu-preview-actions">
+        ${x.createDemo?fuCreateDemoButton(x.unit,x.createDemo,{long:true,testid:'followup-preview-create-demo'}):''}
         <button type="button" class="btn primary" data-fu="queue-whatsapp" data-fu-key="${esc(x.key)}" ${x.wa&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.wa} Abrir WhatsApp</button>
         <button type="button" class="btn" data-copy-text="${esc(message)}" ${message&&!message.includes('{{inmueble_candidato}}')?'':'disabled'}>${icon.copy} Copiar borrador</button>
         <button type="button" class="btn" ${ready?`data-fu="preview-confirm" data-fu-key="${esc(x.key)}" data-testid="followup-preview-confirm" title="Ya lo enviaste: se guarda el envío y pasás a la siguiente"`:'disabled title="No está lista para ejecutar"'}>✓ Confirmar envío y siguiente</button>
@@ -3787,7 +3789,8 @@
       .map(([k,l,c])=>`<button type="button" class="btn small ${filter===k?'primary':''}" aria-pressed="${filter===k}" data-fu="leads-state" data-fu-state="${esc(k)}">${esc(l)} · ${int(c)}</button>`).join('');
     const app=unitOf(scope)?.appUrl?new URL(unitOf(scope).appUrl).origin:'';
     const idx=stageIdx(pick.key);
-    const action=(r)=>r.state==='lista'&&r.queued?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(r.key)}">Tomarla</button>`
+    const action=(r)=>(r.createDemo&&r.state!=='hecha'?fuCreateDemoButton(scope,r.createDemo,{small:true,testid:'leads-create-demo'}):'')+action0(r);
+    const action0=(r)=>r.state==='lista'&&r.queued&&!r.createDemo?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(r.key)}">Tomarla</button>`
       :scope==='habita'&&r.state==='equipo'&&/^Pasada a/.test(r.reason)?`<button type="button" class="btn small" data-fu="leads-retake" data-fu-id="${esc(r.agencyId)}" data-fu-name="${esc(r.name)}">Retomar</button>`
       :scope==='habita'&&app?`<a class="btn small" href="${esc(`${app}/admin/inmobiliarias/${r.agencyId}`)}" target="_blank" rel="noopener">Ver ficha</a>`:'';
     const rows=shown.slice(0,200).map(r=>`<tr data-lead="${esc(r.agencyId)}">
@@ -4673,6 +4676,7 @@
       <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn small" type="button" data-fu="back">← Volver a la cola</button>${exec ? `<span class="sub os-fu-lock-note">Reservada para vos${t.lockedUntil ? ` hasta las ${esc(new Date(t.lockedUntil).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }))}` : ' 10 minutos'}</span>` : otherClaim ? `<span class="badge off">Lo tiene ${esc(it.claim.by)}</span>` : ''}</div>
       <section class="hero os-fu-mobile-title"><div>${fuDot(t.unit)}<h1>${esc(t.name || it.name)}</h1><p>Etapa: ${esc(commercialStage?.title || it.stageTitle || '')}${it.situationLabel ? ` · Situación: ${esc(it.situationLabel)}` : ''}</p>${commercialStage && it.stageTitle && commercialStage.title !== it.stageTitle ? `<p class="os-fu-technical-context">Actividad: ${esc(it.stageTitle)}</p>` : ''}</div></section>
       ${exec?`<div class="os-fu-mobile-send" data-testid="fu-mobile-actions">
+        ${(t.stage||it.stage)==='sin-demo'?fuCreateDemoButton(t.unit,(t.links&&t.links.createDemo)||it.createDemo,{long:true,testid:'fu-create-demo-mobile'}):''}
         ${whatsappActions}
         <button type="button" class="btn os-fu-mobile-copy" data-fu="copy" data-fu-index="0">${icon.copy} Copiar mensaje</button>
         <button type="button" class="btn os-fu-open-blank" data-fu="open-blank" data-testid="fu-open-without-text">Abrir sin texto</button>
@@ -4723,9 +4727,10 @@
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
             <div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes||'Sin observaciones registradas.')}</p></div>`
           : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !fuStopped(it) && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
-          <div class="section"><h3>Enlaces</h3>${fuCreateDemo(t,it,u)}<div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
+          <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
         </section>
         <section class="card glass os-fu-execution-card"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
+          ${fuCreateDemo(t,it,u)}
           ${exec && t.checklist.length ? `<ul class="history" data-testid="fu-checklist">${t.checklist.map((c) => `<li data-check="${esc(c.key)}" data-ok="${c.ok}"><time>${c.ok ? '✓' : '✗'}</time><span><strong>${esc(c.label)}</strong>${c.note ? ` · ${esc(c.note)}` : ''}</span></li>`).join('')}</ul>` : ''}
           ${exec ? `<div class="btns os-fu-execution-primary">${whatsappActions}<button class="btn" type="button" data-fu="confirm" data-testid="fu-confirm">Confirmar envío</button></div>
             <p class="sub" style="margin:0">Abrir el chat no cuenta. Confirmá cuando lo veas enviado; si el número del chat no coincide, no lo mandes.</p>
@@ -4739,15 +4744,29 @@
   /**
    * «Crear demo» a mano, en la app: abre la propiedad que Prospectos ya dejó en su panel (sus fotos a
    * un clic) o, si no hay, el inicio de una demo nueva. Para cuando la extensión no puede hacerla.
+   * Se ve en la tarjeta de la cola, en la tarea (como botón principal) y en Leads, aunque esté bloqueada.
    */
+  function fuCreateDemoHref(unit,path){
+    const u=unitOf(unit);
+    if(!path||!u?.appUrl)return null;
+    try{return new URL(path,u.appUrl).toString();}catch{return null;}
+  }
+  const fuCreateDemoPrepared=(path)=>Boolean(path)&&!/\/propiedades\/nueva(\?|$)/.test(path);
+  /** El botón: `small` en filas y tarjetas; `label` largo en la tarea. */
+  function fuCreateDemoButton(unit,path,{small=false,long=false,testid='fu-create-demo'}={}){
+    const href=fuCreateDemoHref(unit,path);
+    if(!href)return '';
+    const prepared=fuCreateDemoPrepared(path);
+    return `<a class="btn primary${small?' small':''}" href="${esc(href)}" target="_blank" rel="noopener" data-testid="${esc(testid)}" title="${prepared?'Abre la propiedad que Prospectos dejó en su panel: importá sus fotos, generá y publicá':'Abre una demo nueva: pegá el aviso, generá y publicá'}">${icon.ext} ${long&&prepared?'Crear demo con la propiedad preparada':'Crear demo'}</a>`;
+  }
   function fuCreateDemo(t,it,u){
-    const path=t.links&&t.links.createDemo;
+    const path=(t.links&&t.links.createDemo)||it.createDemo;
     if(!path||(t.stage||it.stage)!=='sin-demo')return '';
-    let href;
-    try{href=new URL(path,u.appUrl).toString();}catch{return '';}
-    const prepared=!/\/propiedades\/nueva(\?|$)/.test(path);
-    return `<div class="btns os-fu-create-demo" data-testid="fu-create-demo"><a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener">${icon.ext} ${prepared?'Crear demo con la propiedad preparada':'Crear demo'}</a></div>
-      <p class="sub" style="margin:4px 0 8px">${prepared?'Abre la propiedad que ya está en su panel: tocá «Importar fotos de la publicación», elegí las mejores, generá y publicá.':'Abre una demo nueva en '+esc(u.appName)+': pegá el aviso, generá y publicá.'} Al publicarla, la tarea avanza sola.</p>`;
+    const prepared=fuCreateDemoPrepared(path);
+    const button=fuCreateDemoButton(t.unit||it.unit,path,{long:true});
+    if(!button)return '';
+    return `<div class="os-fu-create-demo" data-testid="fu-create-demo-box"><div class="btns">${button}</div>
+      <p class="sub" style="margin:4px 0 8px">${prepared?'Abre la propiedad que ya está en su panel: tocá «Importar fotos de la publicación», elegí las mejores, generá y publicá.':'Abre una demo nueva en '+esc(u.appName)+': pegá el aviso, generá y publicá.'} Al publicarla, la tarea avanza sola.</p></div>`;
   }
 
   /** El mensaje armado por la app lleva la demo de otra cuenta (por ejemplo, la de otro consultorio con el mismo número). */

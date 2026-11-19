@@ -44,3 +44,16 @@ test('la pestaña está en el menú y en las pestañas de Follow-up, con sus acc
   assert.match(js, /leads: fuLeads/);
   for (const a of ['leads-stage', 'leads-state', 'leads-pick', 'leads-retake']) assert.match(js, new RegExp(`case '${a}'`));
 });
+
+test('«Crear demo» a mano: la propiedad preparada o una nueva, también con la tarea bloqueada', () => {
+  const prep = { prep: { items: [{ key: 'demo_listing_url', ok: true, demoId: 'd1' }] } };
+  assert.equal(F.createDemoPath({ agencyId: 'a1', stage: 'sin-demo', demoKit: prep }), '/admin/inmobiliarias/a1/propiedades/d1?seccion=fotos');
+  assert.equal(F.createDemoPath({ agencyId: 'a1', stage: 'sin-demo' }), '/admin/inmobiliarias/a1/propiedades/nueva');
+  assert.equal(F.createDemoPath({ agencyId: 'a1', stage: 'no-abrio', demoKit: prep }), null);
+  const n = F.normalize({ habita: snap({ blocked: [{ agencyId: 'a1', name: 'Uno', stage: 'sin-demo', blocked: 'Completar inmueble candidato en Prospectos.', demoKit: prep }] }) });
+  assert.equal(n.blocked[0].createDemo, '/admin/inmobiliarias/a1/propiedades/d1?seccion=fotos');
+  assert.equal(F.leads(n, 'habita').rows[0].createDemo, '/admin/inmobiliarias/a1/propiedades/d1?seccion=fotos');
+  // Se ve sin tomar la tarea: en la tarjeta del celular, en el panel lateral de la cola, en la tarea y en Leads.
+  for (const id of ['fu-mobile-create-demo', 'followup-preview-create-demo', 'fu-create-demo-mobile', 'leads-create-demo']) assert.match(js, new RegExp(id));
+  assert.match(js, /os-fu-execution-card"><h2>[^\n]*\n\s*\$\{fuCreateDemo\(t,it,u\)\}/);
+});
