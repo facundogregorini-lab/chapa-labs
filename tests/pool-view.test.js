@@ -184,6 +184,9 @@ test('la ficha muestra los avisos de «Crear demo»: si se importan, si ya está
   const prepared = Pool.render(data([{ ...r, demoPrep: { at, by: 'Preparación automática', attempts: 1, items: [{ key: 'demo_listing_url', url: 'https://ficticia.test/p/1', ok: true, demoId: 'd1', photos: 12, error: null }] } }]), Pool.defaults({ open: 'a' }), {});
   assert.match(prepared, /en su panel, lista para importar/);
   assert.match(prepared, /Preparada hoy \d\d:\d\d por Preparación automática\./);
+  const found = Pool.render(data([{ ...r, kit: { ...r.kit, items: r.kit.items.map((i) => i.key === 'demo_preload_url_3' ? { ...i, url: 'https://ficticia.test/p/3' } : i) }, demoPrep: { at, by: 'Facu', attempts: 1, items: [], found: ['https://ficticia.test/p/3'], removed: ['https://ficticia.test/p/9'] } }]), Pool.defaults({ open: 'a' }), {});
+  assert.match(found, /la encontró habita\. en su web/);
+  assert.match(found, /Se sacaron de su panel 1 de avisos cambiados/);
   const none = Pool.render(data([row('a', { profile: {} })]), Pool.defaults({ open: 'a' }), {});
   assert.doesNotMatch(none, /pool-kit/);
 });

@@ -86,20 +86,21 @@
     const kit=row.kit;if(!kit)return '';
     const disabled=o.saving||!o.available;
     const prep=row.demoPrep,inPanel=url=>(prep&&prep.items||[]).find(i=>i.url===url);
+    const found=url=>(prep&&prep.found||[]).includes(url);
     const short=u=>String(u).replace(/^https?:\/\/(www\.)?/,'').slice(0,60);
     const line=i=>{
       if(!i.url)return `<li class="pp-kit-empty"><b>${esc(i.label)}</b> <span class="sub">sin cargar</span></li>`;
       const c=i.check,p=inPanel(i.url);
       const state=p&&p.ok?'<span class="pp-ok">en su panel, lista para importar</span>':p&&!p.ok?`<span class="bad">no quedó en su panel: ${esc(p.error||'')}</span>`
         :!c?'<span class="sub">sin comprobar</span>':c.ok?`<span class="pp-ok">se importa · ${num(c.photos)} fotos</span>`:`<span class="bad">no se puede importar: ${esc(c.error||'')}</span>`;
-      return `<li><b>${esc(i.label)}</b> <a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(short(i.url))}</a> · ${state}</li>`;
+      return `<li><b>${esc(i.label)}</b> <a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(short(i.url))}</a> · ${state}${found(i.url)?' <span class="sub">· la encontró habita. en su web</span>':''}</li>`;
     };
     const any=kit.items.some(i=>i.url);
     return `<div class="pp-kit" data-testid="pool-kit"><span class="os-kicker">AVISOS PARA «CREAR DEMO»</span>
       <ul>${kit.items.map(line).join('')}</ul>
-      <p class="sub">${prep?`Preparada ${esc(runWhen(prep.at))} por ${esc(prep.by||'')}.`:'Cuando pase a Interesado, habita. deja estos avisos en su panel como «Lista para importar»: la extensión no tiene que buscarlos.'}</p>
+      <p class="sub">${prep?`Preparada ${esc(runWhen(prep.at))} por ${esc(prep.by||'')}.${prep.removed&&prep.removed.length?` Se sacaron de su panel ${num(prep.removed.length)} de avisos cambiados (sin fotos ni publicar).`:''}`:'Cuando pase a Interesado, habita. deja estos avisos en su panel como «Lista para importar»: la extensión no tiene que buscarlos. Si faltan precargas, habita. las busca en su web.'}</p>
       <div class="pp-actions"><button class="btn small" type="button" data-pool="check" data-id="${esc(row.id)}" ${disabled||!any?'disabled':''}>COMPROBAR AVISOS</button>
-        <button class="btn small" type="button" data-pool="prepare" data-id="${esc(row.id)}" ${disabled||!row.profile?.demo_listing_url?'disabled':''} title="Importa ahora los avisos a su panel, sin ambientar nada ni usar créditos">DEJAR EN SU PANEL</button></div></div>`;
+        <button class="btn small" type="button" data-pool="prepare" data-id="${esc(row.id)}" ${disabled||!row.profile?.demo_listing_url?'disabled':''} title="Con la tarea «Crear demo» pendiente: importa ahora los avisos a su panel, sin ambientar nada ni usar créditos">DEJAR EN SU PANEL</button></div></div>`;
   }
 
   function detail(row,catalog,o){

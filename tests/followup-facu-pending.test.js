@@ -13,7 +13,7 @@ test('las respuestas para Facu sin tarea vuelven a la cola como «Para Facu»', 
     habita: snap({
       queue: [{ agencyId: 'a-lista', name: 'Lista', stage: 'no-responde', action: 'presentacion', actionLabel: 'Presentación' }],
       blocked: [
-        { agencyId: 'a-pasada', name: 'Pasada', stage: 'sin-demo', blocked: 'Pasada a Facu. Retomar para volver a ejecutar.' },
+        { agencyId: 'a-pasada', name: 'Pasada', stage: 'sin-demo', action: 'principal', actionLabel: 'Crear demo', blocked: 'Pasada a Facu. Retomar para volver a ejecutar.', heldFor: 'Facu' },
         { agencyId: 'a-espera', name: 'Espera', stage: 'no-responde', blocked: 'Ya le escribimos después de su última respuesta: esperá que conteste.' },
       ],
       inbox: [
@@ -31,6 +31,11 @@ test('las respuestas para Facu sin tarea vuelven a la cola como «Para Facu»', 
   assert.equal(audio.bucket, 'facu');
   assert.equal(audio.action, 'Responder · Audio');
   assert.ok(audio.blocked, 'no se ejecuta desde la cola');
+  assert.equal(audio.heldFor, null, 'sin tarea armada: se responde, no se ejecuta');
+  // La tarea pasada a Facu llega con `heldFor`: el panel le muestra «EJECUTAR», la extensión no la toma.
+  const pasada = n.facu.find((x) => x.name === 'Pasada');
+  assert.equal(pasada.heldFor, 'Facu');
+  assert.equal(pasada.action, 'Crear demo');
   assert.notEqual(audio.key, 'habita:a-audio', 'no pisa la clave de una tarea real');
 });
 
