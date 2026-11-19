@@ -64,7 +64,11 @@ test('Mobile cards replace wide queue table without changing filtered data',()=>
 });
 
 test('Mobile execute is disabled for claimed, blocked, scheduled and closed items',()=>{
-  assert.match(app,/const executable=!closed&&!done&&!x\.claim&&!x\.blocked&&!x\.dueAt&&Boolean\(x\.action\)/);
+  assert.match(app,/const executable=!closed&&!done&&!x\.claim&&!fuStopped\(x\)&&!x\.dueAt&&Boolean\(x\.action\)/);
+  // Lo que es de Facu (pasada a él o con su respuesta) tiene «EJECUTAR» como lo de la extensión.
+  assert.match(app,/function fuStopped\(x\) \{ return Boolean\(x\?\.blocked\) && !\(x\.heldFor && !agentMode\(\)\); \}/);
+  // Una respuesta para Facu sin tarea armada: «RESPONDER» abre su WhatsApp.
+  assert.match(app,/data-fu="queue-whatsapp" data-fu-key="\$\{esc\(x\.key\)\}" data-testid="fu-mobile-reply">RESPONDER →/);
   assert.match(app,/TOMADA POR /);
   assert.match(app,/SIN ACCIÓN/);
   assert.match(app,/data-fu="claim" data-fu-key="\$\{esc\(x\.key\)\}"/);

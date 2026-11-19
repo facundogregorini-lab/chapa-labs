@@ -67,6 +67,9 @@
       since: (q.lastAction && q.lastAction.at) || q.lastContactAt || q.since || '',
       lastText: (q.lastAction && q.lastAction.text) || '',
       blocked: q.blocked || null,
+      // habita.: para quién es cuando lo único que la frena es ser de una persona (pasada a Facu o
+      // Axel, o con una respuesta para Facu). Esa persona la ejecuta; la extensión no.
+      heldFor: q.heldFor || null,
       dueAt: q.dueAt || null,
       snoozedUntil: q.snoozedUntil || null,
       claim: live(q.claim, now) ? { by: q.claim.by, until: q.claim.until } : null,
@@ -100,9 +103,37 @@
     return next;
   }
 
+  // Lo que espera a Facu y no tiene una tarea lista en la cola (19/11/2026): una tarea pasada a Facu o
+  // con una respuesta para él (audio, pregunta no cubierta) queda «bloqueada», y una respuesta que llega
+  // después de la última acción ya ejecutada (un audio al saludo) no deja ninguna tarea. Así no aparecían
+  // en la vista FACU. Acá vuelven como filas «Para Facu», sin tocar las reglas del motor de cada app.
+  const FACU_BLOCK = /^(Asignada a Facu|Pasada a Facu)/;
+  function forFacu(unit, snap, now) {
+    const ready = new Set((snap.queue || []).map((q) => q.agencyId || q.id));
+    const seen = new Set();
+    const rows = [];
+    for (const q of snap.blocked || []) {
+      const id = q.agencyId || q.id;
+      if (!q.stage || ready.has(id) || seen.has(id) || !FACU_BLOCK.test(String(q.blocked || ''))) continue;
+      seen.add(id);
+      rows.push({ ...item(unit, { ...q, owner: q.owner || 'Facu', group: 'respuestas', priority: 'alta' }, snap, 'facu', now), key: `${unit}:${id}:facu` });
+    }
+    if (unit === 'habita') for (const r of snap.inbox || []) {
+      if (r.status !== 'facu' || ready.has(r.agency_id) || seen.has(r.agency_id)) continue;
+      seen.add(r.agency_id);
+      const what = r.note || r.classification || 'Respuesta para Facu';
+      rows.push({ ...item(unit, {
+        agencyId: r.agency_id, name: r.name, phone: r.phone, stage: r.stage || '', situation: r.situation || '',
+        owner: 'Facu', group: 'respuestas', priority: 'alta', actionLabel: `Responder · ${what}`,
+        blocked: `Para Facu: ${what}`, lastAction: { at: r.received_at, text: r.body },
+      }, snap, 'facu', now), key: `${unit}:${r.agency_id}:facu` });
+    }
+    return rows;
+  }
+
   /** La cola de cada unidad ({ habita: snapshot, turnia: snapshot }) en una sola forma. */
   function normalize(units, now = Date.now()) {
-    const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], executed: [], errors: {}, units: {} };
+    const out = { queue: [], scheduled: [], blocked: [], noInteresados: [], executed: [], facu: [], errors: {}, units: {} };
     for (const [unit, snap] of Object.entries(units || {})) {
       if (!snap || snap.error) { out.errors[unit] = (snap && snap.error) || 'Sin datos.'; continue; }
       if (snap.__warning) out.errors[unit] = 'Mostrando datos anteriores (no actualizados): ' + snap.__warning;
@@ -117,11 +148,13 @@
         const x = item(unit, q, snap, 'ejecutada', now);
         return { ...x, key: `${x.key}:enviada:${x.stage}:${q.action || ""}:${q.execution.at}`, since: q.execution.at };
       }));
+      out.facu.push(...forFacu(unit, snap, now));
 
     }
     out.queue.sort(byPriority);
     out.scheduled.sort((a, b) => String(a.dueAt).localeCompare(String(b.dueAt)));
     out.blocked.sort(byPriority);
+    out.facu.sort((a, b) => String(a.since).localeCompare(String(b.since)));
     out.executed.sort((a, b) => String(b.since).localeCompare(String(a.since)));
     return out;
   }
