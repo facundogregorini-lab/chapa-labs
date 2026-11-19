@@ -2796,7 +2796,7 @@
 
   function fuFind(key) {
     const n = state.fu.n;
-    return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.noInteresados||[]), ...(n.executed||[])].find((x) => x.key === key) : null;
+    return n ? [...n.queue, ...n.scheduled, ...n.blocked, ...(n.facu||[]), ...(n.noInteresados||[]), ...(n.executed||[])].find((x) => x.key === key) : null;
   }
 
   // The task opens at once with what the queue already knows (name, stage,
@@ -3050,6 +3050,7 @@
     if(by.startsWith('facu'))return 'facu';
     if(by==='axel'||by.startsWith('axel '))return 'axel';
   }
+  if(x?.bucket==='facu')return 'facu';
   const o=String(x?.owner||'').trim().toLowerCase();
   if(o.startsWith('facu'))return 'facu';
   if(o==='axel'||o.startsWith('axel '))return 'axel';
@@ -3096,6 +3097,23 @@
   return pct>0?{dir:'up',text:`▲ ${pct}%`}:pct<0?{dir:'down',text:`▼ ${Math.abs(pct)}%`}:{dir:'flat',text:'= 0%'};
 }
 
+  // «Registrala a mano»: también los contactados que ya no tienen tarea (un saludo ya enviado que se
+  // contesta con un audio no deja nada en la cola) y, en habita., cualquier inmobiliaria del embudo.
+  function fuManualReplyOptions(n,scope) {
+  const byId=new Map();
+  for(const x of [...n.queue,...n.scheduled,...n.blocked,...(n.facu||[]),...(n.executed||[])])
+    if(x.unit===scope&&!byId.has(x.id))byId.set(x.id,{id:x.id,name:x.name,stageTitle:x.stageTitle||''});
+  const snap=n.units?.[scope];
+  const titles=Object.fromEntries((snap?.stages||[]).map(s=>[s.key,s.title]));
+  for(const a of (scope==='habita'?snap?.agencies||[]:[]))
+    if(a.stage&&!byId.has(a.agencyId))byId.set(a.agencyId,{id:a.agencyId,name:a.name,stageTitle:titles[a.stage]||a.stage});
+  return [...byId.values()].sort((a,b)=>a.name.localeCompare(b.name));
+}
+  function fuLocalNow(d=new Date()) {
+  const p=(v)=>String(v).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
   function fuQueueSelection(scope) {
   const n=state.fu.n,q=fuQueueState();
   const snap=scope==='todas'?null:n.units[scope];
@@ -3104,7 +3122,7 @@
   const base=q.closed ? n.noInteresados
     : q.kpi==='bloqueadas' ? n.blocked
     : q.kpi==='respuestas' ? n.queue.filter(x=>x.group==='respuestas')
-    : q.kpi==='demos' ? n.queue.filter(x=>x.group==='demos') : n.queue;
+    : q.kpi==='demos' ? n.queue.filter(x=>x.group==='demos') : [...n.queue,...(n.facu||[])];
   const pick=(list)=>list.filter(x=>{
     if(scope!=='todas'&&x.unit!==scope)return false;
     if(current && !(current.technical.includes(x.stage) && (!current.situation||x.situation===current.situation)))return false;
@@ -3186,7 +3204,7 @@
     const locked=x.claim&&x.claim.by!==me;
     const done=x.bucket==='ejecutada';
     const executable=!closed&&!done&&!x.claim&&!x.blocked&&!x.dueAt&&Boolean(x.action);
-    const stateText=closed?'CERRADA':done?'EJECUTADA · '+dayTime(x.since).toUpperCase():x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
+    const stateText=closed?'CERRADA':done?'EJECUTADA · '+dayTime(x.since).toUpperCase():x.bucket==='facu'?'PARA FACU':x.blocked?'BLOQUEADA':x.dueAt?'PROGRAMADA':
       locked?'TOMADA POR '+x.claim.by:x.claim?'YA TOMADA':!x.action?'SIN ACCIÓN':'LISTA';
     return `<article class="os-fu-mobile-item" data-testid="fu-mobile-item">
       <div class="os-fu-mobile-item-main">
@@ -3284,7 +3302,7 @@
   ];
   const baseStageRows=q.closed?n.noInteresados:executed?(n.executed||[]):q.kpi==='bloqueadas'?n.blocked:
     q.kpi==='respuestas'?n.queue.filter(x=>x.group==='respuestas'):
-    q.kpi==='demos'?n.queue.filter(x=>x.group==='demos'):n.queue;
+    q.kpi==='demos'?n.queue.filter(x=>x.group==='demos'):[...n.queue,...(n.facu||[])];
   const stageCounter=(stage,inTime=(x)=>q.closed||fuInPeriod(x,q.period))=>F.filter(baseStageRows,{unit:scope,q:q.search,group:q.group}).filter(x=>
     (!stage||stage.technical.includes(x.stage)&&(!stage.situation||x.situation===stage.situation))&&
     (!q.situation||x.situation===q.situation||x.catalogSituation===q.situation||x.productSituations?.includes(q.situation))&&
@@ -3410,8 +3428,9 @@
     <div class="os-section-heading"><h2>${scope==='habita'?'Registrar una respuesta':'Registrar una respuesta manual'}</h2><button type="button" class="btn small" data-fu="reply-manual">CERRAR</button></div>
     <p class="os-fu-caption">Usá este formulario cuando recibiste un mensaje que no quedó registrado por la extensión o la lectura de WhatsApp.</p>
     <label class="field"><span>${scope==='habita'?'Inmobiliaria':'Contacto'}</span><select class="input" name="id" required><option value="">Elegí…</option>
-    ${[...new Map([...n.queue,...n.scheduled,...n.blocked].filter(x=>x.unit===scope).map(x=>[x.id,x])).values()].sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.stageTitle||'')}</option>`).join('')}</select></label>
-    <label class="field"><span>${scope==='habita'?'Lo que respondió (tal cual)':'Texto original'}</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió…"></textarea></label>
+    ${fuManualReplyOptions(n,scope).map(x=>`<option value="${esc(x.id)}">${esc(x.name)} · ${esc(x.stageTitle||'')}</option>`).join('')}</select></label>
+    ${scope==='habita'?`<label class="field"><span>Hora de la respuesta (la del chat)</span><input class="input" type="datetime-local" name="hora" value="${esc(fuLocalNow())}" max="${esc(fuLocalNow())}"></label>`:''}
+    <label class="field"><span>${scope==='habita'?'Lo que respondió (tal cual)':'Texto original'}</span><textarea class="input" name="texto" rows="3" maxlength="4000" required placeholder="Copiá lo que respondió… (en un audio: «Audio de 0:09»)"></textarea></label>
     <label class="field"><span>Clasificación</span><select class="input" name="clase"><option value="">${scope==="turnia"?"Sin clasificar (Turnia registra Neutro)":"Clasificar más tarde"}</option>
     ${allowed.map(x=>`<option value="${esc(x.key)}">${esc(x.label)}</option>`).join('')}</select></label>
     <button class="btn primary" type="submit">${scope==='habita'?'REGISTRAR':'REGISTRAR RESPUESTA'}</button></form>`:'';
@@ -3483,7 +3502,9 @@
   }else if(form.matches('[data-fu-manual-reply-form]')){
     const id=String(fd.get('id')||''), body=String(fd.get('texto')||'').trim(),classification=String(fd.get('clase')||'');
     if(!id||!body){toast('Elegí el contacto y copiá su respuesta.',true);return;}
-    const data={op:'reply',inmobiliaria:id,texto:body,...(classification?{clasificacion:classification,confianza:1}:{})};
+    const hora=scope==='habita'?String(fd.get('hora')||''):'';
+    const at=hora?new Date(hora):null;
+    const data={op:'reply',inmobiliaria:id,texto:body,...(at&&!Number.isNaN(at.getTime())?{hora:at.toISOString()}:{}),...(classification?{clasificacion:classification,confianza:1}:{})};
     if(!await fuOp(scope,data,{label:'Respuesta registrada.'}))return;
     fuReplyState().manual=false;await loadFollowup({quiet:true});render();
   }
