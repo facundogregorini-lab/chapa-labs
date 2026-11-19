@@ -4654,7 +4654,7 @@
             ${t.messages.map((m, i) => `<div class="section"><h3>${t.messages.length > 1 ? `Mensaje ${i + 1} de ${t.messages.length}` : `V${esc(t.version || '')}`}</h3><p style="margin:0;white-space:pre-wrap;font-size:15px" data-testid="fu-message" data-index="${i}">${esc(m)}</p><div class="btns"><button class="btn small" type="button" data-fu="copy" data-fu-index="${i}">${icon.copy} Copiar</button></div></div>`).join('')}
             <div class="section"><h3>Observaciones</h3><p style="margin:0;white-space:pre-wrap;font-size:14px">${esc(t.notes||'Sin observaciones registradas.')}</p></div>`
           : `<p class="sub">${it.action ? `Próxima acción: <strong>${esc(it.action)}</strong>.` : esc(it.actionReason || 'No hay nada para mandarle ahora.')}</p>${it.action && !fuStopped(it) && !it.dueAt && !otherClaim ? `<button class="btn primary" type="button" data-fu="claim" data-fu-key="${esc(it.key)}">Tomarla y armar el mensaje</button>` : ''}`}
-          <div class="section"><h3>Enlaces</h3><div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
+          <div class="section"><h3>Enlaces</h3>${fuCreateDemo(t,it,u)}<div class="btns">${t.links && t.links.demo ? `<a class="btn small" href="${esc(t.links.demo)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : it.demoUrl ? `<a class="btn small" href="${esc(it.demoUrl)}" target="_blank" rel="noopener">${icon.ext} Su demo</a>` : ''}${t.links && t.links.panel ? `<a class="btn small" href="${esc(t.links.panel)}" target="_blank" rel="noopener">${icon.ext} Su panel</a>` : ''}<a class="btn small" href="${esc(u.appUrl)}" target="_blank" rel="noopener">${icon.ext} Abrir ${esc(u.appName)}</a>${acc ? `<button class="btn small" type="button" data-fu="ficha" data-fu-account="${esc(acc.id)}">Ver la ficha</button>` : ''}</div></div>
         </section>
         <section class="card glass os-fu-execution-card"><h2>${exec ? 'Antes de mandar' : 'Acciones'}</h2>
           ${exec && t.checklist.length ? `<ul class="history" data-testid="fu-checklist">${t.checklist.map((c) => `<li data-check="${esc(c.key)}" data-ok="${c.ok}"><time>${c.ok ? '✓' : '✗'}</time><span><strong>${esc(c.label)}</strong>${c.note ? ` · ${esc(c.note)}` : ''}</span></li>`).join('')}</ul>` : ''}
@@ -4665,6 +4665,20 @@
           ${exec ? `<button class="btn ghost" type="button" data-fu="next-after">Siguiente pendiente →</button>` : ''}
         </section>
       </div>`;
+  }
+
+  /**
+   * «Crear demo» a mano, en la app: abre la propiedad que Prospectos ya dejó en su panel (sus fotos a
+   * un clic) o, si no hay, el inicio de una demo nueva. Para cuando la extensión no puede hacerla.
+   */
+  function fuCreateDemo(t,it,u){
+    const path=t.links&&t.links.createDemo;
+    if(!path||(t.stage||it.stage)!=='sin-demo')return '';
+    let href;
+    try{href=new URL(path,u.appUrl).toString();}catch{return '';}
+    const prepared=!/\/propiedades\/nueva(\?|$)/.test(path);
+    return `<div class="btns os-fu-create-demo" data-testid="fu-create-demo"><a class="btn primary" href="${esc(href)}" target="_blank" rel="noopener">${icon.ext} ${prepared?'Crear demo con la propiedad preparada':'Crear demo'}</a></div>
+      <p class="sub" style="margin:4px 0 8px">${prepared?'Abre la propiedad que ya está en su panel: tocá «Importar fotos de la publicación», elegí las mejores, generá y publicá.':'Abre una demo nueva en '+esc(u.appName)+': pegá el aviso, generá y publicá.'} Al publicarla, la tarea avanza sola.</p>`;
   }
 
   /** El mensaje armado por la app lleva la demo de otra cuenta (por ejemplo, la de otro consultorio con el mismo número). */
