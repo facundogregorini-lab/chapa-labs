@@ -405,5 +405,53 @@
     return { unit, never: false, at: r.at, trigger: r.trigger || '', totals: r.totals || {}, lines, pending };
   }
 
-  return { whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
+  // ─── Leads: dónde está cada lead hoy y qué reglas dejaron de salir ───────
+  // habita. manda la vista armada (amoblaia src/lib/followup/leads.ts: todas las inmobiliarias del
+  // tablero, su estado en la cola, cuántos días lleva así y la última regla que le salió). Sin ella
+  // (Turnia, hasta que su API la mande) se arma con lo que la cola ya trae: solo lo pendiente, sin
+  // días ni últimas ejecuciones, y la pantalla lo avisa.
+  const LEAD_STATES = ['lista', 'tomada', 'programada', 'reprogramada', 'equipo', 'respuesta', 'bloqueada', 'hecha', 'sin_accion'];
+  const LEAD_STATE_LABEL = {
+    lista: 'Lista para mandar', tomada: 'Tomada', programada: 'Programada', reprogramada: 'Reprogramada',
+    equipo: 'Esperando al equipo', respuesta: 'Respuesta sin clasificar', bloqueada: 'Bloqueada',
+    hecha: 'Mensaje enviado', sin_accion: 'Sin acción',
+  };
+  /** Los estados que piden que alguien haga algo (los que «traban» una etapa). */
+  const LEAD_STUCK = ['equipo', 'respuesta', 'bloqueada'];
+
+  function fallbackState(x) {
+    if (x.bucket === 'cola') return x.claim ? 'tomada' : 'lista';
+    if (x.bucket === 'programada') return x.snoozedUntil ? 'reprogramada' : 'programada';
+    const b = String(x.blocked || '');
+    if (/^(Asignada a Facu|Pasada a (Facu|Axel)|Para Facu)/.test(b)) return 'equipo';
+    if (/^Tiene una respuesta sin clasificar/.test(b)) return 'respuesta';
+    if (/^(Programada para|Reprogramada|Fuera de horario|Fuera de la ventana|Sin cupo)/.test(b)) return 'programada';
+    return 'bloqueada';
+  }
+
+  function leads(n, unit) {
+    const snap = n && n.units && n.units[unit];
+    if (!snap) return null;
+    const stagesOf = (snap.stages || []).map((s) => ({ key: s.key, title: s.title, goal: s.goal || '' }));
+    const queued = new Map();
+    for (const x of [...(n.queue || []), ...(n.scheduled || []), ...(n.blocked || []), ...(n.facu || [])]) {
+      if (x.unit === unit && !queued.has(x.id)) queued.set(x.id, x);
+    }
+    const count = (rows) => rows.reduce((o, r) => ((o[r.state] = (o[r.state] || 0) + 1), o), {});
+    if (snap.leads && Array.isArray(snap.leads.rows)) {
+      const rows = snap.leads.rows.map((r) => ({ ...r, unit, key: `${unit}:${r.agencyId}`, queued: queued.has(r.agencyId) }));
+      return { complete: true, staleDays: snap.leads.staleDays || 3, alerts: snap.leads.alerts || [], rows,
+        stages: (snap.leads.stages || []).map((s) => ({ ...s, states: s.states || {}, rules: s.rules || [] })) };
+    }
+    const rows = [...queued.values()].map((x) => ({
+      unit, key: x.key.replace(/:facu$/, ''), agencyId: x.id, name: x.name, stage: x.stage, situation: x.situationLabel || x.situation,
+      state: fallbackState(x), reason: x.blocked || (x.dueAt ? `Programada para ${x.dueAt}` : 'Puede salir ahora.'),
+      who: x.claim ? x.claim.by : /Axel/.test(String(x.blocked || '')) ? 'Axel' : /Facu/.test(String(x.blocked || '')) ? 'Facu' : null,
+      days: null, next: x.action || null, ruleKey: x.ruleKey || null, lastRule: null, queued: true,
+    }));
+    const stages = stagesOf.map((s) => { const own = rows.filter((r) => r.stage === s.key); return { ...s, count: own.length, states: count(own), rules: [] }; });
+    return { complete: false, staleDays: 3, alerts: [], rows, stages };
+  }
+
+  return { leads, LEAD_STATES, LEAD_STATE_LABEL, LEAD_STUCK, whatsapp, GROUPS, GROUP_LABEL, PRIORITY_LABEL, ACTION_LABEL, COMMERCIAL, commercialStages, inboxItems, item, normalize, mergeUnits, byPriority, filter, summary, taskFields, prepared, versionRows, ruleRows, actorRows };
 });

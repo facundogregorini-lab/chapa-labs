@@ -189,6 +189,15 @@ Chapa Labs es la pantalla comercial única de habita. y Turnia. **No guarda ni r
 - **Registrala a mano (habita.):** lista también a los contactados que ya no tienen tarea (los ejecutados de la semana) y guarda la **hora real** de la respuesta (`hora`). Para un audio: texto «Audio de 0:09» y clasificación «Audio», que la manda a Facu.
 - **El panel sigue abierto sin contraseña** (decisión del 08/11): antes de compartir el link, poner `PROSPECTING_PASSWORD` en Vercel.
 
+### Leads (`?vista=leads`, 19/11)
+
+Pestaña de Follow-up, después de Embudo: cuántos leads hay en cada etapa, en qué estado de la cola está cada uno, por qué no sale y qué reglas activas dejaron de salir.
+
+- **Para revisar:** las reglas activas con leads que no salen hace más de 3 días, y las tareas listas que nadie mandó en 2 días. Tocando una se abre la etapa con su filtro.
+- **Una tarjeta por etapa:** el total, una barra por estado, cuántos están trabados (esperando al equipo, con una respuesta sin clasificar o bloqueados), qué ya logró y qué le falta, y las reglas de la etapa con su último envío (en rojo la que no sale).
+- **Detalle:** cada lead con su estado («Esperando a Facu», «Bloqueada»…), el motivo, la situación, el avance, la última regla que le salió y la próxima acción. «Tomarla» si está lista, «Retomar» si se pasó a Facu o Axel, o «Ver ficha».
+- La vista la arma habita. (`src/lib/followup/leads.ts` en amoblaia). Turnia, hasta que su API mande `leads`, muestra solo lo pendiente de su cola, sin días ni última regla, y la pantalla lo avisa.
+
 ## Liquid glass
 
 Fondo: `prospecting/fondo.jpg`, «St. Moritz on an evening during the winter in Switzerland», de [GoodFreePhotos](https://www.goodfreephotos.com/Free-Stock-Photos/st-moritz-on-an-evening-during-the-winter-in-switzerland.jpg.php) (CC0, dominio público). Para cambiarlo alcanza con reemplazar el archivo; sin archivo queda la luz de color.

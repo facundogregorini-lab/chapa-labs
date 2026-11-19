@@ -2935,3 +2935,41 @@ body[data-unit="turnia"] .os-native-chart.is-turnia{grid-template-columns:repeat
 
 /* Con la ficha abierta, el buscador y la cuenta quedan detrás del velo: no se montan sobre el título de la ficha. */
 body:has(#drawer:not([hidden])) .top.os-top{z-index:30!important}
+
+/* ─── Follow-up · Leads: dónde está cada lead y qué reglas no salen ─── */
+.os-leads-alerts h2{margin:0 0 10px;font-size:16px}
+.os-leads-alerts ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.os-leads-alert{width:100%;text-align:left;display:grid;gap:4px;padding:12px 14px;border-radius:12px;border:1px solid var(--glass-line);background:var(--field);color:var(--ink);cursor:pointer;min-height:44px;font:inherit}
+.os-leads-alert span{font-size:13.5px}.os-leads-alert small{font-size:12px;color:var(--ink-2)}
+.os-leads-alert.is-bad{border-color:#e6a597;background:#fdf1ee}.os-leads-alert.is-bad b{color:#9f2a1c}
+.os-leads-alert.is-warn{border-color:#e9c98c;background:#fdf7ea}.os-leads-alert.is-warn b{color:#7a5300}
+.os-leads-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink-2);margin:4px 0 10px}
+.os-leads-legend span{display:flex;align-items:center;gap:6px}.os-leads-legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.os-leads-stages{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));margin-bottom:16px}
+.os-leads-stage{display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;border-radius:14px;border:1px solid var(--glass-line);background:var(--glass);color:var(--ink);cursor:pointer;font:inherit;min-height:44px}
+.os-leads-stage strong{font-size:14px;line-height:1.25}.os-leads-stage small{font-size:11.5px;color:var(--ink-2);line-height:1.4}
+.os-leads-stage.is-on{border:2px solid var(--accent);box-shadow:0 0 0 3px #d8efe1}
+.os-leads-stage.has-alert{border-color:#e6a597}
+.os-leads-count{font-size:32px;font-weight:850;line-height:1}
+.os-leads-bar{display:flex;height:7px;border-radius:99px;overflow:hidden;background:var(--grid)}
+.os-leads-bar i,.os-leads-legend i{display:block}
+:is(.os-leads-bar,.os-leads-legend) i.is-ready,.os-leads-pill.is-ready{background:#12764c}
+:is(.os-leads-bar,.os-leads-legend) i.is-later{background:#9dbbe0}
+:is(.os-leads-bar,.os-leads-legend) i.is-team,.os-leads-pill.is-team{background:#9a6400}
+:is(.os-leads-bar,.os-leads-legend) i.is-bad,.os-leads-pill.is-bad{background:#b3361f}
+:is(.os-leads-bar,.os-leads-legend) i.is-done{background:#c9d3cb}
+.os-leads-stuck{align-self:flex-start;font-size:11px;font-weight:800;padding:2px 8px;border-radius:99px;background:#fbe4e1;color:#8e1f16}
+.os-leads-rules{list-style:none;margin:4px 0 0;padding:8px 0 0;border-top:1px solid var(--glass-line);display:grid;gap:4px}
+.os-leads-rules li{display:flex;justify-content:space-between;gap:8px;font-size:11.5px}.os-leads-rules li small{white-space:nowrap}
+.os-leads-rules li.is-bad{color:#9f2a1c;font-weight:800}.os-leads-rules li.is-bad small{color:#9f2a1c}
+.os-leads-detail-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:flex-end;margin-bottom:12px}
+.os-leads-detail-head h2{margin:2px 0 0;font-size:18px}
+.os-leads-table{overflow-x:auto;border:1px solid var(--glass-line);border-radius:12px}
+.os-leads-table table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:960px}
+.os-leads-table th,.os-leads-table td{padding:10px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--glass-line)}
+.os-leads-table thead th{border-top:0;background:var(--glass-soft);font-size:11.5px;color:var(--ink-2)}
+.os-leads-table tbody th small,.os-leads-table td small{display:block;color:var(--muted);font-weight:500;font-size:11.5px}
+.os-leads-pill{display:inline-block;white-space:nowrap;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;color:#fff}
+.os-leads-pill.is-later{color:#1e447a;background:#e3ecf8}.os-leads-pill.is-done{color:#3c5a49;background:#edf1ee}
+:root[data-theme="dark"] .os-leads-alert.is-bad{background:#3a1f1a}:root[data-theme="dark"] .os-leads-alert.is-warn{background:#3a2f17}
+:root[data-theme="dark"] .os-leads-stuck{background:#4a211b;color:#ffd5cd}

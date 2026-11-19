@@ -483,7 +483,7 @@
     `<button type="button" data-unit="${id}" aria-pressed="${state.unit === id}"><span class="dot" style="--c:var(--${color})"></span>${esc(name.toUpperCase())}${id === 'todas' || fuCount(id) === '' ? '' : `<span class="count num">${fuCount(id)}</span>`}</button>`
   ).join('');
   // Cola de ejecución, Embudo y después el resto (13/11/2026).
-  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['pipeline','EMBUDO','◫'],['responder','RESPUESTAS','◌',replyCount(state.unit)],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
+  const common = [['hoy','COLA DE EJECUCIÓN','☷',fuCount(state.unit)],['pipeline','EMBUDO','◫'],['leads','LEADS','◧'],['responder','RESPUESTAS','◌',replyCount(state.unit)],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥'],['etapas','ETAPAS Y SITUACIONES','⚙'],['script','SCRIPT','▣']];
   const tabs = state.unit === 'todas'
     ? [['resumen','RESUMEN','▦'],['hoy','COLA DE EJECUCIÓN','☷',fuCount('todas')],['pipeline','EMBUDOS','◫'],['prospectos','PROSPECTOS','▤'],['secuencias','REGLAS Y MENSAJES','◇'],['rendimiento','RESULTADOS','▥']]
     : common;
@@ -544,7 +544,7 @@
       ['resumen','RESUMEN'],['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDOS'],
       ['prospectos','PROSPECTOS'],['secuencias','REGLAS Y MENSAJES'],['rendimiento','RESULTADOS'],
     ]:[
-      ['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDO'],
+      ['hoy','COLA DE EJECUCIÓN'],['pipeline','EMBUDO'],['leads','LEADS'],
       ['responder','RESPUESTAS'],['secuencias','REGLAS'],
       ['etapas','ETAPAS Y SITUACIONES'],['rendimiento','RESULTADOS'],['script','SCRIPT'],
     ];
@@ -2664,8 +2664,8 @@
   const F = window.ProspectingFollowup;
   const FU_VIEWS = ['hoy', 'pipeline', 'prospectos', 'secuencias', 'rendimiento'];
   const TODAS_VIEWS = [...FU_VIEWS, 'resumen'];
-  const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas'];
-  const UNIT_VIEWS = ['script', 'hoy', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
+  const UNIT_FU_VIEWS = [...FU_VIEWS, 'etapas', 'leads'];
+  const UNIT_VIEWS = ['script', 'hoy', 'leads', 'responder', 'responder-legado', 'followup', 'pipeline', 'prospectos', 'secuencias', 'rendimiento', 'etapas', 'adquisicion', 'enviar', 'embudo', 'cuentas', 'inmobiliarias', 'onboarding', 'mensajes', 'playbook'];
   const FU_LABEL = { hoy: 'Hoy', pipeline: 'Pipeline', prospectos: 'Prospectos', secuencias: 'Secuencias', rendimiento: 'Rendimiento' };
   state.fu = { raw: null, n: null, loading: false, error: null, at: 0,
     loadedAt: {}, periodSignature: null, revision: 0, requestedRevision: 0,
@@ -2963,7 +2963,7 @@
     const errors = Object.entries(state.fu.n.errors).filter(([u]) => fuScope() === 'todas' || u === fuScope())
       .map(([u, e]) => `<div class="notice glass"><span class="badge off">${esc(fuName(u))}</span><span>${esc(e)}</span></div>`).join('')
       + (state.fu.error ? `<div class="notice glass" role="status" data-testid="followup-stale-warning"><span class="badge off">CONEXIÓN</span><span>No se pudo actualizar. Se conserva la última lectura válida: ${esc(state.fu.error)}</span><button class="btn small" type="button" data-fu="reload">REINTENTAR</button></div>` : '');
-    const body = { hoy: fuHoy, responder: fuReplies, pipeline: fuPipeline, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
+    const body = { hoy: fuHoy, responder: fuReplies, pipeline: fuPipeline, leads: fuLeads, prospectos: fuProspectos, secuencias: fuSecuencias, rendimiento: fuRendimiento, etapas: fuCatalog }[v] || fuHoy;
     return sub + errors + body();
   }
 
@@ -3734,6 +3734,75 @@
     ${fuFunnelReviewList(snap,rows,focus,chart,unit)}
   </section>`;
 }
+
+  // ─── Leads: dónde está cada lead hoy, por qué no sale y qué reglas dejaron de salir ───
+  // La vista la arma cada app (habita.: amoblaia src/lib/followup/leads.ts); prospecting/followup.js
+  // la pone en una sola forma. Acá solo se mira y se filtra: tomar o retomar usa las mismas ops.
+  const LEAD_TONE={lista:'is-ready',tomada:'is-ready',programada:'is-later',reprogramada:'is-later',equipo:'is-team',respuesta:'is-team',bloqueada:'is-bad',hecha:'is-done',sin_accion:'is-done'};
+  function fuLeads(){
+    const scope=fuScope();
+    if(scope==='todas')return `<section class="card glass"><p>Elegí habita. o Turnia para ver sus leads.</p></section>`;
+    const L=F.leads(state.fu.n,scope),snap=state.fu.n.units[scope];
+    if(!L)return `<section class="card glass"><p>Los leads de ${esc(fuName(scope))} no están disponibles.</p></section>`;
+    const sit=(k)=>(snap.labels?.situations||{})[k]||k||'—';
+    const stageTitle=(k)=>L.stages.find(s=>s.key===k)?.title||k;
+    const stageIdx=(k)=>L.stages.findIndex(s=>s.key===k);
+    const pick=L.stages.find(s=>s.key===state.fu.leadsStage)||L.stages.find(s=>F.LEAD_STUCK.some(x=>s.states[x]))||L.stages[0];
+    const filter=state.fu.leadsState||'';
+    const daysTxt=(d)=>d==null?'':d<=1?'desde hoy':`hace ${int(d)} días`;
+    const lastTxt=(iso)=>{if(!iso)return 'nunca';const d=Math.round((Date.now()-Date.parse(iso))/86400000);return `${dayTime(iso)} · ${d<=0?'hoy':d===1?'ayer':`hace ${d} días`}`;};
+    const alertRule=(k)=>L.alerts.find(a=>a.kind==='regla'&&a.ruleKey===k);
+    const statesLine=(st)=>F.LEAD_STATES.filter(k=>st[k]).map(k=>`${int(st[k])} ${esc(F.LEAD_STATE_LABEL[k].toLowerCase())}`).join(' · ');
+    const alerts=L.alerts.map(a=>a.kind==='regla'
+      ?`<li><button type="button" class="os-leads-alert is-bad" data-fu="leads-pick" data-fu-stage="${esc(a.stage)}" data-fu-state="trabados">
+          <span><b>${esc(a.name)}</b> no sale ${a.days==null?'desde que existe':`hace ${int(a.days)} días`}</span>
+          <small>${esc(stageTitle(a.stage))}: ${int(a.pending)} leads esperándola · ${statesLine(a.states)}</small></button></li>`
+      :`<li><button type="button" class="os-leads-alert is-warn" data-fu="leads-pick" data-fu-stage="${esc(a.stage)}" data-fu-state="lista">
+          <span><b>${int(a.count)} ${a.count===1?'lista':'listas'} sin mandar</b> en ${esc(stageTitle(a.stage))}</span>
+          <small>La más vieja lleva ${int(a.oldest)} días lista y nadie la ejecutó.</small></button></li>`).join('');
+    const bar=(s)=>{const tot=s.count||0;return `<span class="os-leads-bar" aria-hidden="true">${F.LEAD_STATES.filter(k=>s.states[k]).map(k=>`<i class="${LEAD_TONE[k]}" style="width:${(s.states[k]/tot)*100}%"></i>`).join('')}</span>`;};
+    const cards=L.stages.map((s,i)=>{
+      const stuck=F.LEAD_STUCK.reduce((n,k)=>n+(s.states[k]||0),0);
+      const rules=(s.rules||[]).filter(r=>r.enabled).map(r=>`<li class="${alertRule(r.key)?'is-bad':''}"><span>${esc(r.name)}</span><small>${esc(lastTxt(r.lastSentAt))}</small></li>`).join('');
+      return `<button type="button" class="os-leads-stage ${s.key===pick.key?'is-on':''} ${(s.rules||[]).some(r=>alertRule(r.key))?'has-alert':''}" aria-pressed="${s.key===pick.key}" data-fu="leads-stage" data-fu-stage="${esc(s.key)}">
+        <span class="os-kicker">ETAPA ${i+1}</span><strong>${esc(s.title)}</strong>
+        <span class="os-leads-count">${int(s.count)}</span>${bar(s)}
+        <small>${s.count?statesLine(s.states):'Nadie en esta etapa'}</small>
+        ${i>0?`<small class="os-leads-progress">Ya: ${esc(L.stages[i-1].goal||'')} · Falta: ${esc(s.goal||'')}</small>`:''}
+        ${stuck?`<span class="os-leads-stuck">${int(stuck)} ${stuck===1?'trabado':'trabados'}</span>`:''}
+        ${rules?`<ul class="os-leads-rules" aria-label="Reglas de la etapa">${rules}</ul>`:''}
+      </button>`;}).join('');
+    const own=L.rows.filter(r=>r.stage===pick.key);
+    const shown=own.filter(r=>!filter||(filter==='trabados'?F.LEAD_STUCK.includes(r.state):r.state===filter))
+      .sort((a,b)=>F.LEAD_STATES.indexOf(a.state)-F.LEAD_STATES.indexOf(b.state)||(b.days||0)-(a.days||0));
+    const chips=[['','Todos',own.length],['trabados','Trabados',own.filter(r=>F.LEAD_STUCK.includes(r.state)).length],
+      ...F.LEAD_STATES.filter(k=>pick.states[k]).map(k=>[k,F.LEAD_STATE_LABEL[k],pick.states[k]])]
+      .map(([k,l,c])=>`<button type="button" class="btn small ${filter===k?'primary':''}" aria-pressed="${filter===k}" data-fu="leads-state" data-fu-state="${esc(k)}">${esc(l)} · ${int(c)}</button>`).join('');
+    const app=unitOf(scope)?.appUrl?new URL(unitOf(scope).appUrl).origin:'';
+    const idx=stageIdx(pick.key);
+    const action=(r)=>r.state==='lista'&&r.queued?`<button type="button" class="btn small primary" data-fu="claim" data-fu-key="${esc(r.key)}">Tomarla</button>`
+      :scope==='habita'&&r.state==='equipo'&&/^Pasada a/.test(r.reason)?`<button type="button" class="btn small" data-fu="leads-retake" data-fu-id="${esc(r.agencyId)}" data-fu-name="${esc(r.name)}">Retomar</button>`
+      :scope==='habita'&&app?`<a class="btn small" href="${esc(`${app}/admin/inmobiliarias/${r.agencyId}`)}" target="_blank" rel="noopener">Ver ficha</a>`:'';
+    const rows=shown.slice(0,200).map(r=>`<tr data-lead="${esc(r.agencyId)}">
+      <th scope="row">${esc(r.name)}${r.days!=null?`<small>${esc(F.LEAD_STATE_LABEL[r.state])} ${esc(daysTxt(r.days))}</small>`:''}</th>
+      <td><span class="os-leads-pill ${LEAD_TONE[r.state]}">${esc(r.state==='equipo'&&r.who?`Esperando a ${r.who}`:F.LEAD_STATE_LABEL[r.state])}</span></td>
+      <td>${esc(r.reason||'')}</td>
+      <td>${esc(sit(r.situation))}</td>
+      <td>${idx>0?`${esc(L.stages[idx-1].goal||'')} ✓<br><small>falta ${esc(pick.goal||'')}</small>`:'<small>Sin contactar</small>'}</td>
+      <td>${r.lastRule?`${esc(r.lastRule.label)}<br><small>${esc(lastTxt(r.lastRule.at))}${r.lastRule.stage!==r.stage?` · en ${esc(stageTitle(r.lastRule.stage))}`:''}</small>`:L.complete?'<small>Ninguna todavía</small>':'<small>—</small>'}</td>
+      <td>${esc(r.next||'—')}</td>
+      <td>${action(r)}</td></tr>`).join('');
+    return `<section class="hero"><div><span class="eyebrow">${esc(fuName(scope).toUpperCase())} / LEADS</span><h1>Dónde está cada lead hoy.</h1>
+      <p>Cuántos hay en cada etapa, en qué estado de la cola están, por qué no salen y qué reglas activas dejaron de ejecutarse.</p></div></section>
+      ${L.complete?'':`<div class="notice glass" role="status"><span class="badge off">PARCIAL</span><span>${esc(fuName(scope))} todavía no manda la lista completa de leads: se ven solo los pendientes de la cola, sin días en el estado ni la última regla ejecutada.</span></div>`}
+      ${alerts?`<section class="card glass os-leads-alerts" data-testid="leads-alerts" aria-labelledby="leads-alerts-h"><h2 id="leads-alerts-h">Para revisar</h2><ul>${alerts}</ul></section>`:L.complete?`<div class="notice glass" role="status" data-testid="leads-alerts-ok"><span class="badge">OK</span><span>Todas las reglas activas con leads salieron en los últimos ${int(L.staleDays)} días.</span></div>`:''}
+      <div class="os-leads-legend" aria-label="Estados">${['lista','programada','equipo','bloqueada','hecha'].map(k=>`<span><i class="${LEAD_TONE[k]}"></i>${esc(F.LEAD_STATE_LABEL[k])}</span>`).join('')}</div>
+      <div class="os-leads-stages" data-testid="leads-stages">${cards}</div>
+      <section class="card glass os-leads-detail" data-testid="leads-detail" aria-labelledby="leads-detail-h">
+        <div class="os-leads-detail-head"><div><span class="os-kicker">DETALLE</span><h2 id="leads-detail-h">${esc(pick.title)} · ${int(pick.count)}</h2></div><div class="btns">${chips}</div></div>
+        ${shown.length?`<div class="os-leads-table"><table><thead><tr><th scope="col">${esc(scope==='turnia'?'Consultorio':'Inmobiliaria')}</th><th scope="col">Estado</th><th scope="col">Por qué</th><th scope="col">Situación</th><th scope="col">Avance</th><th scope="col">Última regla ejecutada</th><th scope="col">Próxima acción</th><th scope="col"><span class="sr">Acción</span></th></tr></thead><tbody>${rows}</tbody></table></div>${shown.length>200?`<p class="sub">Se muestran 200 de ${int(shown.length)}.</p>`:''}`:'<p class="sub">No hay leads con ese filtro.</p>'}
+      </section>`;
+  }
 
   function fuPipeline() {
   const n=state.fu.n, scope=fuScope();
@@ -4847,6 +4916,13 @@
       }
       case 'funnel-reset':state.fu.chartFocus=null;render();break;
       case 'funnel-review-more':state.fu.funnelReviewLimit=(state.fu.funnelReviewLimit||80)+80;render();break;
+      case 'leads-stage': state.fu.leadsStage = ds.fuStage; state.fu.leadsState = ''; render(); break;
+      case 'leads-state': state.fu.leadsState = ds.fuState || ''; render(); break;
+      case 'leads-pick': state.fu.leadsStage = ds.fuStage; state.fu.leadsState = ds.fuState || ''; render(); document.querySelector('[data-testid="leads-detail"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); break;
+      case 'leads-retake': {
+        if (await fuOp(state.unit, { op: 'handoff', inmobiliaria: ds.fuId, para: null }, { label: `${ds.fuName || 'La inmobiliaria'} volvió a la cola.` })) loadFollowup();
+        break;
+      }
       case 'pipeline-stage': state.fu.pipelineStage = ds.fuStage; state.fu.technicalStage = null; state.fu.pipelineSituation=null;render(); break;
       case 'pipeline-technical': state.fu.technicalStage = ds.fuStage || null; render(); break;
       case 'pipeline-situation': state.fu.pipelineSituation=ds.fuSituation||null;render();break;
