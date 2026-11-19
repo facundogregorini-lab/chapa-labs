@@ -67,6 +67,9 @@
       since: (q.lastAction && q.lastAction.at) || q.lastContactAt || q.since || '',
       lastText: (q.lastAction && q.lastAction.text) || '',
       blocked: q.blocked || null,
+      // habita.: para quién es cuando lo único que la frena es ser de una persona (pasada a Facu o
+      // Axel, o con una respuesta para Facu). Esa persona la ejecuta; la extensión no.
+      heldFor: q.heldFor || null,
       dueAt: q.dueAt || null,
       snoozedUntil: q.snoozedUntil || null,
       claim: live(q.claim, now) ? { by: q.claim.by, until: q.claim.until } : null,
