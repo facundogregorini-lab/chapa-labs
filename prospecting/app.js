@@ -4236,7 +4236,9 @@
   const filled=fillCandidate(body,sample)
     .replaceAll('{{inmobiliaria}}',name).replaceAll('{{destinatario}}',name)
     .replaceAll('{{decisor}}',person).replaceAll('{{sdr}}','vos')
-    .replaceAll('{{demo}}','[link a demo]').replaceAll('{{panel}}','[link a panel]');
+    .replaceAll('{{demo}}','[link a demo]').replaceAll('{{panel}}','[link a panel]')
+    // {{precargas}}: en el envío, su línea solo va si las 2 propiedades ya están en su panel (si no, no se manda).
+    .replace(/\{\{\s*precargas\s*\}\}/g,'2 de sus propiedades [solo si están en su panel]');
   const bubbles=filled.split(/(?:\r?\n)\s*---\s*(?:\r?\n)/).filter(Boolean);
   return `<aside class="fu-ref-wa-preview" data-testid="followup-preview">
     <h3>◉ VISTA PREVIA EN WHATSAPP</h3>
