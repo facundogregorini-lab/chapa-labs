@@ -86,6 +86,8 @@
   }
 
   const unitRequests = new Map();
+  // Cuándo se pidió por última vez cada unidad (para no releerla en cada vuelta a la pestaña).
+  const unitLoadedAt = {};
   async function loadUnit(id, { quiet, noSync } = {}) {
     if (state.demo) {
       state.data[id] = window.ProspectingFixture.build(unitOf(id));
@@ -93,6 +95,7 @@
     }
     if (unitRequests.has(id)) return unitRequests.get(id);
     if (!quiet) state.data[id] = { loading: true };
+    unitLoadedAt[id] = Date.now();
     const work = (async () => {
       try {
         const d = await api('data', { query: { unit: id } });
@@ -2697,6 +2700,12 @@
     return (fuCounts[scope] = F.filter(state.fu.n.queue, { unit: scope }).filter((x) => !x.claim).length);
   }
 
+  // Cada cuánto se relee la cola sola (con la pestaña a la vista). Antes era cada minuto: unas 380
+  // lecturas por día del tablero de habita., que sale entero de Supabase en cada una.
+  const FU_REFRESH_MS = 5 * 60_000;
+  /** Pasaron 5 minutos desde el último pedido de la cola (bien o mal: un error no se reintenta cada 30 s). */
+  function fuStale() { return Date.now() - (state.fu.triedAt || 0) >= FU_REFRESH_MS; }
+
   async function loadFollowup({ quiet, scope: only } = {}) {
     if (state.demo) { state.fu.n = F.normalize({}); state.fu.raw = { units: {} }; return; }
     if (!state.session || !state.session.user) return;
@@ -2716,6 +2725,7 @@
       state.fu.loadedAt = {};
     }
     state.fu.periodSignature = signature;
+    if (!only) state.fu.triedAt = Date.now();
     state.fu.loading = true;
     state.fu.requestedScope = scope;
     state.fu.requestedPeriod = signature;
@@ -2729,7 +2739,7 @@
       } });
       const now = Date.now();
       const prior = Object.fromEntries(Object.entries(state.fu.raw?.units || {})
-        .filter(([id, snap]) => snap && !snap.error && now - (state.fu.loadedAt[id] || 0) < 4 * 60_000));
+        .filter(([id, snap]) => snap && !snap.error && now - (state.fu.loadedAt[id] || 0) < FU_REFRESH_MS + 60_000));
       const combined = F.mergeUnits(prior, response.units);
       for (const [id, snap] of Object.entries(response.units || {}))
         if (snap && !snap.error && !snap.__freshness?.stale) state.fu.loadedAt[id] = now;
@@ -2755,12 +2765,12 @@
     }
   }
   // Pasar de habita. a Turnia (o al revés) sin «Cargando»: con uno a la vista, el otro se trae en segundo
-  // plano y se mantiene fresco (menos de 3 minutos), así el cambio muestra sus datos al instante.
+  // plano y se mantiene fresco (menos de 5 minutos, lo mismo que la cola), así el cambio muestra sus datos al instante.
   function fuPrefetchOther(scope) {
     if (state.demo || state.fu.loading || !['habita','turnia'].includes(scope)) return;
     const other = scope === 'habita' ? 'turnia' : 'habita';
     if (!units().some((u) => u.id === other)) return;
-    if (state.fu.n?.units?.[other] && Date.now() - (state.fu.loadedAt[other] || 0) < 3 * 60_000) return;
+    if (state.fu.n?.units?.[other] && Date.now() - (state.fu.loadedAt[other] || 0) < FU_REFRESH_MS) return;
     void loadFollowup({ quiet: true, scope: other });
   }
   function renderTopOnly() { renderTop(); requestAnimationFrame(() => document.querySelectorAll('.seg').forEach(moveThumb)); }
@@ -5660,10 +5670,12 @@
     clearTimeout(e.target._t);
     e.target._t = setTimeout(() => { const pos = e.target.selectionStart; render(); const s = $('[data-fu-search]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); } }, 200);
   });
-  // La cola se relee cada minuto mientras se mira (así se ve lo que toma la otra persona).
+  // La cola se relee cada 5 minutos, y solo con la pestaña a la vista (así se ve lo que toma la
+  // otra persona sin gastar el egreso de Supabase de habita.: cada lectura recalcula el tablero).
+  // Las acciones (tomar, confirmar…) la releen al momento; «↻ Actualizar» también.
   setInterval(() => {
-    if (document.visibilityState === 'visible' && isFu() && !state.fu.task && !state.fu.busy && !state.demo) loadFollowup({ quiet: true });
-  }, 60000);
+    if (document.visibilityState === 'visible' && isFu() && !state.fu.task && !state.fu.busy && !state.demo && fuStale()) loadFollowup({ quiet: true });
+  }, 30_000);
 
 
   // Igual que Habita: prioridad drag & drop (con flechas accesibles como alternativa).
@@ -6223,12 +6235,13 @@
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && !state.demo && state.session && state.session.user && !state.drawer && !state.pending) {
+      // Al volver a la pestaña se relee solo si lo que se ve tiene 5 minutos o más.
       if (isFu()) {
-        if (!state.fu.task) loadFollowup({ quiet: true });
+        if (!state.fu.task && fuStale()) loadFollowup({ quiet: true });
       } else if (state.view==='script') {
         const x=state.scripts[state.unit];
         if(x && state.scriptDrafts[state.unit]===(x.body||''))loadScript(state.unit,{quiet:true});
-      } else if (state.unit !== 'todas') {
+      } else if (state.unit !== 'todas' && Date.now() - (unitLoadedAt[state.unit] || 0) >= FU_REFRESH_MS) {
         loadUnit(state.unit, { quiet: true }).then(render);
       }
     }
