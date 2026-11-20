@@ -152,7 +152,7 @@ Implementación:
 - `/prospecting` y `?vista=pipeline|prospectos|secuencias|rendimiento|resumen`.
 - `/prospecting/turnia?vista=followup` y su equivalente para habita.
 
-**Comportamiento:** la cola se relee cada minuto mientras está a la vista, salvo con una tarea abierta.
+**Comportamiento:** la cola se relee sola cada 5 minutos, solo con la pestaña a la vista y salvo con una tarea abierta; al volver a la pestaña se relee solo si lo que se ve tiene 5 minutos o más. Las acciones (tomar, confirmar…) y «↻ Actualizar» la releen al momento. Antes era cada minuto (unas 380 lecturas por día): cada una recalcula el tablero de habita. en Supabase, así que pesaba directo en su egreso (20/11/2026; del lado de habita., lecturas incrementales y caché en amoblaia, ver su `docs/FOLLOWUP.md`).
 
 ## Cómo probar
 
