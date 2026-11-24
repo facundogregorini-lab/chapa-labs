@@ -30,8 +30,7 @@
     <section class="voice-rules" data-connection aria-labelledby="voice-connection-title" hidden>
       <h3 id="voice-connection-title">Conexión de WhatsApp · 5483</h3>
       <p role="status" data-connection-status></p>
-      <img width="240" height="240" data-connection-qr alt="Código QR para vincular el WhatsApp Business del 5483" hidden>
-      <button class="btn small" type="button" data-reconnect hidden>Generar QR</button>
+      <p class="sub">Chapa solo consulta el estado. Las reconexiones se revisan manualmente fuera del panel. Si WhatsApp muestra una suspensión, solicitá revisión en la aplicación antes de intentar vincular de nuevo.</p>
     </section>
     <section class="voice-rules" aria-labelledby="voice-rules-title">
       <h3 id="voice-rules-title">Reglas de envío</h3>
@@ -143,8 +142,6 @@
   let draftUrl;
   let previewUrl;
   let connectionTimer;
-  let connectionBusy = false;
-  let connectionTried = false;
 
   function message(text) { el('status').textContent = text; }
 
@@ -360,8 +357,6 @@
   function clearConnection() {
     clearTimeout(connectionTimer);
     el('connection').hidden = true;
-    el('connection-qr').hidden = true;
-    el('connection-qr').removeAttribute('src');
   }
 
   function canWatchConnection() {
@@ -373,29 +368,14 @@
     if (canWatchConnection()) connectionTimer = setTimeout(checkConnection, delay);
   }
 
-  async function reconnect(relink) {
-    connectionTried = true;
-    connectionBusy = true;
-    el('reconnect').hidden = true;
-    el('connection-status').textContent = relink ? 'Preparando una vinculación nueva…' : 'Intentando recuperar la conexión…';
-    try {
-      await request({ body: { action: 'reconnect', relink } });
-    } catch (error) {
-      if (canWatchConnection()) el('connection-status').textContent = error.message;
-    } finally {
-      connectionBusy = false;
-      watchConnection(2500);
-    }
-  }
-
   async function checkConnection() {
     if (!canWatchConnection()) return;
-    if (connectionBusy || busy || running || reviewing || recorder || document.hidden) {
+    if (busy || running || reviewing || recorder || document.hidden) {
       watchConnection(5000);
       return;
     }
     const id = generation;
-    let delay = 15000;
+    const delay = 15000;
     try {
       const channel = await request({ query: { view: 'connection' } });
       if (id !== generation || !canWatchConnection()) return;
@@ -408,36 +388,20 @@
           : `El WhatsApp ${initialSender} necesita conexión.`);
       }
       if (channel.ready) {
-        connectionTried = false;
         clearConnection();
         watchConnection(delay);
         return;
       }
       el('connection').hidden = false;
-      const image = el('connection-qr');
-      const qr = channel.status === 'SCAN_QR_CODE' && channel.qr;
-      image.hidden = !qr;
-      if (qr) {
-        const src = 'data:image/png;base64,' + qr;
-        if (image.getAttribute('src') !== src) image.src = src;
-      } else image.removeAttribute('src');
-      const retry = el('reconnect');
-      retry.hidden = channel.status !== 'FAILED';
-      retry.dataset.relink = String(Boolean(channel.hasAccount));
-      retry.textContent = channel.hasAccount ? 'Volver a vincular' : 'Generar otro QR';
-      if (channel.status === 'FAILED' && !connectionTried) {
-        await reconnect(false);
-        return;
-      }
       const labels = {
-        FAILED: channel.hasAccount ? 'La sesión no se pudo recuperar. Volvé a vincular el 5483 para obtener un QR.' : 'El QR venció. Generá uno nuevo cuando tengas el teléfono a mano.',
+        FAILED: 'El 5483 está desconectado. Este estado no indica la causa: revisá el aviso de WhatsApp Business en el teléfono. Chapa no intentará reconectarlo.',
         STARTING: 'WAHA está iniciando la sesión…',
-        SCAN_QR_CODE: qr ? 'En el WhatsApp Business del 5483, abrí Dispositivos vinculados → Vincular dispositivo y escaneá el QR.' : 'Esperando el próximo QR de WAHA…',
+        SCAN_QR_CODE: 'El 5483 espera una vinculación. Revisá primero que WhatsApp Business permita usar la cuenta; Chapa no genera ni muestra nuevos QR.',
+        STOPPED: 'La sesión del 5483 está detenida. Chapa no la inicia automáticamente.',
         WRONG_NUMBER: 'WAHA tiene otro número vinculado. Revisá el servidor del 5483.',
       };
       const status = labels[channel.status] || 'El 5483 no está disponible. Revisá la sesión en WAHA.';
       if (el('connection-status').textContent !== status) el('connection-status').textContent = status;
-      if (channel.status === 'STARTING' || channel.status === 'SCAN_QR_CODE') delay = 3000;
     } catch {
       if (id !== generation || !canWatchConnection()) return;
       clearConnection();
@@ -522,12 +486,6 @@
     controls();
     adjustAfterSend = false;
     if (recorder?.state === 'recording') recorder.stop();
-  });
-  el('reconnect').addEventListener('click', () => {
-    if (!canWatchConnection() || busy || running || reviewing || connectionBusy) return;
-    const relink = el('reconnect').dataset.relink === 'true';
-    if (relink && !window.confirm('¿Querés reemplazar la vinculación del 5483? Vas a escanear un QR nuevo con ese teléfono.')) return;
-    reconnect(relink);
   });
   el('authorize').addEventListener('click', () => {
     popup = window.open(origin + '/panel/prospeccion/audio/acceso', '_blank', 'popup,width=540,height=650');

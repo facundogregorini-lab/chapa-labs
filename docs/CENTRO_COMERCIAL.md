@@ -1,5 +1,11 @@
 # Centro comercial: Chapa Labs + habita. + Turnia
 
+## Protección de la conexión de Turnia — 24/11/2026
+
+Ante una suspensión informada del WhatsApp de prospección, «Audios y mensajes» deja de reiniciar una sesión cuando detecta `FAILED`. Ese estado no identifica la causa y no debe tratarse como un QR vencido. El diálogo consulta el estado cada 15 segundos, sin botones de recuperación ni QR. Turnia también bloquea `action: reconnect` con HTTP 423 para proteger las pestañas que todavía tengan el código anterior.
+
+La recuperación de una cuenta se revisa manualmente fuera de Chapa, después de comprobar el aviso y, si corresponde, el resultado de la revisión en WhatsApp Business. Este arreglo no reinicia, desvincula ni actualiza instancias WAHA. No se confirmó que el intento automático haya causado la suspensión. Habita. no usa este circuito de WAHA y conserva su funcionamiento.
+
 ## Fuente de interacción actualizada: Habita 2a067b1 (09/11/2026)
 
 La fuente de verdad del diseño de interacción es `axellaban/amoblaia` `main` a commit `2a067b11298e9f36bb074d7245c312f2ac23b5e7`, verificado contra `4917aa7` (6 commits). Cualquier actualización posterior exige reconsultar esa fuente antes de afirmar paridad.
