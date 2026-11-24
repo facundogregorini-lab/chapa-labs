@@ -1,5 +1,7 @@
 # Prospección (`/prospecting`)
 
+**Conexión del WhatsApp de Turnia (24/11/2026):** «Audios y mensajes» solo consulta el estado del emisor. No reinicia ni desvincula sesiones ni ofrece QR. Un `FAILED` requiere revisar primero el aviso de WhatsApp Business en el teléfono; no implica por sí solo que haya vencido una vinculación. La API de Turnia también rechaza las solicitudes antiguas de reconexión.
+
 Actualizado: 03/11/2026. La operación comercial de Turnia y habita. en un solo panel: un **panel base** con el motor, la forma de medir y la interfaz, y encima **un panel por unidad** con su ICP, su propuesta de valor, sus plantillas y su cadencia. Una mejora al panel base llega a las dos; lo propio de cada una vive en `prospecting/units.js`.
 
 - `/prospecting`: resumen de todas las unidades (embudos lado a lado, contactos por día, lo que pasa en el producto).
